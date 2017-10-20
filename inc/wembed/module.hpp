@@ -1,0 +1,185 @@
+#pragma once
+
+#include <ostream>
+#include <string_view>
+#include <unordered_map>
+#include <vector>
+
+#include <boost/endian/conversion.hpp>
+
+#include <llvm-c/Core.h>
+
+#include "lang.hpp"
+
+namespace wembed {
+
+  class module {
+    friend class context;
+  public:
+    module(uint8_t *pInput, size_t pLen);
+    virtual ~module();
+
+    void dump_ll(std::ostream &os);
+
+  protected:
+    uint8_t *mCurrent, *mEnd;
+    size_t mImportFuncOffset = 0;
+    size_t mUnreachableDepth = 0;
+
+    LLVMModuleRef mModule;
+    LLVMBuilderRef mBuilder;
+    std::vector<memory_type> mMemoryTypes;
+    LLVMValueRef mBaseMemory = nullptr;
+    LLVMValueRef mContextRef;
+    struct Table {
+      table_type mType;
+      LLVMValueRef mGlobal;
+    };
+    std::vector<Table> mTables;
+    LLVMValueRef mStartFunc;
+    LLVMBasicBlockRef mStartContinue;
+    LLVMValueRef mMemCpy,
+        mCtlz_i32, mCtlz_i64, mCttz_i32, mCttz_i64, mCtpop_i32, mCtpop_i64,
+        mSqrt_f32, mSqrt_f64, mCeil_f32, mCeil_f64, mFloor_f32, mFloor_f64,
+        mTrunc_f32, mTrunc_f64, mNearest_f32, mNearest_f64,
+        mAbs_f32, mAbs_f64, mMin_f32, mMin_f64, mMax_f32, mMax_f64,
+        mCopysign_f32, mCopysign_f64, mGrowMemory, mCurrentMemory;
+    std::vector<LLVMValueRef> mEvalStack;
+    enum CFInstr {
+      cf_function, cf_block, cf_if, cf_else, cf_loop
+    };
+    struct CFEntry {
+      CFInstr mInstr;
+      LLVMTypeRef mSignature;
+      LLVMBasicBlockRef mEnd;
+      LLVMValueRef mPhi;
+      LLVMBasicBlockRef mElse;
+      size_t mOuterStackSize;
+      size_t mOuterBlockDepth;
+      bool mReachable;
+      bool mElseReachable;
+    };
+    std::vector<CFEntry> mCFEntries;
+    struct BlockEntry {
+      LLVMTypeRef mSignature;
+      LLVMBasicBlockRef mBlock;
+      LLVMValueRef mPhi;
+    };
+    std::vector<BlockEntry> mBlockEntries;
+
+    std::vector<LLVMTypeRef> mTypes;
+    std::vector<LLVMValueRef> mFunctions;
+    std::vector<LLVMValueRef> mGlobals;
+
+    struct export_t {
+      external_kind mKind;
+      LLVMValueRef mValue;
+      export_t(external_kind pKind, LLVMValueRef pValue) : mKind(pKind), mValue(pValue) {}
+    };
+    std::unordered_map<std::string_view, export_t> mExports;
+
+    void pushCFEntry(CFInstr pInstr, LLVMTypeRef pType, LLVMBasicBlockRef pEnd, LLVMValueRef pPhi,
+                     LLVMBasicBlockRef pElse = nullptr);
+    void pushBlockEntry(LLVMTypeRef pType, LLVMBasicBlockRef pBlock, LLVMValueRef pPhi);
+    const BlockEntry &branch_depth(size_t pDepth);
+    LLVMValueRef top();
+    void push(LLVMValueRef lVal);
+    LLVMValueRef pop();
+    LLVMValueRef pop(LLVMTypeRef pDesired);
+
+    template<typename T> T parse() {
+      T lResult = *reinterpret_cast<T*>(mCurrent);
+      mCurrent += sizeof(T);
+      return boost::endian::little_to_native(lResult);
+    }
+
+    std::string_view parse_str(size_t pSize);
+
+    template<typename T> T parse_uleb128() {
+      T lResult = 0;
+      size_t lShift = 0;
+      uint8_t lByte;
+      do {
+        lByte = *mCurrent++;
+        lResult |= T(lByte & (uint8_t) 0x7f) << lShift;
+        lShift += 7;
+      } while (lByte & 0x80);
+      return boost::endian::little_to_native(lResult);
+    }
+
+    template<typename T> T parse_sleb128() {
+      T lResult = 0;
+      size_t lShift = 0;
+      uint8_t lByte;
+      do {
+        lByte = *mCurrent++;
+        lResult |= T(lByte & (uint8_t) 0x7f) << lShift;
+        lShift += 7;
+      } while (lByte & 0x80);
+      const size_t lSize = sizeof(T) * 8;
+      if ((lShift < lSize) && (lByte & 0x40))
+        lResult |= - (1 << lShift);
+      return boost::endian::little_to_native(lResult);
+    }
+
+    elem_type parse_elem_type();
+    resizable_limits parse_resizable_limits();
+    table_type parse_table_type();
+    external_kind parse_external_kind();
+
+    void parse_sections();
+    void parse_custom_section(const std::string_view &pName, size_t pInternalSize);
+    void parse_names(size_t pInternalSize);
+
+    LLVMValueRef get_const(bool value) { return LLVMConstInt(LLVMInt1Type(), ull_t(value), false); }
+    LLVMValueRef get_const(int32_t value) { return LLVMConstInt(LLVMInt32Type(), ull_t(value), true); }
+    LLVMValueRef get_const(int64_t value) { return LLVMConstInt(LLVMInt64Type(), ull_t(value), true); }
+    LLVMValueRef get_const(uint32_t value) { return LLVMConstInt(LLVMInt32Type(), ull_t(value), false); }
+    LLVMValueRef get_const(uint64_t value) { return LLVMConstInt(LLVMInt64Type(), ull_t(value), false); }
+    LLVMValueRef get_const(float value) { return LLVMConstReal(LLVMFloatType(), value); }
+    LLVMValueRef get_const(double value) { return LLVMConstReal(LLVMDoubleType(), value); }
+    LLVMValueRef get_zero(LLVMTypeRef pType);
+
+    uint8_t bit_count(LLVMTypeRef pType);
+
+    LLVMValueRef emit_shift_mask(LLVMTypeRef pType, LLVMValueRef pCount) ;
+    LLVMValueRef emit_rotl(LLVMTypeRef pType, LLVMValueRef pLHS, LLVMValueRef pRHS);
+    LLVMValueRef emit_rotr(LLVMTypeRef pType, LLVMValueRef pLHS, LLVMValueRef pRHS);
+    LLVMValueRef emit_srem(LLVMTypeRef pType, LLVMValueRef lFunc, LLVMValueRef pLHS, LLVMValueRef pRHS);
+
+    LLVMTypeRef parse_llvm_btype();
+    LLVMTypeRef parse_llvm_vtype();
+    LLVMValueRef parse_llvm_init();
+
+    void init_intrinsics();
+
+    LLVMValueRef i32_to_bool(LLVMValueRef i32);
+    LLVMValueRef bool_to_i32(LLVMValueRef b);
+
+    LLVMValueRef create_phi(LLVMTypeRef pType, LLVMBasicBlockRef pBlock);
+    LLVMValueRef get_intrinsic(const std::string &pName, LLVMTypeRef pReturnType,
+                               const std::initializer_list<LLVMTypeRef> &pArgTypes);
+    LLVMValueRef call_intrinsic(LLVMValueRef pIntrinsic, const std::initializer_list<LLVMValueRef> &pArgs);
+
+    LLVMValueRef clear_nan(LLVMValueRef pInput);
+    LLVMValueRef clear_nan_internal(LLVMTypeRef pInputType, LLVMTypeRef pIntType, LLVMValueRef pInput,
+                            LLVMValueRef pConstMaskSignificand, LLVMValueRef pConstMaskExponent,
+                            LLVMValueRef pConstNanBit);
+
+    void parse_types();
+    void parse_imports();
+    void parse_functions();
+    void parse_section_table(uint32_t pSectionSize);
+    void parse_section_memory(uint32_t pSectionSize);
+    void parse_globals();
+    void parse_exports();
+    void parse_section_start(uint32_t pSectionSize);
+    void parse_section_element(uint32_t pSectionSize);
+    void skip_unreachable(uint8_t *pPastEnd);
+    void parse_section_code(uint32_t pSectionSize);
+    void parse_section_data(uint32_t pSectionSize);
+
+    void finalize();
+  };  // class module
+
+}  // namespace wembed
