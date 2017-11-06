@@ -170,8 +170,8 @@ namespace wembed {
     LLVMValueRef bool_to_i32(LLVMValueRef b);
 
     LLVMValueRef create_phi(LLVMTypeRef pType, LLVMBasicBlockRef pBlock);
-    LLVMValueRef get_intrinsic(const std::string &pName, LLVMTypeRef pReturnType,
-                               const std::initializer_list<LLVMTypeRef> &pArgTypes);
+    LLVMValueRef init_intrinsic(const std::string &pName, LLVMTypeRef pReturnType,
+                                const std::initializer_list<LLVMTypeRef> &pArgTypes);
     LLVMValueRef call_intrinsic(LLVMValueRef pIntrinsic, const std::initializer_list<LLVMValueRef> &pArgs);
 
     LLVMValueRef clear_nan(LLVMValueRef pInput);

@@ -390,7 +390,7 @@ protected:
 
         regex lHexReplacer("\\\\([0-9a-fA-F][0-9a-fA-F])");
         for (auto &lFragment : lCodeFragments)
-          pOutput << "    " << std::regex_replace(string(lFragment.mView), lHexReplacer, "\\x$1") << "\n";
+          pOutput << "    " << std::regex_replace(string(lFragment.mView), lHexReplacer, "\\u00$1") << "\n";
         pOutput << ";\n  // Expected error: " << lError.mView << "\n"
                 << "  EXPECT_THROW(wembed::module((uint8_t*)lMalformedBin.data(), lMalformedBin.size()),"
                 << "malformed_exception);\n";

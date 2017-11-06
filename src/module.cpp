@@ -18,6 +18,9 @@ namespace wembed {
     mCurrent = pInput;
     mEnd = pInput + pLen;
 
+    if (parse<uint32_t>() != 0x6d736100)
+      throw malformed_exception("unexpected magic code");
+
     LLVMTypeRef lVoidFuncT = LLVMFunctionType(LLVMVoidType(), nullptr, 0, false);
     mModule = LLVMModuleCreateWithName("module");
     mBaseMemory = LLVMAddGlobal(mModule, LLVMInt8Type(), "baseMemory");
@@ -26,17 +29,20 @@ namespace wembed {
     mStartFunc = LLVMAddFunction(mModule, "__start", lVoidFuncT);
     mStartContinue = LLVMAppendBasicBlock(mStartFunc, "fContinue");
     LLVMPositionBuilderAtEnd(mBuilder, mStartContinue);
-
-    if (parse<uint32_t>() != 0x6d736100)
-      throw malformed_exception("unexpected magic code");
-
     init_intrinsics();
-    switch(parse<uint32_t>()) { // version
-      case 1: parse_sections(); break;
-      default: throw malformed_exception("unexpected version");
-    }
 
-    finalize();
+    try {
+      switch(parse<uint32_t>()) { // version
+        case 1: parse_sections(); break;
+        default: throw malformed_exception("unexpected version");
+      }
+      finalize();
+    }
+    catch (...) {
+      LLVMDisposeBuilder(mBuilder);
+      LLVMDisposeModule(mModule);
+      throw;
+    }
   }
 
   module::~module() {
@@ -119,9 +125,9 @@ namespace wembed {
     return lVal;
   }
 
-  LLVMValueRef module::get_intrinsic(const std::string &pName,
-                             LLVMTypeRef pReturnType,
-                             const std::initializer_list<LLVMTypeRef> &pArgTypes) {
+  LLVMValueRef module::init_intrinsic(const std::string &pName,
+                                      LLVMTypeRef pReturnType,
+                                      const std::initializer_list<LLVMTypeRef> &pArgTypes) {
 
     LLVMTypeRef *lArgTypes = const_cast<LLVMTypeRef*>(pArgTypes.begin());
     LLVMTypeRef lType = LLVMFunctionType(pReturnType, lArgTypes, pArgTypes.size(), false);
@@ -134,7 +140,7 @@ namespace wembed {
   }
 
   void module::init_intrinsics() {
-    mMemCpy = get_intrinsic("llvm.memcpy.p0i8.p0i8.i32", LLVMVoidType(), {
+    mMemCpy = init_intrinsic("llvm.memcpy.p0i8.p0i8.i32", LLVMVoidType(), {
         LLVMPointerType(LLVMInt8Type(), 0), // dest
         LLVMPointerType(LLVMInt8Type(), 0), // src
         LLVMInt32Type(), // len
@@ -142,41 +148,41 @@ namespace wembed {
         LLVMInt1Type() // volatile
     });
 
-    mCtlz_i32 = get_intrinsic("llvm.ctlz.i32", LLVMInt32Type(), {
+    mCtlz_i32 = init_intrinsic("llvm.ctlz.i32", LLVMInt32Type(), {
         LLVMInt32Type(), // src
         LLVMInt1Type() // is_zero_undef
     });
-    mCtlz_i64 = get_intrinsic("llvm.ctlz.i64", LLVMInt64Type(), {
+    mCtlz_i64 = init_intrinsic("llvm.ctlz.i64", LLVMInt64Type(), {
         LLVMInt64Type(), // src
         LLVMInt1Type() // is_zero_undef
     });
 
-    mCttz_i32 = get_intrinsic("llvm.cttz.i32", LLVMInt32Type(), {
+    mCttz_i32 = init_intrinsic("llvm.cttz.i32", LLVMInt32Type(), {
         LLVMInt32Type(), // src
         LLVMInt1Type() // is_zero_undef
     });
-    mCttz_i64 = get_intrinsic("llvm.cttz.i64", LLVMInt64Type(), {
+    mCttz_i64 = init_intrinsic("llvm.cttz.i64", LLVMInt64Type(), {
         LLVMInt64Type(), // src
         LLVMInt1Type() // is_zero_undef
     });
 
-    mGrowMemory = get_intrinsic("wembed.grow_memory.i32", LLVMInt32Type(), {
+    mGrowMemory = init_intrinsic("wembed.grow_memory.i32", LLVMInt32Type(), {
         LLVMPointerType(LLVMInt8Type(), 0),
         LLVMInt32Type()
     });
-    mCurrentMemory = get_intrinsic("wembed.current_memory.i32", LLVMInt32Type(), {
+    mCurrentMemory = init_intrinsic("wembed.current_memory.i32", LLVMInt32Type(), {
         LLVMPointerType(LLVMInt8Type(), 0)
     });
 
-    mCtpop_i32 = get_intrinsic("llvm.ctpop.i32", LLVMInt32Type(), {LLVMInt32Type()});
-    mCtpop_i64 = get_intrinsic("llvm.ctpop.i64", LLVMInt64Type(), {LLVMInt64Type()});
+    mCtpop_i32 = init_intrinsic("llvm.ctpop.i32", LLVMInt32Type(), {LLVMInt32Type()});
+    mCtpop_i64 = init_intrinsic("llvm.ctpop.i64", LLVMInt64Type(), {LLVMInt64Type()});
 
-    mSqrt_f32 = get_intrinsic("llvm.sqrt.f32", LLVMFloatType(), {LLVMFloatType()});
-    mSqrt_f64 = get_intrinsic("llvm.sqrt.f64", LLVMDoubleType(), {LLVMDoubleType()});
-    mAbs_f32 = get_intrinsic("llvm.fabs.f32", LLVMFloatType(), {LLVMFloatType()});
-    mAbs_f64 = get_intrinsic("llvm.fabs.f64", LLVMDoubleType(), {LLVMDoubleType()});
-    mCopysign_f32 = get_intrinsic("llvm.copysign.f32", LLVMFloatType(), {LLVMFloatType(), LLVMFloatType()});
-    mCopysign_f64 = get_intrinsic("llvm.copysign.f64", LLVMDoubleType(), {LLVMDoubleType(), LLVMDoubleType()});
+    mSqrt_f32 = init_intrinsic("llvm.sqrt.f32", LLVMFloatType(), {LLVMFloatType()});
+    mSqrt_f64 = init_intrinsic("llvm.sqrt.f64", LLVMDoubleType(), {LLVMDoubleType()});
+    mAbs_f32 = init_intrinsic("llvm.fabs.f32", LLVMFloatType(), {LLVMFloatType()});
+    mAbs_f64 = init_intrinsic("llvm.fabs.f64", LLVMDoubleType(), {LLVMDoubleType()});
+    mCopysign_f32 = init_intrinsic("llvm.copysign.f32", LLVMFloatType(), {LLVMFloatType(), LLVMFloatType()});
+    mCopysign_f64 = init_intrinsic("llvm.copysign.f64", LLVMDoubleType(), {LLVMDoubleType(), LLVMDoubleType()});
 
   #ifdef WEMBED_FAST_MATH
       mCeil_f32 = get_intrinsic("llvm.ceil.f32", LLVMFloatType(), {LLVMFloatType()});
@@ -192,18 +198,18 @@ namespace wembed {
       mMax_f32 = get_intrinsic("llvm.maxnum.f32", LLVMFloatType(), {LLVMFloatType(), LLVMFloatType()});
       mMax_f64 = get_intrinsic("llvm.maxnum.f64", LLVMDoubleType(), {LLVMDoubleType(), LLVMDoubleType()});
   #else
-      mCeil_f32 = get_intrinsic("wembed.ceil.f32", LLVMFloatType(), {LLVMFloatType()});
-      mCeil_f64 = get_intrinsic("wembed.ceil.f64", LLVMDoubleType(), {LLVMDoubleType()});
-      mFloor_f32 = get_intrinsic("wembed.floor.f32", LLVMFloatType(), {LLVMFloatType()});
-      mFloor_f64 = get_intrinsic("wembed.floor.f64", LLVMDoubleType(), {LLVMDoubleType()});
-      mTrunc_f32 = get_intrinsic("wembed.trunc.f32", LLVMFloatType(), {LLVMFloatType()});
-      mTrunc_f64 = get_intrinsic("wembed.trunc.f64", LLVMDoubleType(), {LLVMDoubleType()});
-      mNearest_f32 = get_intrinsic("wembed.nearbyint.f32", LLVMFloatType(), {LLVMFloatType()});
-      mNearest_f64 = get_intrinsic("wembed.nearbyint.f64", LLVMDoubleType(), {LLVMDoubleType()});
-      mMin_f32 = get_intrinsic("wembed.minnum.f32", LLVMFloatType(), {LLVMFloatType(), LLVMFloatType()});
-      mMin_f64 = get_intrinsic("wembed.minnum.f64", LLVMDoubleType(), {LLVMDoubleType(), LLVMDoubleType()});
-      mMax_f32 = get_intrinsic("wembed.maxnum.f32", LLVMFloatType(), {LLVMFloatType(), LLVMFloatType()});
-      mMax_f64 = get_intrinsic("wembed.maxnum.f64", LLVMDoubleType(), {LLVMDoubleType(), LLVMDoubleType()});
+      mCeil_f32 = init_intrinsic("wembed.ceil.f32", LLVMFloatType(), {LLVMFloatType()});
+      mCeil_f64 = init_intrinsic("wembed.ceil.f64", LLVMDoubleType(), {LLVMDoubleType()});
+      mFloor_f32 = init_intrinsic("wembed.floor.f32", LLVMFloatType(), {LLVMFloatType()});
+      mFloor_f64 = init_intrinsic("wembed.floor.f64", LLVMDoubleType(), {LLVMDoubleType()});
+      mTrunc_f32 = init_intrinsic("wembed.trunc.f32", LLVMFloatType(), {LLVMFloatType()});
+      mTrunc_f64 = init_intrinsic("wembed.trunc.f64", LLVMDoubleType(), {LLVMDoubleType()});
+      mNearest_f32 = init_intrinsic("wembed.nearbyint.f32", LLVMFloatType(), {LLVMFloatType()});
+      mNearest_f64 = init_intrinsic("wembed.nearbyint.f64", LLVMDoubleType(), {LLVMDoubleType()});
+      mMin_f32 = init_intrinsic("wembed.minnum.f32", LLVMFloatType(), {LLVMFloatType(), LLVMFloatType()});
+      mMin_f64 = init_intrinsic("wembed.minnum.f64", LLVMDoubleType(), {LLVMDoubleType(), LLVMDoubleType()});
+      mMax_f32 = init_intrinsic("wembed.maxnum.f32", LLVMFloatType(), {LLVMFloatType(), LLVMFloatType()});
+      mMax_f64 = init_intrinsic("wembed.maxnum.f64", LLVMDoubleType(), {LLVMDoubleType(), LLVMDoubleType()});
   #endif
   }
 
@@ -1072,7 +1078,7 @@ namespace wembed {
             if (lIsImport) {
               lCalleeParams.insert(lCalleeParams.begin(), mBaseMemory);
             }
-            std::vector<LLVMTypeRef> lArgTypes(lCalleeParamCount);
+            std::vector<LLVMTypeRef> lArgTypes(LLVMCountParamTypes(lCalleeType));
             LLVMGetParamTypes(lCalleeType, lArgTypes.data());
             for (size_t i = 0; i < lCalleeParamCount; i++) {
               if (LLVMTypeOf(lCalleeParams[i]) != lArgTypes[i])
@@ -1563,13 +1569,11 @@ namespace wembed {
     char *lError = nullptr;
     if (LLVMVerifyModule(mModule, LLVMReturnStatusAction, &lError)) {
       std::stringstream lMessage;
-      lMessage << "module failed verification";
-      if (lError != nullptr) {
-        lMessage << ": " << lError;
-        LLVMDisposeMessage(lError);
-      }
+      lMessage << "module failed verification: " << lError;
+      LLVMDisposeMessage(lError);
       throw invalid_exception(lMessage.str());
     }
+    LLVMDisposeMessage(lError);
 
     LLVMPassManagerBuilderRef passBuilder = LLVMPassManagerBuilderCreate();
     LLVMPassManagerBuilderSetOptLevel(passBuilder, 4);
