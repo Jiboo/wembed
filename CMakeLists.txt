@@ -38,7 +38,7 @@ add_library(wembed ${WEMBED_INC} ${WEMBED_SRC})
 target_link_libraries(wembed ${LLVM_LIBS})
 
 add_executable(tstgen tst/test_gen.cpp)
-target_link_libraries(tstgen stdc++fs)
+target_link_libraries(tstgen wembed stdc++fs)
 
 include_directories(tst)
 set(TESTSUITE_OUTPUT ${CMAKE_BINARY_DIR}/generated_tests.cpp)
@@ -47,4 +47,5 @@ target_link_libraries(generated_tests ${LLVM_LIBS} wembed gtest)
 
 add_custom_command(OUTPUT ${TESTSUITE_OUTPUT}
   COMMAND tstgen ${TEST_SUITE_PATH} ${TESTSUITE_OUTPUT}
+  DEPENDS tstgen
 )

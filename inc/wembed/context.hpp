@@ -3,6 +3,7 @@
 #pragma once
 
 #include <functional>
+#include <sstream>
 
 #include <llvm-c/ExecutionEngine.h>
 
@@ -26,10 +27,13 @@ namespace wembed {
 
     template<typename TReturn, typename... TParams>
     std::function<TReturn(TParams...)> get_fn(const std::string &pName) {
-      uint64_t lAddress = LLVMGetFunctionAddress(mEngine, pName.c_str());
-      if (!lAddress)
-        throw std::runtime_error("function not found");
-      return reinterpret_cast<TReturn (*)(TParams...)>(lAddress);
+#ifdef WEMBED_PREFIX_EXPORTED_FUNC
+      std::stringstream lPrefixed;
+      lPrefixed << "__wexport_" <<  pName;
+      return get_fn_internal<TReturn, TParams...>(lPrefixed.str());
+#else
+      return get_fn_internal<TReturn, TParams...>(pName);
+#endif
     };
 
 #ifdef WEMBED_NATIVE_CODE_DUMP
@@ -39,6 +43,14 @@ namespace wembed {
   protected:
     friend i32 intrinsics::grow_memory(uint8_t *pContext, uint32_t pDelta);
     friend i32 intrinsics::current_memory(uint8_t *pContext);
+
+    template<typename TReturn, typename... TParams>
+    std::function<TReturn(TParams...)> get_fn_internal(const std::string &pName) {
+      uint64_t lAddress = LLVMGetFunctionAddress(mEngine, pName.c_str());
+      if (!lAddress)
+        throw std::runtime_error("function not found");
+      return reinterpret_cast<TReturn (*)(TParams...)>(lAddress);
+    };
 
     module &mModule;
     resizable_limits mMemoryLimits;

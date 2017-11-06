@@ -77,7 +77,7 @@ namespace wembed {
       mTables[i].resize(lTableSpec.mType.mLimits.mInitial);
       map_global(lTableSpec.mGlobal, mTables[i].data());
     }
-    get_fn<void>("__start")();
+    get_fn_internal<void>("__start")();
     // Replaces indices loaded in tables
     for (size_t i = 0; i < lTableCount; i++) {
       std::vector<void*> &lContainer = mTables[i];

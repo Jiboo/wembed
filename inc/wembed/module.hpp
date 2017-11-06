@@ -13,6 +13,16 @@
 
 namespace wembed {
 
+  class malformed_exception : std::runtime_error {
+  public:
+    malformed_exception(const std::string &pCause) : runtime_error(pCause) {}
+  };
+
+  class invalid_exception : std::runtime_error {
+  public:
+    invalid_exception(const std::string &pCause) : runtime_error(pCause) {}
+  };
+
   class module {
     friend class context;
   public:
@@ -21,12 +31,13 @@ namespace wembed {
 
     void dump_ll(std::ostream &os);
 
+    LLVMModuleRef mModule;
+
   protected:
     uint8_t *mCurrent, *mEnd;
     size_t mImportFuncOffset = 0;
     size_t mUnreachableDepth = 0;
 
-    LLVMModuleRef mModule;
     LLVMBuilderRef mBuilder;
     std::vector<memory_type> mMemoryTypes;
     LLVMValueRef mBaseMemory = nullptr;
@@ -83,8 +94,10 @@ namespace wembed {
     void pushBlockEntry(LLVMTypeRef pType, LLVMBasicBlockRef pBlock, LLVMValueRef pPhi);
     const BlockEntry &branch_depth(size_t pDepth);
     LLVMValueRef top();
+    LLVMValueRef top(LLVMTypeRef pDesired);
     void push(LLVMValueRef lVal);
     LLVMValueRef pop();
+    LLVMValueRef pop_int();
     LLVMValueRef pop(LLVMTypeRef pDesired);
 
     template<typename T> T parse() {

@@ -7,6 +7,8 @@
 
 #include <experimental/filesystem>
 
+#include "wembed.hpp"
+
 using namespace std;
 using namespace std::experimental::filesystem;
 
@@ -14,28 +16,53 @@ string wast2wasm(string_view pCode) {
   path tmp = temp_directory_path();
   path wast = tmp / string("tmp.wast");
   path wasm = tmp / string("tmp.wasm");
-  path hex = tmp / string("tmp.hex");
 
   ofstream owast(wast.string(), ios::trunc);
   owast.write(pCode.data(), pCode.size());
   owast.close();
 
   stringstream command;
-  command << "wast2wasm -o " << wasm.string() << ' ' << wast.string();
-  system(command.str().c_str());
+  command << "wast2wasm --no-check -o " << wasm.string() << ' ' << wast.string();
+  if (system(command.str().c_str()) != 0)
+    throw std::runtime_error(string("couldn't compile module: ") + command.str());
 
-  command.str(std::string());
-  command << "hexdump -v -e '1/1 \"0x%02X, \"' " << wasm.string() << " > " << hex.string();
+  ifstream ibin(wasm.string(), ios::ate);
+  size_t lBinSize = size_t(ibin.tellg());
+  ibin.seekg(0, ios::beg);
+  string lResult(lBinSize, '\0');
+  ibin.read(lResult.data(), lBinSize);
+  ibin.close();
+
+  remove(wast);
+  remove(wasm);
+  return lResult;
+}
+
+string bin2hex(string pInput) {
+  path tmp = temp_directory_path();
+  path wasm = tmp / string("tmp.wasm");
+  path hex = tmp / string("tmp.hex");
+
+  ofstream obin(wasm.string(), ios::trunc);
+  obin.write(pInput.data(), pInput.size());
+  obin.close();
+
+  stringstream command;
+  command << "xxd -i " << wasm.string() << " > " << hex.string();
   system(command.str().c_str());
 
   ifstream ihex(hex.string(), ios::ate);
-  size_t lHexSize = size_t(ihex.tellg()) - 2;
+  size_t lHexSize = size_t(ihex.tellg());
   ihex.seekg(0, ios::beg);
-  string lResult(lHexSize, '\0');
-  ihex.read(lResult.data(), lHexSize);
+
+  string lHex(lHexSize, '\0');
+  ihex.read(lHex.data(), lHexSize);
   ihex.close();
 
-  remove(wast);
+  size_t lStart = lHex.find_first_of('{');
+  size_t lEnd = lHex.find_last_of('}');
+  string lResult = lHex.substr(lStart + 2, lEnd - lStart - 3);
+
   remove(wasm);
   remove(hex);
   return lResult;
@@ -137,6 +164,7 @@ protected:
   tokenizer_t mTokenizer;
   ostream &mOutput;
   size_t mSectionIndex = 0;
+  unique_ptr<wembed::module> mModule;
 
   token_t expect(token_t::type_t pType) {
     token_t result = mTokenizer.next();
@@ -196,6 +224,29 @@ protected:
     }
 
     return lOutput.str();
+  }
+
+  string func_return_type(const string &pFuncName) {
+#ifdef WEMBED_PREFIX_EXPORTED_FUNC
+    std::stringstream lPrefixed;
+    lPrefixed << "__wexport_" << pFuncName;
+    LLVMValueRef lFunc = LLVMGetNamedFunction(mModule->mModule, lPrefixed.str().c_str());
+#else
+    LLVMValueRef lFunc = LLVMGetNamedFunction(mModule->mModule, pFuncName.c_str());
+#endif
+    assert(lFunc);
+    LLVMTypeRef lFuncSig = LLVMGetElementType(LLVMTypeOf(lFunc));
+    LLVMTypeRef lType = LLVMGetReturnType(lFuncSig);
+    if (lType == LLVMFloatType())
+      return "f32";
+    else if (lType == LLVMDoubleType())
+      return "f64";
+    else if (lType == LLVMInt32Type())
+      return "i32";
+    else if (lType == LLVMInt64Type())
+      return "i64";
+    else
+      throw std::runtime_error("can't determine return type");
   }
 
   bool parse_assertion(ostream &pOutput) {
@@ -266,6 +317,105 @@ protected:
       }
       pOutput << ";\n";
     }
+    else if (lId.mView == "assert_return_canonical_nan") {
+      expect(token_t::OPAR);
+      expect("invoke");
+      auto lFuncName = expect(token_t::STR);
+      stringstream lArgTypes, lArgs;
+      auto lNext = mTokenizer.next();
+      // Parse params
+      while (lNext.mType != token_t::CPAR) {
+        auto lType = mTokenizer.next().mView.substr(0, 3);
+        auto lValue = mTokenizer.next();
+        expect(token_t::CPAR);
+        lArgTypes << ", " << lType;
+        lArgs << dump_value(lType, lValue.mView) << ", ";
+        lNext = mTokenizer.next();
+      }
+      assert(lNext.mType == token_t::CPAR);
+      expect(token_t::CPAR);
+      string lCleanedName = string(lFuncName.mView.data() + 1, lFuncName.mView.size() - 2);
+      string lReturnType = func_return_type(lCleanedName);
+      string lArgsFormatted = lArgs.str().substr(0, lArgs.str().size() - 2);
+
+      pOutput << "  EXPECT_TRUE(canonical_nan<" << lReturnType << ">("
+              << "lCtx.get_fn<" << lReturnType << lArgTypes.str() << ">("
+              << lFuncName.mView << ")(" << lArgsFormatted << ")));\n";
+    }
+    else if (lId.mView == "assert_return_arithmetic_nan") {
+      expect(token_t::OPAR);
+      expect("invoke");
+      auto lFuncName = expect(token_t::STR);
+      stringstream lArgTypes, lArgs;
+      auto lNext = mTokenizer.next();
+      // Parse params
+      while (lNext.mType != token_t::CPAR) {
+        auto lType = mTokenizer.next().mView.substr(0, 3);
+        auto lValue = mTokenizer.next();
+        expect(token_t::CPAR);
+        lArgTypes << ", " << lType;
+        lArgs << dump_value(lType, lValue.mView) << ", ";
+        lNext = mTokenizer.next();
+      }
+      assert(lNext.mType == token_t::CPAR);
+      expect(token_t::CPAR);
+      string lCleanedName = string(lFuncName.mView.data() + 1, lFuncName.mView.size() - 2);
+      string lReturnType = func_return_type(lCleanedName);
+      string lArgsFormatted = lArgs.str().substr(0, lArgs.str().size() - 2);
+
+      pOutput << "  EXPECT_TRUE(arithmetic_nan<" << lReturnType << ">("
+              << "lCtx.get_fn<" << lReturnType << lArgTypes.str() << ">("
+              << lFuncName.mView << ")(" << lArgsFormatted << ")));\n";
+    }
+    else if (lId.mView == "assert_malformed") {
+      expect(token_t::OPAR);
+      expect("module");
+      auto lType = expect(token_t::NAME);
+      vector<token_t> lCodeFragments;
+      lCodeFragments.push_back(expect(token_t::STR));
+      auto lNext = mTokenizer.next();
+      while (lNext.mType != token_t::CPAR) {
+        assert(lNext.mType == token_t::STR);
+        lCodeFragments.push_back(lNext);
+        lNext = mTokenizer.next();
+      }
+      assert(lNext.mType == token_t::CPAR);
+      auto lError = expect(token_t::STR);
+      expect(token_t::CPAR);
+
+      if (lType.mView == "binary") {
+        pOutput << "}\n\n"
+                << "TEST(" << mTestName << ", malformed" << ++mSectionIndex << ") {\n"
+                << "  std::string lMalformedBin = \n";
+
+        regex lHexReplacer("\\\\([0-9a-fA-F][0-9a-fA-F])");
+        for (auto &lFragment : lCodeFragments)
+          pOutput << "    " << std::regex_replace(string(lFragment.mView), lHexReplacer, "\\x$1") << "\n";
+        pOutput << ";\n  // Expected error: " << lError.mView << "\n"
+                << "  EXPECT_THROW(wembed::module((uint8_t*)lMalformedBin.data(), lMalformedBin.size()),"
+                << "malformed_exception);\n";
+      }
+    }
+    else if (lId.mView == "assert_invalid") {
+
+      auto lCodeStart = expect(token_t::OPAR);
+      expect("module");
+      auto lEnd = match_par();
+      auto lError = expect(token_t::STR);
+      expect(token_t::CPAR);
+
+      string_view lCode(lCodeStart.mView.data(), lEnd.mView.data() - lCodeStart.mView.data() + 1);
+      string lBin = wast2wasm(lCode);
+      if (lBin.size() > 0) {
+        string lHex = bin2hex(lBin);
+        pOutput << "}\n\n"
+                << "TEST(" << mTestName << ", invalid" << ++mSectionIndex << ") {\n"
+                << "  uint8_t lInvalidBin[] = {" << lHex << "};\n"
+                << "  /*" << lCode << "*/\n"
+                << "  // Expected error: " << lError.mView << "\n"
+                << "  EXPECT_THROW(wembed::module(lInvalidBin, sizeof(lInvalidBin)), wembed::invalid_exception);\n";
+      }
+    }
     else if (lId.mView.find_first_of("assert_") == 0) {
       // unsuported assert type
       match_par();
@@ -281,18 +431,22 @@ protected:
   }
 
   void parse_test() {
-    mOutput << "TEST(" << mTestName << ", section" << mSectionIndex << ") {\n";
+    mOutput << "TEST(" << mTestName << ", module" << mSectionIndex << ") {\n";
 
     string_view lModuleSource = parse_module();
     if (lModuleSource.size()) {
       string lModuleBytecode = wast2wasm(lModuleSource);
-      mOutput << "  uint8_t lCode[] = {" << lModuleBytecode << "};\n";
+      string lModuleHex = bin2hex(lModuleBytecode);
+      mOutput << "  uint8_t lCode[] = {" << lModuleHex << "};\n";
       mOutput << "/*" << lModuleSource << "*/\n\n";
       mOutput << "  module lModule(lCode, sizeof(lCode));\n";
       mOutput << "  context lCtx(lModule, {\n"
           "    {\"spectest_global\", (void*)&spectest_global},\n"
           "    {\"spectest_print\", (void*)&spectest_print},\n"
           "  });\n";
+
+      mModule = std::make_unique<wembed::module>((uint8_t*)lModuleBytecode.data(),
+                                                 lModuleBytecode.size());
     }
 
     while(parse_assertion(mOutput));
@@ -304,9 +458,12 @@ protected:
 };
 
 const unordered_set<string> sBlacklist = {
-  // WONT FIX
+  // WONT FIX: Text parser related
   "comments",
   "inline-module",
+
+  // WONT FIX: This code isn't emitted, ozef
+  "unreached-invalid",
 
   //FIXME UTF8
   "names",
@@ -319,9 +476,6 @@ const unordered_set<string> sBlacklist = {
   "imports",
   "exports",
   "linking",
-
-  // FIXME https://bugs.llvm.org/show_bug.cgi?id=34941
-  "f64",
 };
 
 void handle(path pInputFile, ostream &pOutput) {
@@ -331,38 +485,19 @@ void handle(path pInputFile, ostream &pOutput) {
   ifstream is(pInputFile, ios::ate);
   if (!is.is_open())
     throw runtime_error(string("couldn't open file ") + pInputFile.string());
-  size_t size = is.tellg();
 #if 1
-  //if (!(lTestName == "f32" || lTestName == "f64")) return;
+  size_t size = is.tellg();
   vector<char> contents(size);
   is.seekg(0, ios::beg);
   is.read(contents.data(), size);
 #else
   if (lTestName != "func") return;
-  string contents = "(module"
-      "  (memory (data \"\\00\\00\\a0\\7f\"))\n"
-      "\n"
-      "  (func (export \"f32.load\") (result f32) (f32.load (i32.const 0)))\n"
-      "  (func (export \"i32.load\") (result i32) (i32.load (i32.const 0)))\n"
-      "  (func (export \"f32.store\") (f32.store (i32.const 0) (f32.const nan:0x200000)))\n"
-      "  (func (export \"i32.store\") (i32.store (i32.const 0) (i32.const 0x7fa00000)))\n"
-      "  (func (export \"reset\") (i32.store (i32.const 0) (i32.const 0)))\n"
-      ")\n"
-      "\n"
-      "(assert_return (invoke \"i32.load\") (i32.const 0x7fa00000))\n"
-      "(assert_return (invoke \"f32.load\") (f32.const nan:0x200000))\n"
-      "(invoke \"reset\")\n"
-      "(assert_return (invoke \"i32.load\") (i32.const 0x0))\n"
-      "(assert_return (invoke \"f32.load\") (f32.const 0.0))\n"
-      "(invoke \"f32.store\")\n"
-      "(assert_return (invoke \"i32.load\") (i32.const 0x7fa00000))\n"
-      "(assert_return (invoke \"f32.load\") (f32.const nan:0x200000))\n"
-      "(invoke \"reset\")\n"
-      "(assert_return (invoke \"i32.load\") (i32.const 0x0))\n"
-      "(assert_return (invoke \"f32.load\") (f32.const 0.0))\n"
-      "(invoke \"i32.store\")\n"
-      "(assert_return (invoke \"i32.load\") (i32.const 0x7fa00000))\n"
-      "(assert_return (invoke \"f32.load\") (f32.const nan:0x200000))"
+  string contents = "(assert_invalid\n"
+      "  (module (func $type-arg-void-vs-num-nested (result i32)\n"
+      "    (block (result i32) (i32.const 0) (block (br_if 1 (i32.const 1))))\n"
+      "  ))\n"
+      "  \"type mismatch\"\n"
+      ")"
   ;
 #endif
 

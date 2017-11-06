@@ -73,6 +73,21 @@ wembed::fp_bits<T> fp(const char *p) {
   return lResult;
 }
 
+template<typename T>
+bool canonical_nan(T pInput) {
+  wembed::fp_bits<T> lComponents(pInput);
+  return lComponents.mBits.mExponent == wembed::fp_bits<T>::sMaxExponent
+         && lComponents.mBits.mSignificand != 0
+         && (lComponents.mBits.mSignificand & wembed::fp_bits<T>::sQuietNan);
+}
+
+template<typename T>
+bool arithmetic_nan(T pInput) {
+  wembed::fp_bits<T> lComponents(pInput);
+  return lComponents.mBits.mExponent == wembed::fp_bits<T>::sMaxExponent
+         && lComponents.mBits.mSignificand != 0;
+}
+
 namespace wembed {
   template<typename T>
   bool operator==(const fp_bits <T> &pLHS, const fp_bits<T> &pRHS) {
