@@ -40,6 +40,7 @@ namespace wembed {
 
     LLVMBuilderRef mBuilder;
     std::vector<memory_type> mMemoryTypes;
+    std::string mMemoryImport;
     LLVMValueRef mBaseMemory = nullptr;
     LLVMValueRef mContextRef;
     struct Table {

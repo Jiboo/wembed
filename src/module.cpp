@@ -31,18 +31,11 @@ namespace wembed {
     LLVMPositionBuilderAtEnd(mBuilder, mStartContinue);
     init_intrinsics();
 
-    try {
-      switch(parse<uint32_t>()) { // version
-        case 1: parse_sections(); break;
-        default: throw malformed_exception("unexpected version");
-      }
-      finalize();
+    switch(parse<uint32_t>()) { // version
+      case 1: parse_sections(); break;
+      default: throw malformed_exception("unexpected version");
     }
-    catch (...) {
-      LLVMDisposeBuilder(mBuilder);
-      LLVMDisposeModule(mModule);
-      throw;
-    }
+    finalize();
   }
 
   module::~module() {
@@ -144,7 +137,6 @@ namespace wembed {
         LLVMPointerType(LLVMInt8Type(), 0), // dest
         LLVMPointerType(LLVMInt8Type(), 0), // src
         LLVMInt32Type(), // len
-        LLVMInt32Type(), // align
         LLVMInt1Type() // volatile
     });
 
@@ -185,18 +177,18 @@ namespace wembed {
     mCopysign_f64 = init_intrinsic("llvm.copysign.f64", LLVMDoubleType(), {LLVMDoubleType(), LLVMDoubleType()});
 
   #ifdef WEMBED_FAST_MATH
-      mCeil_f32 = get_intrinsic("llvm.ceil.f32", LLVMFloatType(), {LLVMFloatType()});
-      mCeil_f64 = get_intrinsic("llvm.ceil.f64", LLVMDoubleType(), {LLVMDoubleType()});
-      mFloor_f32 = get_intrinsic("llvm.floor.f32", LLVMFloatType(), {LLVMFloatType()});
-      mFloor_f64 = get_intrinsic("llvm.floor.f64", LLVMDoubleType(), {LLVMDoubleType()});
-      mTrunc_f32 = get_intrinsic("llvm.trunc.f32", LLVMFloatType(), {LLVMFloatType()});
-      mTrunc_f64 = get_intrinsic("llvm.trunc.f64", LLVMDoubleType(), {LLVMDoubleType()});
-      mNearest_f32 = get_intrinsic("llvm.nearbyint.f32", LLVMFloatType(), {LLVMFloatType()});
-      mNearest_f64 = get_intrinsic("llvm.nearbyint.f64", LLVMDoubleType(), {LLVMDoubleType()});
-      mMin_f32 = get_intrinsic("llvm.minnum.f32", LLVMFloatType(), {LLVMFloatType(), LLVMFloatType()});
-      mMin_f64 = get_intrinsic("llvm.minnum.f64", LLVMDoubleType(), {LLVMDoubleType(), LLVMDoubleType()});
-      mMax_f32 = get_intrinsic("llvm.maxnum.f32", LLVMFloatType(), {LLVMFloatType(), LLVMFloatType()});
-      mMax_f64 = get_intrinsic("llvm.maxnum.f64", LLVMDoubleType(), {LLVMDoubleType(), LLVMDoubleType()});
+      mCeil_f32 = init_intrinsic("llvm.ceil.f32", LLVMFloatType(), {LLVMFloatType()});
+      mCeil_f64 = init_intrinsic("llvm.ceil.f64", LLVMDoubleType(), {LLVMDoubleType()});
+      mFloor_f32 = init_intrinsic("llvm.floor.f32", LLVMFloatType(), {LLVMFloatType()});
+      mFloor_f64 = init_intrinsic("llvm.floor.f64", LLVMDoubleType(), {LLVMDoubleType()});
+      mTrunc_f32 = init_intrinsic("llvm.trunc.f32", LLVMFloatType(), {LLVMFloatType()});
+      mTrunc_f64 = init_intrinsic("llvm.trunc.f64", LLVMDoubleType(), {LLVMDoubleType()});
+      mNearest_f32 = init_intrinsic("llvm.nearbyint.f32", LLVMFloatType(), {LLVMFloatType()});
+      mNearest_f64 = init_intrinsic("llvm.nearbyint.f64", LLVMDoubleType(), {LLVMDoubleType()});
+      mMin_f32 = init_intrinsic("llvm.minnum.f32", LLVMFloatType(), {LLVMFloatType(), LLVMFloatType()});
+      mMin_f64 = init_intrinsic("llvm.minnum.f64", LLVMDoubleType(), {LLVMDoubleType(), LLVMDoubleType()});
+      mMax_f32 = init_intrinsic("llvm.maxnum.f32", LLVMFloatType(), {LLVMFloatType(), LLVMFloatType()});
+      mMax_f64 = init_intrinsic("llvm.maxnum.f64", LLVMDoubleType(), {LLVMDoubleType(), LLVMDoubleType()});
   #else
       mCeil_f32 = init_intrinsic("wembed.ceil.f32", LLVMFloatType(), {LLVMFloatType()});
       mCeil_f64 = init_intrinsic("wembed.ceil.f64", LLVMDoubleType(), {LLVMDoubleType()});
@@ -247,7 +239,7 @@ namespace wembed {
     resizable_limits lResult;
     lResult.mFlags = parse<uint8_t>();
     lResult.mInitial = parse_uleb128<uint32_t>();
-    if (lResult.mFlags) {
+    if (lResult.mFlags & 0x1) {
       lResult.mMaximum = parse_uleb128<uint32_t>();
       if (lResult.mMaximum < lResult.mInitial)
         throw invalid_exception("maximum shouldn't be smaller than initial");
@@ -548,12 +540,8 @@ namespace wembed {
           size_t lParamCount = LLVMCountParamTypes(lType);
           std::vector<LLVMTypeRef> lParams(lParamCount);
           LLVMGetParamTypes(lType, lParams.data());
-          lParams.insert(lParams.begin(), LLVMPointerType(LLVMInt8Type(), 0));
-          LLVMTypeRef lNewType = LLVMFunctionType(
-              LLVMGetReturnType(lType), lParams.data(), lParams.size(),
-              LLVMIsFunctionVarArg(lType));
 
-          LLVMValueRef lFunction = LLVMAddFunction(mModule, lName.str().c_str(), lNewType);
+          LLVMValueRef lFunction = LLVMAddFunction(mModule, lName.str().c_str(), lType);
           LLVMSetLinkage(lFunction, LLVMLinkage::LLVMExternalLinkage);
           mFunctions.push_back(lFunction);
   #ifdef WEMBED_VERBOSE
@@ -570,10 +558,17 @@ namespace wembed {
           LLVMSetGlobalConstant(lGlobal, !lMutable);
           mGlobals.push_back(lGlobal);
         } break;
-        case ek_memory:
-          parse_resizable_limits();
         case ek_table:
           parse_table_type();
+          break;
+        case ek_memory:
+          mMemoryImport = lName.str();
+          memory_type lMemType;
+          lMemType.mLimits = parse_resizable_limits();
+          if (lMemType.mLimits.mInitial > 65536 || (lMemType.mLimits.mFlags && lMemType.mLimits.mMaximum > 65536))
+            throw invalid_exception("memory size too big, max 65536 pages");
+          mMemoryTypes.emplace_back(lMemType);
+          break;
         default: throw malformed_exception("unexpected import kind");
       }
     }
@@ -659,8 +654,8 @@ namespace wembed {
         case ek_global: {
           if (lIndex >= mGlobals.size())
             throw invalid_exception("global index out of bounds");
-          if (!LLVMIsGlobalConstant(mGlobals[lIndex]))
-            throw invalid_exception("Globals export are required to be immutable");
+          /*if (!LLVMIsGlobalConstant(mGlobals[lIndex]))
+            throw invalid_exception("Globals export are required to be immutable");*/
           mExports.emplace(lName, export_t{lKind, mGlobals[lIndex]});
           LLVMSetValueName(mGlobals[lIndex], lName.data());
         } break;
@@ -680,14 +675,10 @@ namespace wembed {
     LLVMTypeRef lStartSignature = LLVMGetElementType(LLVMTypeOf(mFunctions[lIndex]));
     if (LLVMGetReturnType(lStartSignature) != LLVMVoidType())
       throw invalid_exception("start function required to return void");
-    const bool lIsImported = lIndex < mImportFuncOffset;
-    if (LLVMCountParamTypes(lStartSignature) > (lIsImported ? 1 : 0))
-      throw invalid_exception("start function required to return void");
+    if (LLVMCountParamTypes(lStartSignature) > 0)
+      throw invalid_exception("start function require no input param");
 
-    if (!lIsImported)
-      LLVMBuildCall(mBuilder, mFunctions[lIndex], nullptr, 0, "");
-    else
-      LLVMBuildCall(mBuilder, mFunctions[lIndex], &mBaseMemory, 1, "");
+    LLVMBuildCall(mBuilder, mFunctions[lIndex], nullptr, 0, "");
   }
 
   void module::parse_section_element(uint32_t pSectionSize) {
@@ -1064,20 +1055,16 @@ namespace wembed {
 
           case o_call: {
             uint32_t lCalleeIndex = parse_uleb128<uint32_t>();
-            bool lIsImport = lCalleeIndex < mImportFuncOffset; // Calling import function, pass memory offset too, for reference
             if (lCalleeIndex >= mFunctions.size())
               throw invalid_exception("function index out of bounds");
             LLVMValueRef lCallee = mFunctions[lCalleeIndex];
             LLVMTypeRef lCalleeType = LLVMGetElementType(LLVMTypeOf(lCallee));
-            size_t lCalleeParamCount = LLVMCountParams(lCallee) - (lIsImport ? 1 : 0);
+            size_t lCalleeParamCount = LLVMCountParams(lCallee);
             if (lCalleeParamCount > mEvalStack.size())
               throw invalid_exception("not enough args in stack");
             std::vector<LLVMValueRef> lCalleeParams(lCalleeParamCount);
             std::copy(mEvalStack.end() - lCalleeParamCount, mEvalStack.end(), lCalleeParams.begin());
             mEvalStack.resize(mEvalStack.size() - lCalleeParamCount);
-            if (lIsImport) {
-              lCalleeParams.insert(lCalleeParams.begin(), mBaseMemory);
-            }
             std::vector<LLVMTypeRef> lArgTypes(LLVMCountParamTypes(lCalleeType));
             LLVMGetParamTypes(lCalleeType, lArgTypes.data());
             for (size_t i = 0; i < lCalleeParamCount; i++) {
@@ -1454,8 +1441,8 @@ namespace wembed {
           WEMBED_CAST(o_extend_ui32, LLVMBuildZExt, LLVMInt32Type(), LLVMInt64Type())
 
   #ifdef WEMBED_FAST_MATH
-          WEMBED_CAST(o_demote_f64, LLVMBuildFPTrunc, LLVMFloatType())
-          WEMBED_CAST(o_promote_f32, LLVMBuildFPExt, LLVMDoubleType())
+          WEMBED_CAST(o_demote_f64, LLVMBuildFPTrunc, LLVMDoubleType(), LLVMFloatType())
+          WEMBED_CAST(o_promote_f32, LLVMBuildFPExt, LLVMFloatType(), LLVMDoubleType())
   #else
           case o_demote_f64: {
             push(clear_nan(LLVMBuildFPTrunc(mBuilder, pop(LLVMDoubleType()), LLVMFloatType(), "demote")));
@@ -1545,7 +1532,6 @@ namespace wembed {
           LLVMConstIntToPtr(LLVMConstInt(LLVMInt64Type(), ull_t(mCurrent), false),
                             LLVMPointerType(LLVMInt8Type(), 0)),
           LLVMConstInt(LLVMInt32Type(), lSize, false),
-          LLVMConstInt(LLVMInt32Type(), 1, false),
           LLVMConstInt(LLVMInt1Type(), 1, false),
       });
       mCurrent += lSize;
@@ -1592,6 +1578,8 @@ namespace wembed {
     LLVMDisposePassManager(functionPasses);
     LLVMDisposePassManager(modulePasses);
 
-    //dump_ll(std::cout);
+#ifdef WEMBED_VERBOSE
+    dump_ll(std::cout);
+#endif
   }
 }  // namespace wembed

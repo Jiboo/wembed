@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.8.2)
 project(wembed)
 
-set(TEST_SUITE_PATH ${CMAKE_SOURCE_DIR}/spec/test/core)
+set(TESTSUITE_PATH ${CMAKE_SOURCE_DIR}/spec/test/core)
 # https://github.com/WebAssembly/spec.git
 
 set(ENABLE_NATIVE_CODE_DUMP FALSE)
@@ -10,7 +10,7 @@ set(ENABLE_NATIVE_CODE_DUMP FALSE)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 
-find_package(LLVM 6.0 REQUIRED CONFIG)
+find_package(LLVM 8.0 REQUIRED CONFIG)
 include_directories(${LLVM_INCLUDE_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
 llvm_map_components_to_libnames(LLVM_LIBS
@@ -40,12 +40,20 @@ target_link_libraries(wembed ${LLVM_LIBS})
 add_executable(tstgen tst/test_gen.cpp)
 target_link_libraries(tstgen wembed stdc++fs)
 
-include_directories(tst)
-set(TESTSUITE_OUTPUT ${CMAKE_BINARY_DIR}/generated_tests.cpp)
-add_executable(generated_tests ${TESTSUITE_OUTPUT} ${WEMBED_INC})
-target_link_libraries(generated_tests ${LLVM_LIBS} wembed gtest)
+set(TESTSUITE_OUTPUT ${CMAKE_BINARY_DIR}/tests)
+file(MAKE_DIRECTORY ${TESTSUITE_OUTPUT})
 
-add_custom_command(OUTPUT ${TESTSUITE_OUTPUT}
-  COMMAND tstgen ${TEST_SUITE_PATH} ${TESTSUITE_OUTPUT}
-  DEPENDS tstgen
-)
+set(TESTSUITE_SRC)
+file(GLOB_RECURSE TESTSUITE_FILES "${TESTSUITE_PATH}/**.wast")
+foreach(TESTCASE_WAST ${TESTSUITE_FILES})
+  string(REGEX REPLACE "${TESTSUITE_PATH}/(.*).wast" "${TESTSUITE_OUTPUT}/\\1.cpp" TESTCASE_CPP "${TESTCASE_WAST}")
+  add_custom_command(OUTPUT ${TESTCASE_CPP}
+    COMMAND tstgen ${TESTCASE_WAST} ${TESTCASE_CPP}
+    DEPENDS tstgen ${TESTCASE_WAST}
+  )
+  list(APPEND TESTSUITE_SRC ${TESTCASE_CPP})
+endforeach()
+
+include_directories(tst)
+add_executable(generated_tests ${TESTSUITE_SRC} tst/test.cpp tst/test.hpp)
+target_link_libraries(generated_tests ${LLVM_LIBS} wembed gtest)

@@ -23,7 +23,6 @@ namespace wembed {
 
     void map_intrinsic(LLVMModuleRef pModule, const char *pName, void *pPtr);
     void map_global(LLVMValueRef pDest, void *pSource);
-    uint8_t *memory();
 
     template<typename TReturn, typename... TParams>
     std::function<TReturn(TParams...)> get_fn(const std::string &pName) {

@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <random>
 #include <regex>
 #include <unordered_set>
 
@@ -12,17 +13,44 @@
 using namespace std;
 using namespace std::experimental::filesystem;
 
+const unordered_set<string> sBlacklist = {
+    // WONT FIX: Text parser related
+    "comments",
+    "inline-module",
+
+    // WONT FIX: This code isn't emitted, ozef
+    "unreached-invalid",
+
+    //FIXME UTF8
+    "names",
+    "utf8-custom-section-id",
+    "utf8-import-field",
+    "utf8-import-module",
+    "utf8-invalid-encoding",
+
+    //FIXME Multimodule support
+    "elem",
+    "imports",
+    "exports",
+    "linking",
+};
+
+random_device rdevice;
+default_random_engine rengine(rdevice());
+uniform_int_distribution<int> rdist;
+
 string wast2wasm(string_view pCode) {
+  string uid = to_string(rdist(rengine));
   path tmp = temp_directory_path();
-  path wast = tmp / string("tmp.wast");
-  path wasm = tmp / string("tmp.wasm");
+  path wast = tmp / (string("tmp.wat") + uid);
+  path wasm = tmp / (string("tmp.wasm") + uid);
 
   ofstream owast(wast.string(), ios::trunc);
   owast.write(pCode.data(), pCode.size());
   owast.close();
 
   stringstream command;
-  command << "wast2wasm --no-check -o " << wasm.string() << ' ' << wast.string();
+  command << "wat2wasm --no-check -o " << wasm.string() << ' ' << wast.string();
   if (system(command.str().c_str()) != 0)
     throw std::runtime_error(string("couldn't compile module: ") + command.str());
 
@@ -39,9 +67,10 @@ string wast2wasm(string_view pCode) {
 }
 
 string bin2hex(string pInput) {
+  string uid = to_string(rdist(rengine));
   path tmp = temp_directory_path();
-  path wasm = tmp / string("tmp.wasm");
-  path hex = tmp / string("tmp.hex");
+  path wasm = tmp / (string("tmp.wasm") + uid);
+  path hex = tmp / (string("tmp.hex") + uid);
 
   ofstream obin(wasm.string(), ios::trunc);
   obin.write(pInput.data(), pInput.size());
@@ -84,9 +113,35 @@ struct tokenizer_t {
     mBuffer.push_back(pToken);
   }
   void skip_spaces() {
-    while(isspace(*mInput) && mInput < mEnd) mInput++;
+    bool handled;
+    do {
+      handled = false;
+      if (mInput >= mEnd)
+        return;
+
+      if (isspace(*mInput)) {
+        while (isspace(*mInput) && mInput < mEnd)
+          mInput++;
+        handled = true;
+      }
+      if (mInput + 2 < mEnd) {
+        if (mInput[0] == ';' && mInput[1] == ';') {
+          handled = true;
+          while (*mInput != '\n' && mInput < mEnd)
+            mInput++;
+        } else if (mInput[0] == '(' && mInput[1] == ';') {
+          handled = true;
+          mInput += 2;
+          while ((mInput[0] != ';' || mInput[1] != ')') && mInput < mEnd)
+            mInput++;
+          mInput += 2;
+        }
+      }
+    } while(handled);
   }
   bool ate() {
+    skip_spaces();
+    // TODO Skip comments
     skip_spaces();
     return mInput == mEnd;
   }
@@ -124,19 +179,7 @@ struct tokenizer_t {
       return lResult;
     }
     skip_spaces();
-    if (mInput[0] == ';' && mInput[1] == ';') {
-      while (*mInput != '\n')
-        mInput++;
-      return next();
-    }
-    else if (mInput[0] == '(' && mInput[1] == ';') {
-      mInput += 2;
-      while (mInput[0] != ';' || mInput[1] != ')')
-        mInput++;
-      mInput += 2;
-      return next();
-    }
-    else if (*mInput == '(') return {{mInput++, 1}, token_t::OPAR};
+    if (*mInput == '(') return {{mInput++, 1}, token_t::OPAR};
     else if (*mInput == ')') return {{mInput++, 1}, token_t::CPAR};
     else if (*mInput == '"') return parse_str();
     else if (isname(*mInput)) return parse_name();
@@ -418,6 +461,7 @@ protected:
     }
     else if (lId.mView.find_first_of("assert_") == 0) {
       // unsuported assert type
+      std::cerr << "unsuported assert type: " << lId.mView << std::endl;
       match_par();
     }
     else {
@@ -441,41 +485,35 @@ protected:
       mOutput << "/*" << lModuleSource << "*/\n\n";
       mOutput << "  module lModule(lCode, sizeof(lCode));\n";
       mOutput << "  context lCtx(lModule, {\n"
-          "    {\"spectest_global\", (void*)&spectest_global},\n"
+          "    {\"spectest_global_i32\", (void*)&spectest_global_i32},\n"
+          "    {\"spectest_global_f32\", (void*)&spectest_global_f32},\n"
+          "    {\"spectest_global_f64\", (void*)&spectest_global_f64},\n"
           "    {\"spectest_print\", (void*)&spectest_print},\n"
+          "    {\"spectest_print_i32\", (void*)&spectest_print_i32},\n"
+          "    {\"spectest_print_i32_f32\", (void*)&spectest_print_i32_f32},\n"
+          "    {\"spectest_print_f64_f64\", (void*)&spectest_print_f64_f64},\n"
+          "    {\"spectest_print_f32\", (void*)&spectest_print_f32},\n"
+          "    {\"spectest_print_f64\", (void*)&spectest_print_f64},\n"
+          "    {\"spectest_memory\", spectest_mem.data()},\n"
           "  });\n";
-
-      mModule = std::make_unique<wembed::module>((uint8_t*)lModuleBytecode.data(),
-                                                 lModuleBytecode.size());
+      mOutput.flush();
+      try {
+        mModule = std::make_unique<wembed::module>((uint8_t *) lModuleBytecode.data(),
+                                                   lModuleBytecode.size());
+      }
+      catch (const std::exception &e) {
+        std::cerr << "error while compiling module for " << mTestName << " at section " << mSectionIndex << std::endl;
+        std::cerr << e.what() << std::endl;
+      }
     }
 
-    while(parse_assertion(mOutput));
+    while(parse_assertion(mOutput))
+      mOutput.flush();
 
     mOutput << "}\n\n";
 
     mSectionIndex++;
   }
-};
-
-const unordered_set<string> sBlacklist = {
-  // WONT FIX: Text parser related
-  "comments",
-  "inline-module",
-
-  // WONT FIX: This code isn't emitted, ozef
-  "unreached-invalid",
-
-  //FIXME UTF8
-  "names",
-  "utf8-custom-section-id",
-  "utf8-import-field",
-  "utf8-import-module",
-
-  //FIXME Multimodule support
-  "elem",
-  "imports",
-  "exports",
-  "linking",
 };
 
 void handle(path pInputFile, ostream &pOutput) {
@@ -485,61 +523,34 @@ void handle(path pInputFile, ostream &pOutput) {
   ifstream is(pInputFile, ios::ate);
   if (!is.is_open())
     throw runtime_error(string("couldn't open file ") + pInputFile.string());
-#if 1
   size_t size = is.tellg();
   vector<char> contents(size);
   is.seekg(0, ios::beg);
   is.read(contents.data(), size);
-#else
-  if (lTestName != "func") return;
-  string contents = "(assert_invalid\n"
-      "  (module (func $type-arg-void-vs-num-nested (result i32)\n"
-      "    (block (result i32) (i32.const 0) (block (br_if 1 (i32.const 1))))\n"
-      "  ))\n"
-      "  \"type mismatch\"\n"
-      ")"
-  ;
-#endif
-
-  cout << "handling " << lTestName << endl;
   Transpiler transpiler(contents.data(), contents.size(), lTestName, pOutput);
   transpiler.parse_tests();
 }
 
 int main(int argc,char** argv) {
   if (argc != 3) {
-    cerr << "usage: " << argv[0] << " <.wast tests folder> <output path>" << endl;
+    cerr << "usage: " << argv[0] << " <.wast> <.cpp>" << endl;
     return EXIT_FAILURE;
   }
   path lInputPath(argv[1]);
-  if (!is_directory(lInputPath)) {
-    cerr << argv[1] << " is not a valid directory" << endl;
+  if (!is_regular_file(lInputPath)) {
+    cerr << argv[1] << " is not a valid file" << endl;
     return EXIT_FAILURE;
   }
+
+  //bool lOutputMain = false;
   ofstream lOutput(argv[2]);
+  if (!lOutput.is_open()) {
+    cerr << "i/o error: can't open " << argv[2] << std::endl;
+    return EXIT_FAILURE;
+  }
   lOutput << "#include <gtest/gtest.h>\n";
   lOutput << "#include \"wembed.hpp\"\n";
-  lOutput << "#include \"test_utils.hpp\"\n\n";
-
+  lOutput << "#include \"test.hpp\"\n\n";
   lOutput << "using namespace wembed;\n\n";
-
-  for (auto &lFile : directory_iterator(lInputPath)) {
-    if (lFile.path().extension().compare(".wast") == 0)
-      handle(lFile.path(), lOutput);
-  }
-
-  lOutput << "int main(int argc, char **argv) {\n";
-  lOutput << "  ::testing::InitGoogleTest(&argc, argv);\n";
-  lOutput << "  LLVMLinkInMCJIT();\n";
-  lOutput << "  LLVMInitializeNativeTarget();\n";
-  lOutput << "  LLVMInitializeNativeAsmPrinter();\n";
-
-  lOutput << "#ifdef WEMBED_NATIVE_CODE_DUMP\n";
-  lOutput << "  LLVMInitializeAllTargetInfos();\n";
-  lOutput << "  LLVMInitializeAllTargetMCs();\n";
-  lOutput << "  LLVMInitializeAllDisassemblers();\n";
-  lOutput << "#endif\n";
-
-  lOutput << "  return RUN_ALL_TESTS();\n";
-  lOutput << "}\n";
+  handle(lInputPath, lOutput);
 }

@@ -4,7 +4,7 @@
 #include <llvm-c/Disassembler.h>
 #endif
 
-#ifdef VERBOSE
+#if defined(WEMBED_VERBOSE) or defined(WEMBED_NATIVE_CODE_DUMP)
 #include <iostream>
 #endif
 
@@ -18,38 +18,55 @@ namespace wembed {
       throw std::runtime_error(lErrorStr);
     }
 
+    // Probably need a blacklist here, for values like "baseMemory"
     for (const auto &lMapping : pMappings) {
       LLVMValueRef lValue = LLVMGetNamedFunction(pModule.mModule, lMapping.first.data());
       if (lValue != nullptr) {
         LLVMAddGlobalMapping(mEngine, lValue, lMapping.second);
+#ifdef WEMBED_VERBOSE
+        std::cout << "mapped " << lMapping.first << " function to " << lMapping.second << std::endl;
+#endif
       }
       else {
         lValue = LLVMGetNamedGlobal(pModule.mModule, lMapping.first.data());
         if (lValue != nullptr) {
           LLVMAddGlobalMapping(mEngine, lValue, lMapping.second);
+#ifdef WEMBED_VERBOSE
+          std::cout << "mapped " << lMapping.first << " global to " << lMapping.second << std::endl;
+#endif
         }
       }
     }
 
-    if (pModule.mMemoryTypes.empty()) {
-      mMemoryLimits.mInitial = 0;
-      mMemoryLimits.mMaximum = 0;
-      mMemoryLimits.mFlags = 0;
-    }
-    else {
+    if (pModule.mMemoryTypes.size()) {
       mMemoryLimits = pModule.mMemoryTypes[0].mLimits;
+      mBaseMemory = LLVMGetNamedGlobal(pModule.mModule, "baseMemory");
+      if (!pModule.mMemoryImport.empty()) {
+        if (mBaseMemory != nullptr) {
+          if (pMappings.find(pModule.mMemoryImport) == pMappings.end())
+            throw std::runtime_error("can't find memory import in mapping list");
+          map_global(mBaseMemory, pMappings[pModule.mMemoryImport]);
+#ifdef WEMBED_VERBOSE
+          std::cout << "bound external memory: " << mMemory->size() << ", reserved "
+                    << mMemory->capacity() << " at " << (void *) mMemory->data() << std::endl;
+#endif
+        }
+      }
+      else {
+        constexpr auto lPageSize = 64 * 1024;
+        auto lAllocatedSize = (mMemoryLimits.mFlags & 0x1)
+                              ? (mMemoryLimits.mMaximum + 1) * lPageSize : 256UL * 1024 * 1024;
+        mMemory.emplace(mMemoryLimits.mInitial * lPageSize, lAllocatedSize);
+        if (mBaseMemory != nullptr)
+          map_global(mBaseMemory, mMemory->data());
+        map_intrinsic(pModule.mModule, "wembed.grow_memory.i32", (void*)&wembed::intrinsics::grow_memory);
+        map_intrinsic(pModule.mModule, "wembed.current_memory.i32", (void*)&wembed::intrinsics::current_memory);
+#ifdef WEMBED_VERBOSE
+        std::cout << "initial memory size: " << mMemory->size() << ", reserved "
+                  << mMemory->capacity() << " at " << (void *) mMemory->data() << std::endl;
+#endif
+      }
     }
-    constexpr auto lPageSize = 64 * 1024;
-    auto lAllocatedSize = (mMemoryLimits.mFlags & 0x1)
-                          ? (mMemoryLimits.mMaximum + 1) * lPageSize : 256UL * 1024 * 1024;
-    mMemory.emplace(mMemoryLimits.mInitial * lPageSize, lAllocatedSize);
-    mBaseMemory = LLVMGetNamedGlobal(pModule.mModule, "baseMemory");
-    if (mBaseMemory != nullptr)
-      map_global(mBaseMemory, mMemory->data());
-  #ifdef VERBOSE
-    std::cout << "initial memory size: " << mMemory->size() << ", reserved "
-              << mMemory->capacity() << " at " << (void*)mMemory->data() << std::endl;
-  #endif
 
     LLVMValueRef lContextRef = LLVMGetNamedGlobal(pModule.mModule, "ctxRef");
     if (lContextRef != nullptr)
@@ -67,8 +84,6 @@ namespace wembed {
     map_intrinsic(pModule.mModule, "wembed.trunc.f64", (void*)&wembed::intrinsics::trunc<f64>);
     map_intrinsic(pModule.mModule, "wembed.nearbyint.f32", (void*)&wembed::intrinsics::nearest<f32>);
     map_intrinsic(pModule.mModule, "wembed.nearbyint.f64", (void*)&wembed::intrinsics::nearest<f64>);
-    map_intrinsic(pModule.mModule, "wembed.grow_memory.i32", (void*)&wembed::intrinsics::grow_memory);
-    map_intrinsic(pModule.mModule, "wembed.current_memory.i32", (void*)&wembed::intrinsics::current_memory);
 
     const size_t lTableCount = pModule.mTables.size();
     mTables.resize(lTableCount);
@@ -88,14 +103,14 @@ namespace wembed {
         void *lAddress = (void*)LLVMGetFunctionAddress(mEngine, lName);
         if (!lAddress)
           throw std::runtime_error("func in table was opt out");
-  #ifdef VERBOSE
+  #ifdef WEMBED_VERBOSE
         std::cout << "remap table element for " << i << ", " << ptr << " aka "
                   << lName << ": " << lAddress << std::endl;
   #endif
         lContainer[ptr] = lAddress;
       }
     }
-  #if defined(WEMBED_NATIVE_CODE_DUMP) && defined(VERBOSE) && 0
+  #if defined(WEMBED_NATIVE_CODE_DUMP) && defined(WEMBED_VERBOSE)
     dump_native();
   #endif
   }
@@ -157,14 +172,10 @@ namespace wembed {
     const char *lName = LLVMGetValueName(pDest); // If no name, probably optimised out
     if (lName != nullptr && strlen(lName) > 0) {
       LLVMAddGlobalMapping(mEngine, pDest, pSource);
-  #ifdef VERBOSE
+  #ifdef WEMBED_VERBOSE
       std::cout << "remap " << lName << " to " << pSource << std::endl;
   #endif
     }
-  }
-
-  uint8_t *context::memory() {
-    return mMemory->data();
   }
 
 }  // namespace wembed
