@@ -1,5 +1,3 @@
-
-
 #pragma once
 
 #include <functional>
@@ -13,7 +11,6 @@
 #include "intrinsics.hpp"
 
 namespace wembed {
-
   class context {
   public:
     using mappings_t = std::unordered_map<std::string_view, void*>;
@@ -40,8 +37,8 @@ namespace wembed {
 #endif
 
   protected:
-    friend i32 intrinsics::grow_memory(uint8_t *pContext, uint32_t pDelta);
-    friend i32 intrinsics::current_memory(uint8_t *pContext);
+    friend i32 intrinsics::memory_grow(uint8_t *pContext, uint32_t pDelta);
+    friend i32 intrinsics::memory_size(uint8_t *pContext);
 
     template<typename TReturn, typename... TParams>
     std::function<TReturn(TParams...)> get_fn_internal(const std::string &pName) {
@@ -56,8 +53,12 @@ namespace wembed {
     LLVMValueRef mBaseMemory;
 
     LLVMExecutionEngineRef mEngine = nullptr;
-    std::optional<virtual_mapping> mMemory;
+    std::optional<virtual_mapping> mSelfMemory;
+    virtual_mapping *mExternalMemory = nullptr;
     std::vector<std::vector<void*>> mTables;
+
+  public:
+    virtual_mapping *mem();
   };  // class context
 
 }  // namespace wembed

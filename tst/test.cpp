@@ -16,7 +16,7 @@ float spectest_global_f32 = 0;
 double spectest_global_f64 = 0;
 
 constexpr auto lPageSize = 64 * 1024;
-wembed::virtual_mapping spectest_mem(lPageSize *10, lPageSize *10);
+wembed::virtual_mapping spectest_mem(lPageSize, 2 * lPageSize);
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);

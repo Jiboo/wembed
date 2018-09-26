@@ -55,7 +55,8 @@ namespace wembed {
         mSqrt_f32, mSqrt_f64, mCeil_f32, mCeil_f64, mFloor_f32, mFloor_f64,
         mTrunc_f32, mTrunc_f64, mNearest_f32, mNearest_f64,
         mAbs_f32, mAbs_f64, mMin_f32, mMin_f64, mMax_f32, mMax_f64,
-        mCopysign_f32, mCopysign_f64, mGrowMemory, mCurrentMemory;
+        mCopysign_f32, mCopysign_f64, mMemoryGrow, mMemorySize,
+        mThrowUnlinkable;
     std::vector<LLVMValueRef> mEvalStack;
     enum CFInstr {
       cf_function, cf_block, cf_if, cf_else, cf_loop
@@ -174,6 +175,9 @@ namespace wembed {
     LLVMValueRef init_intrinsic(const std::string &pName, LLVMTypeRef pReturnType,
                                 const std::initializer_list<LLVMTypeRef> &pArgTypes);
     LLVMValueRef call_intrinsic(LLVMValueRef pIntrinsic, const std::initializer_list<LLVMValueRef> &pArgs);
+    void trap_if(LLVMValueRef lFunc, LLVMValueRef pCondition, LLVMValueRef pIntrinsic,
+                                   const std::initializer_list<LLVMValueRef> &pArgs);
+    void trap_data_copy(LLVMValueRef lFunc, LLVMValueRef pOffset, size_t pSize);
 
     LLVMValueRef clear_nan(LLVMValueRef pInput);
     LLVMValueRef clear_nan_internal(LLVMTypeRef pInputType, LLVMTypeRef pIntType, LLVMValueRef pInput,

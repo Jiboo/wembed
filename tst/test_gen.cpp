@@ -440,7 +440,6 @@ protected:
       }
     }
     else if (lId.mView == "assert_invalid") {
-
       auto lCodeStart = expect(token_t::OPAR);
       expect("module");
       auto lEnd = match_par();
@@ -457,6 +456,37 @@ protected:
                 << "  /*" << lCode << "*/\n"
                 << "  // Expected error: " << lError.mView << "\n"
                 << "  EXPECT_THROW(wembed::module(lInvalidBin, sizeof(lInvalidBin)), wembed::invalid_exception);\n";
+      }
+    }
+    else if (lId.mView == "assert_unlinkable") {
+      auto lCodeStart = expect(token_t::OPAR);
+      expect("module");
+      auto lEnd = match_par();
+      auto lError = expect(token_t::STR);
+      expect(token_t::CPAR);
+
+      string_view lCode(lCodeStart.mView.data(), lEnd.mView.data() - lCodeStart.mView.data() + 1);
+      string lBin = wast2wasm(lCode);
+      if (lBin.size() > 0) {
+        string lHex = bin2hex(lBin);
+        pOutput << "}\n\n"
+                << "TEST(" << mTestName << ", unlinkable" << ++mSectionIndex << ") {\n"
+                << "  uint8_t lUnlinkableBin[] = {" << lHex << "};\n"
+                << "  /*" << lCode << "*/\n"
+                << "  // Expected error: " << lError.mView << "\n"
+                << "  module lMod = wembed::module(lUnlinkableBin, sizeof(lUnlinkableBin));\n"
+                << "  EXPECT_THROW(wembed::context lContext(lMod, {\n"
+                   "    {\"spectest_global_i32\", (void*)&spectest_global_i32},\n"
+                   "    {\"spectest_global_f32\", (void*)&spectest_global_f32},\n"
+                   "    {\"spectest_global_f64\", (void*)&spectest_global_f64},\n"
+                   "    {\"spectest_print\", (void*)&spectest_print},\n"
+                   "    {\"spectest_print_i32\", (void*)&spectest_print_i32},\n"
+                   "    {\"spectest_print_i32_f32\", (void*)&spectest_print_i32_f32},\n"
+                   "    {\"spectest_print_f64_f64\", (void*)&spectest_print_f64_f64},\n"
+                   "    {\"spectest_print_f32\", (void*)&spectest_print_f32},\n"
+                   "    {\"spectest_print_f64\", (void*)&spectest_print_f64},\n"
+                   "    {\"spectest_memory\", (void*)&spectest_mem},\n"
+                   "  }), wembed::unlinkable_exception);\n";
       }
     }
     else if (lId.mView.find_first_of("assert_") == 0) {
@@ -494,7 +524,7 @@ protected:
           "    {\"spectest_print_f64_f64\", (void*)&spectest_print_f64_f64},\n"
           "    {\"spectest_print_f32\", (void*)&spectest_print_f32},\n"
           "    {\"spectest_print_f64\", (void*)&spectest_print_f64},\n"
-          "    {\"spectest_memory\", spectest_mem.data()},\n"
+          "    {\"spectest_memory\", (void*)&spectest_mem},\n"
           "  });\n";
       mOutput.flush();
       try {

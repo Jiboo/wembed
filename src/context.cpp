@@ -38,6 +38,7 @@ namespace wembed {
       }
     }
 
+    constexpr auto lPageSize = 64 * 1024;
     if (pModule.mMemoryTypes.size()) {
       mMemoryLimits = pModule.mMemoryTypes[0].mLimits;
       mBaseMemory = LLVMGetNamedGlobal(pModule.mModule, "baseMemory");
@@ -45,25 +46,24 @@ namespace wembed {
         if (mBaseMemory != nullptr) {
           if (pMappings.find(pModule.mMemoryImport) == pMappings.end())
             throw std::runtime_error("can't find memory import in mapping list");
-          map_global(mBaseMemory, pMappings[pModule.mMemoryImport]);
+          mExternalMemory = static_cast<virtual_mapping *>(pMappings[pModule.mMemoryImport]);
+          mExternalMemory->resize(std::max(mExternalMemory->size(), size_t(mMemoryLimits.mInitial * lPageSize)));
+          map_global(mBaseMemory, mExternalMemory->data());
 #ifdef WEMBED_VERBOSE
-          std::cout << "bound external memory: " << mMemory->size() << ", reserved "
-                    << mMemory->capacity() << " at " << (void *) mMemory->data() << std::endl;
+          std::cout << "bound external memory: " << mExternalMemory->size() << ", reserved "
+                    << mExternalMemory->capacity() << " at " << (void *) mExternalMemory->data() << std::endl;
 #endif
         }
       }
       else {
-        constexpr auto lPageSize = 64 * 1024;
         auto lAllocatedSize = (mMemoryLimits.mFlags & 0x1)
                               ? (mMemoryLimits.mMaximum + 1) * lPageSize : 256UL * 1024 * 1024;
-        mMemory.emplace(mMemoryLimits.mInitial * lPageSize, lAllocatedSize);
+        mSelfMemory.emplace(mMemoryLimits.mInitial * lPageSize, lAllocatedSize);
         if (mBaseMemory != nullptr)
-          map_global(mBaseMemory, mMemory->data());
-        map_intrinsic(pModule.mModule, "wembed.grow_memory.i32", (void*)&wembed::intrinsics::grow_memory);
-        map_intrinsic(pModule.mModule, "wembed.current_memory.i32", (void*)&wembed::intrinsics::current_memory);
+          map_global(mBaseMemory, mSelfMemory->data());
 #ifdef WEMBED_VERBOSE
-        std::cout << "initial memory size: " << mMemory->size() << ", reserved "
-                  << mMemory->capacity() << " at " << (void *) mMemory->data() << std::endl;
+        std::cout << "initial memory size: " << mSelfMemory->size() << ", reserved "
+                  << mSelfMemory->capacity() << " at " << (void *) mSelfMemory->data() << std::endl;
 #endif
       }
     }
@@ -84,6 +84,10 @@ namespace wembed {
     map_intrinsic(pModule.mModule, "wembed.trunc.f64", (void*)&wembed::intrinsics::trunc<f64>);
     map_intrinsic(pModule.mModule, "wembed.nearbyint.f32", (void*)&wembed::intrinsics::nearest<f32>);
     map_intrinsic(pModule.mModule, "wembed.nearbyint.f64", (void*)&wembed::intrinsics::nearest<f64>);
+
+    map_intrinsic(pModule.mModule, "wembed.memory.grow.i32", (void*) &wembed::intrinsics::memory_grow);
+    map_intrinsic(pModule.mModule, "wembed.memory.size.i32", (void*) &wembed::intrinsics::memory_size);
+    map_intrinsic(pModule.mModule, "wembed.throw.unlinkable", (void*) &wembed::intrinsics::throw_unlinkable);
 
     const size_t lTableCount = pModule.mTables.size();
     mTables.resize(lTableCount);
@@ -176,6 +180,10 @@ namespace wembed {
       std::cout << "remap " << lName << " to " << pSource << std::endl;
   #endif
     }
+  }
+
+  virtual_mapping *context::mem() {
+    return mExternalMemory ? mExternalMemory : &(mSelfMemory.value());
   }
 
 }  // namespace wembed

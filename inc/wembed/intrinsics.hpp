@@ -1,8 +1,16 @@
 #pragma once
 
+#include <exception>
+#include <string>
+
 #include "utils.hpp"
 
 namespace wembed {
+
+  class unlinkable_exception : std::runtime_error {
+  public:
+    unlinkable_exception(const std::string &pCause) : runtime_error(pCause) {}
+  };
 
   namespace intrinsics {
     template<typename T>
@@ -52,8 +60,10 @@ namespace wembed {
       else return std::nearbyint(pVal);
     }
 
-    i32 grow_memory(uint8_t *pContext, uint32_t pDelta);
-    i32 current_memory(uint8_t *pContext);
+    i32 memory_grow(uint8_t *pContext, uint32_t pDelta);
+    i32 memory_size(uint8_t *pContext);
+
+    void throw_unlinkable(const char *pError);
   }
 
 }  // namespace wembed

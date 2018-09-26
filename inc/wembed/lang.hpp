@@ -235,8 +235,8 @@ namespace wembed {
     o_reinterpret_f32_i32 = 0xbe,
     o_reinterpret_f64_i64 = 0xbf,
 
-    o_grow_memory = 0x40,
-    o_current_memory = 0x3f,
+    o_memory_grow = 0x40,
+    o_memory_size = 0x3f,
   };
 
 }  // namespace wembed

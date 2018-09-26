@@ -136,6 +136,36 @@ namespace wembed {
     return LLVMBuildCall(mBuilder, pIntrinsic, lArgs, pArgs.size(), "");
   }
 
+
+  void module::trap_if(LLVMValueRef lFunc, LLVMValueRef pCondition, LLVMValueRef pIntrinsic,
+                                         const std::initializer_list<LLVMValueRef> &pArgs) {
+    LLVMBasicBlockRef lTrapThen = LLVMAppendBasicBlock(lFunc, "trapThen");
+    LLVMBasicBlockRef lTrapSkip = LLVMAppendBasicBlock(lFunc, "trapSkip");
+
+    LLVMBuildCondBr(mBuilder, pCondition, lTrapThen, lTrapSkip);
+
+    auto lPrevBlock = LLVMGetInsertBlock(mBuilder);
+    LLVMMoveBasicBlockAfter(lTrapSkip, lPrevBlock);
+    LLVMMoveBasicBlockAfter(lTrapThen, lPrevBlock);
+
+    LLVMPositionBuilderAtEnd(mBuilder, lTrapThen);
+    call_intrinsic(pIntrinsic, pArgs);
+    LLVMBuildUnreachable(mBuilder);
+
+    LLVMPositionBuilderAtEnd(mBuilder, lTrapSkip);
+  }
+
+  void module::trap_data_copy(LLVMValueRef lFunc, LLVMValueRef pOffset, size_t pSize) {
+    LLVMValueRef lMemorySizePage = LLVMBuildCall(mBuilder, mMemorySize, &mContextRef, 1, "curMemPage");
+    LLVMValueRef lMemorySizeBytes = LLVMBuildMul(mBuilder, lMemorySizePage, get_const(64 * 1024), "curMemByte");
+    LLVMValueRef lUnderflow = LLVMBuildICmp(mBuilder, LLVMIntSLT, pOffset, get_zero(LLVMTypeOf(pOffset)), "testOverflow");
+    LLVMValueRef lTotalOffset = LLVMBuildAdd(mBuilder, pOffset, get_const(i32(pSize)), "endByteOffset");
+    LLVMValueRef lOverflow = LLVMBuildICmp(mBuilder, LLVMIntUGT, lTotalOffset, lMemorySizeBytes, "testOverflow");
+    LLVMValueRef lBoundsError = LLVMBuildOr(mBuilder, lUnderflow, lOverflow, "boundsError");
+    static const char *lErrorString = "data segment does not fit";
+    trap_if(lFunc, lBoundsError, mThrowUnlinkable, {LLVMBuildIntToPtr(mBuilder, get_const(i64(lErrorString)), LLVMPointerType(LLVMInt8Type(), 0), "errorString")});
+  }
+
   void module::init_intrinsics() {
     mMemCpy = init_intrinsic("llvm.memcpy.p0i8.p0i8.i32", LLVMVoidType(), {
         LLVMPointerType(LLVMInt8Type(), 0), // dest
@@ -162,13 +192,14 @@ namespace wembed {
         LLVMInt1Type() // is_zero_undef
     });
 
-    mGrowMemory = init_intrinsic("wembed.grow_memory.i32", LLVMInt32Type(), {
+    mMemoryGrow = init_intrinsic("wembed.memory.grow.i32", LLVMInt32Type(), {
         LLVMPointerType(LLVMInt8Type(), 0),
         LLVMInt32Type()
     });
-    mCurrentMemory = init_intrinsic("wembed.current_memory.i32", LLVMInt32Type(), {
+    mMemorySize = init_intrinsic("wembed.memory.size.i32", LLVMInt32Type(), {
         LLVMPointerType(LLVMInt8Type(), 0)
     });
+    mThrowUnlinkable = init_intrinsic("wembed.throw.unlinkable", LLVMVoidType(), {LLVMPointerType(LLVMInt8Type(), 0)});
 
     mCtpop_i32 = init_intrinsic("llvm.ctpop.i32", LLVMInt32Type(), {LLVMInt32Type()});
     mCtpop_i64 = init_intrinsic("llvm.ctpop.i64", LLVMInt64Type(), {LLVMInt64Type()});
@@ -549,7 +580,7 @@ namespace wembed {
           LLVMSetLinkage(lFunction, LLVMLinkage::LLVMExternalLinkage);
           mFunctions.push_back(lFunction);
   #ifdef WEMBED_VERBOSE
-          std::cout << "Extern func " << mFunctions.size() << ": " << LLVMPrintTypeToString(lNewType) << std::endl;
+          std::cout << "Extern func " << mFunctions.size() << ": " << LLVMPrintTypeToString(lType) << std::endl;
   #endif
         } break;
         case ek_global: {
@@ -566,6 +597,8 @@ namespace wembed {
           parse_table_type();
           break;
         case ek_memory:
+          if (!mMemoryTypes.empty())
+            throw invalid_exception("multiple memories");
           mMemoryImport = lName.str();
           memory_type lMemType;
           lMemType.mLimits = parse_resizable_limits();
@@ -605,6 +638,8 @@ namespace wembed {
     uint32_t lCount = parse_uleb128<uint32_t>();
     if (lCount > 1)
       throw invalid_exception("only one memory region supported");
+    if (!mMemoryTypes.empty() && lCount > 0)
+      throw invalid_exception("multiple memories");
     for (size_t lI = 0; lI < lCount; lI++) {
       memory_type lResult;
       lResult.mLimits = parse_resizable_limits();
@@ -777,8 +812,8 @@ namespace wembed {
       size_t lCodeSize = lBodySize - (mCurrent - lBefore);
       uint8_t *lEndPos = mCurrent + lCodeSize;
       while (mCurrent < lEndPos && !mCFEntries.empty()) {
-  #if defined(WEMBED_VERBOSE) && 0
-        std::cout << "At instruction " << std::hex << (uint32_t)*mCurrent << std::dec
+  #if defined(WEMBED_VERBOSE) && 1
+        std::cout << "At instruction 0x" << std::hex << (uint32_t)*mCurrent << std::dec
                   << ", reachable: " << mCFEntries.back().mReachable
                   << ", depth: " << mUnreachableDepth << std::endl;
   #endif
@@ -802,8 +837,8 @@ namespace wembed {
                 mUnreachableDepth--;
               continue;
 
-            case o_grow_memory:
-            case o_current_memory:
+            case o_memory_grow:
+            case o_memory_size:
               mCurrent++;
               continue;
 
@@ -1174,16 +1209,16 @@ namespace wembed {
             LLVMBuildStore(mBuilder, lValue, mGlobals[lGlobalIndex]);
           } break;
 
-          case o_grow_memory: {
+          case o_memory_grow: {
             if (mMemoryTypes.empty()) throw invalid_exception("grow_memory without memory block");
             /*uint8_t lReserved =*/ parse_uleb128<uint8_t>();
             LLVMValueRef lArgs[] = { mContextRef, pop_int() };
-            push(LLVMBuildCall(mBuilder, mGrowMemory, lArgs, 2, "growMem"));
+            push(LLVMBuildCall(mBuilder, mMemoryGrow, lArgs, 2, "growMem"));
           } break;
-          case o_current_memory: {
+          case o_memory_size: {
             if (mMemoryTypes.empty()) throw invalid_exception("current_memory without memory block");
             /*uint8_t lReserved =*/ parse_uleb128<uint8_t>();
-            push(LLVMBuildCall(mBuilder, mCurrentMemory, &mContextRef, 1, "curMem"));
+            push(LLVMBuildCall(mBuilder, mMemorySize, &mContextRef, 1, "curMem"));
           } break;
 
   #define WEMBED_CONST(OPCODE, PARSEOP) case OPCODE: { \
@@ -1473,28 +1508,32 @@ namespace wembed {
           default:
             throw malformed_exception("unknown instruction");
         }
-  #if defined(WEMBED_VERBOSE) && 0
+  #if defined(WEMBED_VERBOSE) && 1
         std::cout << "Step: " << LLVMPrintValueToString(lFunc) << std::endl;
         std::cout << "Eval stack:" << mEvalStack.size() << std::endl;
         for (size_t i = 0; i < mEvalStack.size(); i++) {
           std::cout << '\t' << i << ": ";
           if (mEvalStack[i] == nullptr)
             std::cout << "null";
-          else
-            std::cout << LLVMPrintValueToString(mEvalStack[i]);
+          else {
+            std::cout << LLVMPrintValueToString(mEvalStack[i]) << ", "
+                      << LLVMPrintTypeToString(LLVMTypeOf(mEvalStack[i]));
+          }
           std::cout << std::endl;
         }
         std::cout << "Control flow stack:" << mCFEntries.size() << std::endl;
         for (size_t i = 0; i < mCFEntries.size(); i++) {
           std::cout << '\t' << i;
           std::cout << ": " << LLVMGetBasicBlockName(mCFEntries[i].mEnd);
-          std::cout << ", " << mCFEntries[i].mReachable;
+          std::cout << ", " << mCFEntries[i].mReachable << ", ";
+          std::cout << LLVMPrintTypeToString(mCFEntries[i].mSignature);
           std::cout << std::endl;
         }
         std::cout << "Block stack:" << mBlockEntries.size() << std::endl;
         for (size_t i = 0; i < mBlockEntries.size(); i++) {
           std::cout << '\t' << i << ": ";
-          std::cout << LLVMGetBasicBlockName(mBlockEntries[i].mBlock);
+          std::cout << LLVMGetBasicBlockName(mBlockEntries[i].mBlock) << ", ";
+          std::cout << LLVMPrintTypeToString(mBlockEntries[i].mSignature);
           std::cout << std::endl;
         }
   #endif
@@ -1530,15 +1569,17 @@ namespace wembed {
       if (LLVMTypeOf(lOffset) != LLVMInt32Type())
         throw invalid_exception("data offset expects i32");
       uint32_t lSize = parse_uleb128<uint32_t>();
-
-      call_intrinsic(mMemCpy, {
-          LLVMBuildInBoundsGEP(mBuilder, mBaseMemory, &lOffset, 1, "offseted"),
-          LLVMConstIntToPtr(LLVMConstInt(LLVMInt64Type(), ull_t(mCurrent), false),
-                            LLVMPointerType(LLVMInt8Type(), 0)),
-          LLVMConstInt(LLVMInt32Type(), lSize, false),
-          LLVMConstInt(LLVMInt1Type(), 1, false),
-      });
-      mCurrent += lSize;
+      trap_data_copy(mStartFunc, lOffset, lSize);
+      if (lSize > 0) {
+        call_intrinsic(mMemCpy, {
+            LLVMBuildInBoundsGEP(mBuilder, mBaseMemory, &lOffset, 1, "offseted"),
+            LLVMConstIntToPtr(LLVMConstInt(LLVMInt64Type(), ull_t(mCurrent), false),
+                              LLVMPointerType(LLVMInt8Type(), 0)),
+            LLVMConstInt(LLVMInt32Type(), lSize, false),
+            LLVMConstInt(LLVMInt1Type(), 1, false),
+        });
+        mCurrent += lSize;
+      }
     }
 
     LLVMBuildBr(mBuilder, mStartContinue);

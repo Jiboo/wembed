@@ -6,6 +6,7 @@
 namespace wembed {
 
   // Zeroed huge chunk of memory mapped to host virtual address space
+  // When resized, the pointers shall not be modified
   class virtual_mapping {
   public:
     virtual_mapping() {}
