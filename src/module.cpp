@@ -68,6 +68,8 @@ namespace wembed {
   LLVMValueRef module::top() {
     if (mEvalStack.empty())
       throw invalid_exception("topping empty stack");
+    else if (!mCFEntries.empty() && mEvalStack.size() <= mCFEntries.back().mOuterStackSize)
+      throw invalid_exception("topping stack outside bounds of current context");
     return mEvalStack.back();
   }
 
@@ -86,6 +88,8 @@ namespace wembed {
   LLVMValueRef module::pop() {
     if (mEvalStack.empty())
       throw invalid_exception("popping empty stack");
+    else if (!mCFEntries.empty() && mEvalStack.size() <= mCFEntries.back().mOuterStackSize)
+      throw invalid_exception("popping stack outside bounds of current context");
     auto lVal = mEvalStack.back();
     mEvalStack.pop_back();
     return lVal;
