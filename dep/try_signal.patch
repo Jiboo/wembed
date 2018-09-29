@@ -1,0 +1,111 @@
+commit 18a01682b77055924834b4421355da1ee5b77e61
+Author: Jiboo <lepesme.jb@gmail.com>
+Date:   Sat Sep 29 18:23:59 2018 +0200
+
+    invoke try_signal lambda with paremeter and result. Add support for FPE signal, and alternative stack to handle stack overflow SEGV. Tested on x86_64 linux only.
+
+diff --git a/try_signal.cpp b/try_signal.cpp
+index f8c2a1b..5b5b77f 100644
+--- a/try_signal.cpp
++++ b/try_signal.cpp
+@@ -77,12 +77,19 @@ void handler(int const signo, siginfo_t*, void*)
+ 
+ void setup_handler()
+ {
++	static char stack[SIGSTKSZ];
++	stack_t ss = {
++			.ss_size = SIGSTKSZ,
++			.ss_sp = stack,
++	};
+ 	struct sigaction sa;
+ 	sa.sa_sigaction = &sig::detail::handler;
+ 	sigemptyset(&sa.sa_mask);
+-	sa.sa_flags = SA_SIGINFO;
++	sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
++	sigaltstack(&ss, 0);
+ 	sigaction(SIGSEGV, &sa, nullptr);
+ 	sigaction(SIGBUS, &sa, nullptr);
++	sigaction(SIGFPE, &sa, nullptr);
+ }
+ 
+ } // detail namespace
+diff --git a/try_signal_mingw.hpp b/try_signal_mingw.hpp
+index e4db043..22d18c0 100644
+--- a/try_signal_mingw.hpp
++++ b/try_signal_mingw.hpp
+@@ -58,8 +58,9 @@ private:
+ 
+ } // detail namespace
+ 
+-template <typename Fun>
+-void try_signal(Fun&& f)
++
++template<class TFunctor, class... TParams>
++decltype(auto) try_signal(TFunctor pFunctor, TParams...pParams)
+ {
+ 	jmp_buf buf;
+ 	int const code = setjmp(buf);
+@@ -69,7 +70,7 @@ void try_signal(Fun&& f)
+ 	if (code != 0)
+ 		throw std::system_error(std::error_code(code, seh_category()));
+ 
+-	f();
++	return std::invoke(pFunctor, pParams...);
+ }
+ 
+ } // sig namespace
+diff --git a/try_signal_msvc.hpp b/try_signal_msvc.hpp
+index 04cc62d..77b63eb 100644
+--- a/try_signal_msvc.hpp
++++ b/try_signal_msvc.hpp
+@@ -42,12 +42,12 @@ bool catch_error(int const code);
+ 
+ } // detail namespace
+ 
+-template <typename Fun>
+-void try_signal(Fun&& f)
++template<class TFunctor, class... TParams>
++decltype(auto) try_signal(TFunctor pFunctor, TParams...pParams)
+ {
+ 	__try
+ 	{
+-		f();
++		return std::invoke(pFunctor, pParams...);
+ 	}
+ 	__except (detail::catch_error(GetExceptionCode()))
+ 	{
+diff --git a/try_signal_posix.hpp b/try_signal_posix.hpp
+index ee86bc3..4abab7c 100644
+--- a/try_signal_posix.hpp
++++ b/try_signal_posix.hpp
+@@ -36,6 +36,7 @@ POSSIBILITY OF SUCH DAMAGE.
+ #include "signal_error_code.hpp"
+ #include <setjmp.h> // for sigjmp_buf
+ #include <atomic>
++#include <functional>
+ 
+ namespace sig {
+ 
+@@ -58,8 +59,8 @@ void setup_handler();
+ 
+ } // detail namespace
+ 
+-template <typename Fun>
+-void try_signal(Fun&& f)
++template<class TFunctor, class... TParams>
++decltype(auto) try_signal(TFunctor pFunctor, TParams...pParams)
+ {
+ 	if (sig::detail::once.test_and_set() == false) {
+ 		sig::detail::setup_handler();
+@@ -73,10 +74,9 @@ void try_signal(Fun&& f)
+ 	if (sig != 0)
+ 		throw std::system_error(static_cast<sig::errors::error_code_enum>(sig));
+ 
+-	f();
++	return std::invoke(pFunctor, pParams...);
+ }
+ 
+ }
+ 
+ #endif
+-

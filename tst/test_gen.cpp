@@ -18,16 +18,6 @@ const unordered_set<string> sBlacklist = {
     "comments",
     "inline-module",
 
-    // WONT FIX: This code isn't emitted, ozef
-    "unreached-invalid",
-
-    //FIXME UTF8
-    "names",
-    "utf8-custom-section-id",
-    "utf8-import-field",
-    "utf8-import-module",
-    "utf8-invalid-encoding",
-
     //FIXME Multimodule support
     "elem",
     "imports",
@@ -120,19 +110,19 @@ struct tokenizer_t {
         return;
 
       if (isspace(*mInput)) {
-        while (isspace(*mInput) && mInput < mEnd)
+        while (mInput < mEnd && isspace(*mInput))
           mInput++;
         handled = true;
       }
       if (mInput + 2 < mEnd) {
         if (mInput[0] == ';' && mInput[1] == ';') {
           handled = true;
-          while (*mInput != '\n' && mInput < mEnd)
+          while (mInput < mEnd && *mInput != '\n')
             mInput++;
         } else if (mInput[0] == '(' && mInput[1] == ';') {
           handled = true;
           mInput += 2;
-          while ((mInput[0] != ';' || mInput[1] != ')') && mInput < mEnd)
+          while (mInput < mEnd && (mInput[0] != ';' || mInput[1] != ')'))
             mInput++;
           mInput += 2;
         }
@@ -288,8 +278,15 @@ protected:
       return "i32";
     else if (lType == LLVMInt64Type())
       return "i64";
+    else if (lType == LLVMVoidType())
+      return "void";
     else
       throw std::runtime_error("can't determine return type");
+  }
+
+  std::string fixescape(const std::string_view &pView) {
+    static std::regex findEscape("\\\\([0-9a-zA-Z][0-9a-zA-Z])");
+    return std::regex_replace(std::string(pView), findEscape, "\\0x$1");
   }
 
   bool parse_assertion(ostream &pOutput) {
@@ -299,7 +296,7 @@ protected:
     auto lStart = expect(token_t::OPAR);
     auto lId = mTokenizer.next();
     if (lId.mView == "invoke") {
-      auto lFuncName = expect(token_t::STR);
+      auto lFuncName = fixescape(expect(token_t::STR).mView);
       stringstream lArgTypes, lArgs;
       auto lNext = mTokenizer.next();
       // Parse params
@@ -313,12 +310,12 @@ protected:
       }
       string lArgsFormatted = lArgs.str().substr(0, lArgs.str().size() - 2);
       pOutput << "  lCtx.get_fn<" << "void" << lArgTypes.str() << ">("
-              << lFuncName.mView << ")(" << lArgsFormatted << ");\n";
+              << lFuncName << ")(" << lArgsFormatted << ");\n";
     }
     else if (lId.mView == "assert_return") {
       expect(token_t::OPAR);
       expect("invoke");
-      auto lFuncName = expect(token_t::STR);
+      auto lFuncName = fixescape(expect(token_t::STR).mView);
       stringstream lArgTypes, lArgs;
       auto lNext = mTokenizer.next();
       // Parse params
@@ -349,7 +346,7 @@ protected:
         pOutput << "  ";
       string lArgsFormatted = lArgs.str().substr(0, lArgs.str().size() - 2);
       pOutput << "lCtx.get_fn<" << lReturnType << lArgTypes.str() << ">("
-              << lFuncName.mView << ")(" << lArgsFormatted << ')';
+              << lFuncName << ")(" << lArgsFormatted << ')';
       if (lReturnType != "void") {
         pOutput << "; EXPECT_EQ(" << lExpectedValue.str() << ", ";
         if (lReturnType[0] == 'i')
@@ -488,6 +485,41 @@ protected:
                    "    {\"spectest_memory\", (void*)&spectest_mem},\n"
                    "  }), wembed::unlinkable_exception);\n";
       }
+    }
+    else if (lId.mView == "assert_trap" || lId.mView == "assert_exhaustion") {
+      expect(token_t::OPAR);
+      auto lType = expect(token_t::NAME);
+      if (lType.mView == "invoke") {
+        auto lFuncName = expect(token_t::STR);
+        stringstream lArgTypes, lArgs;
+        auto lNext = mTokenizer.next();
+        // Parse params
+        while (lNext.mType != token_t::CPAR) {
+          auto lType = mTokenizer.next().mView.substr(0, 3);
+          auto lValue = mTokenizer.next();
+          expect(token_t::CPAR);
+          lArgTypes << ", " << lType;
+          lArgs << dump_value(lType, lValue.mView) << ", ";
+          lNext = mTokenizer.next();
+        }
+        assert(lNext.mType == token_t::CPAR);
+        string lCleanedName = string(lFuncName.mView.data() + 1, lFuncName.mView.size() - 2);
+        string lReturnType = func_return_type(lCleanedName);
+        string lArgsFormatted = lArgs.str().substr(0, lArgs.str().size() - 2);
+        pOutput << "  {\n"
+                << "    auto lThrow = [&lCtx]() {\n"
+                << "      lCtx.get_fn<" << lReturnType << lArgTypes.str() << ">("
+                << lFuncName.mView << ")(" << lArgsFormatted << ");\n"
+                << "    };\n"
+                << "    EXPECT_THROW(lThrow(), vm_runtime_exception);\n"
+                << "  }\n";
+      }
+      else {
+        std::cerr << "unsuported assert trap: " << lType.mView << std::endl;
+        match_par();
+      }
+      expect(token_t::STR); // trap error string
+      expect(token_t::CPAR);
     }
     else if (lId.mView.find_first_of("assert_") == 0) {
       // unsuported assert type

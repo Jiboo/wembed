@@ -1,0 +1,6 @@
+[submodule "dep/testsuite"]
+	path = dep/testsuite
+	url = https://github.com/Jiboo/testsuite
+[submodule "dep/try_signal"]
+	path = dep/try_signal
+	url = https://github.com/Jiboo/try_signal

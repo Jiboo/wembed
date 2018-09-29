@@ -45,7 +45,12 @@ namespace wembed {
     LLVMValueRef mContextRef;
     struct Table {
       table_type mType;
-      LLVMValueRef mGlobal;
+      LLVMValueRef mPointers;
+      LLVMValueRef mTypes;
+
+      inline Table() {}
+      inline Table(table_type pType, LLVMValueRef pPointers, LLVMValueRef pTypes)
+        : mType(pType), mPointers(pPointers), mTypes(pTypes) {}
     };
     std::vector<Table> mTables;
     LLVMValueRef mStartFunc;
@@ -56,7 +61,8 @@ namespace wembed {
         mTrunc_f32, mTrunc_f64, mNearest_f32, mNearest_f64,
         mAbs_f32, mAbs_f64, mMin_f32, mMin_f64, mMax_f32, mMax_f64,
         mCopysign_f32, mCopysign_f64, mMemoryGrow, mMemorySize,
-        mThrowUnlinkable;
+        mUAddWithOverflow_i32, mUAddWithOverflow_i64,
+        mThrowUnlinkable, mThrowVMException;
     std::vector<LLVMValueRef> mEvalStack;
     enum CFInstr {
       cf_function, cf_block, cf_if, cf_else, cf_loop
@@ -71,12 +77,24 @@ namespace wembed {
       size_t mOuterBlockDepth;
       bool mReachable;
       bool mElseReachable;
+
+      inline CFEntry() {}
+      inline CFEntry(CFInstr pInstr, LLVMTypeRef pSignature, LLVMBasicBlockRef pEnd, LLVMValueRef pPhi,
+                     LLVMBasicBlockRef pElse, size_t pOuterStackSize, size_t pOuterBlockDepth,
+                     bool pReachable, bool pElseReachable)
+                     : mInstr(pInstr), mSignature(pSignature), mEnd(pEnd), mPhi(pPhi), mElse(pElse),
+                       mOuterStackSize(pOuterStackSize), mOuterBlockDepth(pOuterBlockDepth),
+                       mReachable(pReachable), mElseReachable(pElseReachable) {}
     };
     std::vector<CFEntry> mCFEntries;
     struct BlockEntry {
       LLVMTypeRef mSignature;
       LLVMBasicBlockRef mBlock;
       LLVMValueRef mPhi;
+
+      inline BlockEntry() {}
+      inline BlockEntry(LLVMTypeRef pSignature, LLVMBasicBlockRef pBlock, LLVMValueRef pPhi)
+        : mSignature(pSignature), mBlock(pBlock), mPhi(pPhi) {}
     };
     std::vector<BlockEntry> mBlockEntries;
 
@@ -154,6 +172,7 @@ namespace wembed {
     LLVMValueRef get_const(float value) { return LLVMConstReal(LLVMFloatType(), value); }
     LLVMValueRef get_const(double value) { return LLVMConstReal(LLVMDoubleType(), value); }
     LLVMValueRef get_zero(LLVMTypeRef pType);
+    LLVMValueRef get_string(const char *pStart);
 
     uint8_t bit_count(LLVMTypeRef pType);
 
@@ -175,6 +194,17 @@ namespace wembed {
     LLVMValueRef init_intrinsic(const std::string &pName, LLVMTypeRef pReturnType,
                                 const std::initializer_list<LLVMTypeRef> &pArgTypes);
     LLVMValueRef call_intrinsic(LLVMValueRef pIntrinsic, const std::initializer_list<LLVMValueRef> &pArgs);
+    LLVMValueRef init_mv_intrinsic(const std::string &pName, const std::initializer_list<LLVMTypeRef> &pReturnTypes,
+                                const std::initializer_list<LLVMTypeRef> &pArgTypes);
+    template<size_t TCount>
+    std::array<LLVMValueRef, TCount> call_mv_intrinsic(LLVMValueRef pIntrinsic, const std::initializer_list<LLVMValueRef> &pArgs) {
+      LLVMValueRef *lArgs = const_cast<LLVMValueRef*>(pArgs.begin());
+      LLVMValueRef lCallResult = LLVMBuildCall(mBuilder, pIntrinsic, lArgs, pArgs.size(), "res");
+      std::array<LLVMValueRef, TCount> lResult;
+      for (size_t lIndex = 0; lIndex < TCount; lIndex++)
+        lResult[lIndex] = LLVMBuildExtractValue(mBuilder, lCallResult, lIndex, "elem");
+      return lResult;
+    }
     void trap_if(LLVMValueRef lFunc, LLVMValueRef pCondition, LLVMValueRef pIntrinsic,
                                    const std::initializer_list<LLVMValueRef> &pArgs);
     void trap_data_copy(LLVMValueRef lFunc, LLVMValueRef pOffset, size_t pSize);

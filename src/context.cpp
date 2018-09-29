@@ -88,30 +88,36 @@ namespace wembed {
     map_intrinsic(pModule.mModule, "wembed.memory.grow.i32", (void*) &wembed::intrinsics::memory_grow);
     map_intrinsic(pModule.mModule, "wembed.memory.size.i32", (void*) &wembed::intrinsics::memory_size);
     map_intrinsic(pModule.mModule, "wembed.throw.unlinkable", (void*) &wembed::intrinsics::throw_unlinkable);
+    map_intrinsic(pModule.mModule, "wembed.throw.vm_exception", (void*) &wembed::intrinsics::throw_vm_exception);
 
     const size_t lTableCount = pModule.mTables.size();
     mTables.resize(lTableCount);
     for (size_t i = 0; i < lTableCount; i++) {
       module::Table lTableSpec = pModule.mTables[i];
-      mTables[i].resize(lTableSpec.mType.mLimits.mInitial);
-      map_global(lTableSpec.mGlobal, mTables[i].data());
+      mTables[i].mPointers.resize(lTableSpec.mType.mLimits.mInitial, nullptr);
+      mTables[i].mTypes.resize(lTableSpec.mType.mLimits.mInitial, 0);
+      map_global(lTableSpec.mPointers, mTables[i].mPointers.data());
+      map_global(lTableSpec.mTypes, mTables[i].mTypes.data());
     }
     get_fn_internal<void>("__start")();
     // Replaces indices loaded in tables
     for (size_t i = 0; i < lTableCount; i++) {
-      std::vector<void*> &lContainer = mTables[i];
+      RuntimeTable &lContainer = mTables[i];
       table_type &lType = pModule.mTables[i].mType;
       for (size_t ptr = 0; ptr < lType.mLimits.mInitial; ptr++) {
-        void *lIndice = lContainer[ptr];
-        const char *lName = LLVMGetValueName(pModule.mFunctions[(size_t)lIndice]);
-        void *lAddress = (void*)LLVMGetFunctionAddress(mEngine, lName);
+        void *lIndice = lContainer.mPointers[ptr];
+        LLVMValueRef lFunc = pModule.mFunctions[(size_t)lIndice];
+        auto lName = value_name(lFunc);
+        void *lAddress = (void*)LLVMGetFunctionAddress(mEngine, lName.data());
         if (!lAddress)
           throw std::runtime_error("func in table was opt out");
+        auto lTypeHash = hash_fn_type(LLVMGetElementType(LLVMTypeOf(lFunc)));
   #ifdef WEMBED_VERBOSE
         std::cout << "remap table element for " << i << ", " << ptr << " aka "
-                  << lName << ": " << lAddress << std::endl;
+                  << lName << ": " << lAddress << ", type: " << lTypeHash << std::endl;
   #endif
-        lContainer[ptr] = lAddress;
+        lContainer.mPointers[ptr] = lAddress;
+        lContainer.mTypes[ptr] = lTypeHash;
       }
     }
   #if defined(WEMBED_NATIVE_CODE_DUMP) && defined(WEMBED_VERBOSE)
@@ -138,10 +144,10 @@ namespace wembed {
 
     char lOutput[2048];
     for (size_t lIndex = mModule.mImportFuncOffset; lIndex < mModule.mFunctions.size(); lIndex++) {
-      const char *lName = LLVMGetValueName(mModule.mFunctions[lIndex]);
-      if (lName == nullptr || strlen(lName) == 0)
+      auto lName = value_name(mModule.mFunctions[lIndex]);
+      if (lName == nullptr || lName.size() == 0)
         continue;
-      uint8_t* lAddress = (uint8_t*)LLVMGetFunctionAddress(mEngine, lName);
+      uint8_t* lAddress = (uint8_t*)LLVMGetFunctionAddress(mEngine, lName.data());
       std::cout << "Function " << lName << " at " << (void*)lAddress << std::endl;
 
       uint8_t *lEnd = lAddress + 128;
@@ -173,8 +179,8 @@ namespace wembed {
   }
 
   void context::map_global(LLVMValueRef pDest, void *pSource) {
-    const char *lName = LLVMGetValueName(pDest); // If no name, probably optimised out
-    if (lName != nullptr && strlen(lName) > 0) {
+    auto lName = value_name(pDest); // If no name, probably optimised out
+    if (lName != nullptr && lName.size() > 0) {
       LLVMAddGlobalMapping(mEngine, pDest, pSource);
   #ifdef WEMBED_VERBOSE
       std::cout << "remap " << lName << " to " << pSource << std::endl;

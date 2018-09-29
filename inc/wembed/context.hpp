@@ -5,6 +5,8 @@
 
 #include <llvm-c/ExecutionEngine.h>
 
+#include "try_signal.hpp"
+
 #include "lang.hpp"
 #include "utils.hpp"
 #include "module.hpp"
@@ -45,8 +47,16 @@ namespace wembed {
       uint64_t lAddress = LLVMGetFunctionAddress(mEngine, pName.c_str());
       if (!lAddress)
         throw std::runtime_error("function not found");
-      return reinterpret_cast<TReturn (*)(TParams...)>(lAddress);
-    };
+      auto lPointer = reinterpret_cast<TReturn (*)(TParams...)>(lAddress);
+      return [lPointer](TParams...pParams) -> TReturn {
+        try {
+          return sig::try_signal(lPointer, pParams...);
+        }
+        catch(const std::system_error &pError) {
+          throw vm_runtime_exception(pError.what());
+        }
+      };
+    }
 
     module &mModule;
     resizable_limits mMemoryLimits;
@@ -55,7 +65,11 @@ namespace wembed {
     LLVMExecutionEngineRef mEngine = nullptr;
     std::optional<virtual_mapping> mSelfMemory;
     virtual_mapping *mExternalMemory = nullptr;
-    std::vector<std::vector<void*>> mTables;
+    struct RuntimeTable {
+      std::vector<void*> mPointers;
+      std::vector<uint64_t> mTypes;
+    };
+    std::vector<RuntimeTable> mTables;
 
   public:
     virtual_mapping *mem();

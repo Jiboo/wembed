@@ -38,4 +38,8 @@ namespace wembed {
     throw unlinkable_exception(pErrorString);
   }
 
+  void intrinsics::throw_vm_exception(const char *pErrorString) {
+    throw vm_runtime_exception(pErrorString);
+  }
+
 }  // namespace wembed
