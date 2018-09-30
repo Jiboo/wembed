@@ -48,7 +48,7 @@ namespace wembed {
     static constexpr bits sMantissaMask = 0b00000000'01111111'11111111'11111111;
     union {
       struct {
-        bits mSignificand : 23;
+        bits mMantissa : 23;
         bits mExponent : 8;
         bits mSign : 1;
       } mBits;
@@ -70,7 +70,7 @@ namespace wembed {
     static constexpr bits sMantissaMask = 0b00000000'00001111'11111111'11111111'11111111'11111111'11111111'11111111;
     union {
       struct {
-        bits mSignificand : 52;
+        bits mMantissa : 52;
         bits mExponent : 11;
         bits mSign : 1;
       } mBits;

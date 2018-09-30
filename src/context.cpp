@@ -74,19 +74,6 @@ namespace wembed {
     if (lContextRef != nullptr)
       map_global(lContextRef, this);
 
-    map_intrinsic(pModule.mModule, "wembed.minnum.f32", (void*)&wembed::intrinsics::min<f32>);
-    map_intrinsic(pModule.mModule, "wembed.minnum.f64", (void*)&wembed::intrinsics::min<f64>);
-    map_intrinsic(pModule.mModule, "wembed.maxnum.f32", (void*)&wembed::intrinsics::max<f32>);
-    map_intrinsic(pModule.mModule, "wembed.maxnum.f64", (void*)&wembed::intrinsics::max<f64>);
-    map_intrinsic(pModule.mModule, "wembed.floor.f32", (void*)&wembed::intrinsics::floor<f32>);
-    map_intrinsic(pModule.mModule, "wembed.floor.f64", (void*)&wembed::intrinsics::floor<f64>);
-    map_intrinsic(pModule.mModule, "wembed.ceil.f32", (void*)&wembed::intrinsics::ceil<f32>);
-    map_intrinsic(pModule.mModule, "wembed.ceil.f64", (void*)&wembed::intrinsics::ceil<f64>);
-    map_intrinsic(pModule.mModule, "wembed.trunc.f32", (void*)&wembed::intrinsics::trunc<f32>);
-    map_intrinsic(pModule.mModule, "wembed.trunc.f64", (void*)&wembed::intrinsics::trunc<f64>);
-    map_intrinsic(pModule.mModule, "wembed.nearbyint.f32", (void*)&wembed::intrinsics::nearest<f32>);
-    map_intrinsic(pModule.mModule, "wembed.nearbyint.f64", (void*)&wembed::intrinsics::nearest<f64>);
-
     map_intrinsic(pModule.mModule, "wembed.memory.grow.i32", (void*) &wembed::intrinsics::memory_grow);
     map_intrinsic(pModule.mModule, "wembed.memory.size.i32", (void*) &wembed::intrinsics::memory_size);
     map_intrinsic(pModule.mModule, "wembed.throw.unlinkable", (void*) &wembed::intrinsics::throw_unlinkable);

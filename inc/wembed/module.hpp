@@ -185,6 +185,10 @@ namespace wembed {
     LLVMValueRef emit_rotl(LLVMTypeRef pType, LLVMValueRef pLHS, LLVMValueRef pRHS);
     LLVMValueRef emit_rotr(LLVMTypeRef pType, LLVMValueRef pLHS, LLVMValueRef pRHS);
     LLVMValueRef emit_srem(LLVMTypeRef pType, LLVMValueRef lFunc, LLVMValueRef pLHS, LLVMValueRef pRHS);
+    LLVMValueRef emit_quiet_nan(LLVMValueRef pInput);
+    LLVMValueRef emit_quiet_nan_or_intrinsic(LLVMValueRef pInput, LLVMValueRef pF32Intr, LLVMValueRef pF64Intr);
+    LLVMValueRef emit_min(LLVMValueRef pLHS, LLVMValueRef pRHS);
+    LLVMValueRef emit_max(LLVMValueRef pLHS, LLVMValueRef pRHS);
 
     LLVMTypeRef parse_llvm_btype();
     LLVMTypeRef parse_llvm_vtype();

@@ -36,7 +36,7 @@ wembed::fp_bits<T> fp(const char *p) {
     case 'I':
     case 'i':
       lResult.mBits.mExponent = wembed::fp_bits<T>::sMaxExponent;
-      lResult.mBits.mSignificand = 0;
+      lResult.mBits.mMantissa = 0;
       break;
     case 'N':
     case 'n': {
@@ -44,9 +44,9 @@ wembed::fp_bits<T> fp(const char *p) {
       assert(p[lIndex + 2] == 'n' || p[lIndex + 2] == 'N');
       lResult.mBits.mExponent = wembed::fp_bits<T>::sMaxExponent;
       if (p[lIndex + 3] == ':') {
-        lResult.mBits.mSignificand = bits(strtoul(p + lIndex + 4, nullptr, 0));
+        lResult.mBits.mMantissa = bits(strtoul(p + lIndex + 4, nullptr, 0));
       } else {
-        lResult.mBits.mSignificand = wembed::fp_bits<T>::sQuietNan;
+        lResult.mBits.mMantissa = wembed::fp_bits<T>::sQuietNan;
       }
     } break;
     default:
@@ -60,15 +60,15 @@ template<typename T>
 bool canonical_nan(T pInput) {
   wembed::fp_bits<T> lComponents(pInput);
   return lComponents.mBits.mExponent == wembed::fp_bits<T>::sMaxExponent
-         && lComponents.mBits.mSignificand != 0
-         && (lComponents.mBits.mSignificand & wembed::fp_bits<T>::sQuietNan);
+         && lComponents.mBits.mMantissa != 0
+         && (lComponents.mBits.mMantissa & wembed::fp_bits<T>::sQuietNan);
 }
 
 template<typename T>
 bool arithmetic_nan(T pInput) {
   wembed::fp_bits<T> lComponents(pInput);
   return lComponents.mBits.mExponent == wembed::fp_bits<T>::sMaxExponent
-         && lComponents.mBits.mSignificand != 0;
+         && lComponents.mBits.mMantissa != 0;
 }
 
 namespace wembed {
@@ -91,7 +91,7 @@ namespace wembed {
   std::ostream &operator<<(std::ostream &pOS, const fp_bits<T> &pVal) {
     if (pVal.mBits.mExponent == fp_bits<T>::sMaxExponent) {
       pOS << (pVal.mBits.mSign ? "-" : "+");
-      if (pVal.mBits.mSignificand == 0)
+      if (pVal.mBits.mMantissa == 0)
         pOS << "inf";
       else
         pOS << "nan";
@@ -101,6 +101,6 @@ namespace wembed {
     return pOS << " (" << std::hex << pVal.mRaw << ", "
                << pVal.mBits.mSign << ", "
                << pVal.mBits.mExponent << ", "
-               << pVal.mBits.mSignificand << std::dec << ')';
+               << pVal.mBits.mMantissa << std::dec << ')';
   }
 }

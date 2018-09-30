@@ -211,6 +211,30 @@ namespace wembed {
         LLVMInt1Type() // is_zero_undef
     });
 
+    mCtpop_i32 = init_intrinsic("llvm.ctpop.i32", LLVMInt32Type(), {LLVMInt32Type()});
+    mCtpop_i64 = init_intrinsic("llvm.ctpop.i64", LLVMInt64Type(), {LLVMInt64Type()});
+    mSqrt_f32 = init_intrinsic("llvm.sqrt.f32", LLVMFloatType(), {LLVMFloatType()});
+    mSqrt_f64 = init_intrinsic("llvm.sqrt.f64", LLVMDoubleType(), {LLVMDoubleType()});
+    mAbs_f32 = init_intrinsic("llvm.fabs.f32", LLVMFloatType(), {LLVMFloatType()});
+    mAbs_f64 = init_intrinsic("llvm.fabs.f64", LLVMDoubleType(), {LLVMDoubleType()});
+    mCopysign_f32 = init_intrinsic("llvm.copysign.f32", LLVMFloatType(), {LLVMFloatType(), LLVMFloatType()});
+    mCopysign_f64 = init_intrinsic("llvm.copysign.f64", LLVMDoubleType(), {LLVMDoubleType(), LLVMDoubleType()});
+    mCeil_f32 = init_intrinsic("llvm.ceil.f32", LLVMFloatType(), {LLVMFloatType()});
+    mCeil_f64 = init_intrinsic("llvm.ceil.f64", LLVMDoubleType(), {LLVMDoubleType()});
+    mFloor_f32 = init_intrinsic("llvm.floor.f32", LLVMFloatType(), {LLVMFloatType()});
+    mFloor_f64 = init_intrinsic("llvm.floor.f64", LLVMDoubleType(), {LLVMDoubleType()});
+    mTrunc_f32 = init_intrinsic("llvm.trunc.f32", LLVMFloatType(), {LLVMFloatType()});
+    mTrunc_f64 = init_intrinsic("llvm.trunc.f64", LLVMDoubleType(), {LLVMDoubleType()});
+    mNearest_f32 = init_intrinsic("llvm.nearbyint.f32", LLVMFloatType(), {LLVMFloatType()});
+    mNearest_f64 = init_intrinsic("llvm.nearbyint.f64", LLVMDoubleType(), {LLVMDoubleType()});
+    mMin_f32 = init_intrinsic("llvm.minnum.f32", LLVMFloatType(), {LLVMFloatType(), LLVMFloatType()});
+    mMin_f64 = init_intrinsic("llvm.minnum.f64", LLVMDoubleType(), {LLVMDoubleType(), LLVMDoubleType()});
+    mMax_f32 = init_intrinsic("llvm.maxnum.f32", LLVMFloatType(), {LLVMFloatType(), LLVMFloatType()});
+    mMax_f64 = init_intrinsic("llvm.maxnum.f64", LLVMDoubleType(), {LLVMDoubleType(), LLVMDoubleType()});
+
+    mUAddWithOverflow_i32 = init_mv_intrinsic("llvm.uadd.with.overflow.i32", {LLVMInt32Type(), LLVMInt1Type()}, {LLVMInt32Type(), LLVMInt32Type()});
+    mUAddWithOverflow_i64 = init_mv_intrinsic("llvm.uadd.with.overflow.i64", {LLVMInt64Type(), LLVMInt1Type()}, {LLVMInt64Type(), LLVMInt64Type()});
+
     mMemoryGrow = init_intrinsic("wembed.memory.grow.i32", LLVMInt32Type(), {
         LLVMPointerType(LLVMInt8Type(), 0),
         LLVMInt32Type()
@@ -220,47 +244,6 @@ namespace wembed {
     });
     mThrowUnlinkable = init_intrinsic("wembed.throw.unlinkable", LLVMVoidType(), {LLVMPointerType(LLVMInt8Type(), 0)});
     mThrowVMException = init_intrinsic("wembed.throw.vm_exception", LLVMVoidType(), {LLVMPointerType(LLVMInt8Type(), 0)});
-
-    mUAddWithOverflow_i32 = init_mv_intrinsic("llvm.uadd.with.overflow.i32", {LLVMInt32Type(), LLVMInt1Type()}, {LLVMInt32Type(), LLVMInt32Type()});
-    mUAddWithOverflow_i64 = init_mv_intrinsic("llvm.uadd.with.overflow.i64", {LLVMInt64Type(), LLVMInt1Type()}, {LLVMInt64Type(), LLVMInt64Type()});
-
-    mCtpop_i32 = init_intrinsic("llvm.ctpop.i32", LLVMInt32Type(), {LLVMInt32Type()});
-    mCtpop_i64 = init_intrinsic("llvm.ctpop.i64", LLVMInt64Type(), {LLVMInt64Type()});
-
-    mSqrt_f32 = init_intrinsic("llvm.sqrt.f32", LLVMFloatType(), {LLVMFloatType()});
-    mSqrt_f64 = init_intrinsic("llvm.sqrt.f64", LLVMDoubleType(), {LLVMDoubleType()});
-    mAbs_f32 = init_intrinsic("llvm.fabs.f32", LLVMFloatType(), {LLVMFloatType()});
-    mAbs_f64 = init_intrinsic("llvm.fabs.f64", LLVMDoubleType(), {LLVMDoubleType()});
-    mCopysign_f32 = init_intrinsic("llvm.copysign.f32", LLVMFloatType(), {LLVMFloatType(), LLVMFloatType()});
-    mCopysign_f64 = init_intrinsic("llvm.copysign.f64", LLVMDoubleType(), {LLVMDoubleType(), LLVMDoubleType()});
-
-  #ifdef WEMBED_FAST_MATH
-      mCeil_f32 = init_intrinsic("llvm.ceil.f32", LLVMFloatType(), {LLVMFloatType()});
-      mCeil_f64 = init_intrinsic("llvm.ceil.f64", LLVMDoubleType(), {LLVMDoubleType()});
-      mFloor_f32 = init_intrinsic("llvm.floor.f32", LLVMFloatType(), {LLVMFloatType()});
-      mFloor_f64 = init_intrinsic("llvm.floor.f64", LLVMDoubleType(), {LLVMDoubleType()});
-      mTrunc_f32 = init_intrinsic("llvm.trunc.f32", LLVMFloatType(), {LLVMFloatType()});
-      mTrunc_f64 = init_intrinsic("llvm.trunc.f64", LLVMDoubleType(), {LLVMDoubleType()});
-      mNearest_f32 = init_intrinsic("llvm.nearbyint.f32", LLVMFloatType(), {LLVMFloatType()});
-      mNearest_f64 = init_intrinsic("llvm.nearbyint.f64", LLVMDoubleType(), {LLVMDoubleType()});
-      mMin_f32 = init_intrinsic("llvm.minnum.f32", LLVMFloatType(), {LLVMFloatType(), LLVMFloatType()});
-      mMin_f64 = init_intrinsic("llvm.minnum.f64", LLVMDoubleType(), {LLVMDoubleType(), LLVMDoubleType()});
-      mMax_f32 = init_intrinsic("llvm.maxnum.f32", LLVMFloatType(), {LLVMFloatType(), LLVMFloatType()});
-      mMax_f64 = init_intrinsic("llvm.maxnum.f64", LLVMDoubleType(), {LLVMDoubleType(), LLVMDoubleType()});
-  #else
-      mCeil_f32 = init_intrinsic("wembed.ceil.f32", LLVMFloatType(), {LLVMFloatType()});
-      mCeil_f64 = init_intrinsic("wembed.ceil.f64", LLVMDoubleType(), {LLVMDoubleType()});
-      mFloor_f32 = init_intrinsic("wembed.floor.f32", LLVMFloatType(), {LLVMFloatType()});
-      mFloor_f64 = init_intrinsic("wembed.floor.f64", LLVMDoubleType(), {LLVMDoubleType()});
-      mTrunc_f32 = init_intrinsic("wembed.trunc.f32", LLVMFloatType(), {LLVMFloatType()});
-      mTrunc_f64 = init_intrinsic("wembed.trunc.f64", LLVMDoubleType(), {LLVMDoubleType()});
-      mNearest_f32 = init_intrinsic("wembed.nearbyint.f32", LLVMFloatType(), {LLVMFloatType()});
-      mNearest_f64 = init_intrinsic("wembed.nearbyint.f64", LLVMDoubleType(), {LLVMDoubleType()});
-      mMin_f32 = init_intrinsic("wembed.minnum.f32", LLVMFloatType(), {LLVMFloatType(), LLVMFloatType()});
-      mMin_f64 = init_intrinsic("wembed.minnum.f64", LLVMDoubleType(), {LLVMDoubleType(), LLVMDoubleType()});
-      mMax_f32 = init_intrinsic("wembed.maxnum.f32", LLVMFloatType(), {LLVMFloatType(), LLVMFloatType()});
-      mMax_f64 = init_intrinsic("wembed.maxnum.f64", LLVMDoubleType(), {LLVMDoubleType(), LLVMDoubleType()});
-  #endif
   }
 
   LLVMValueRef module::i32_to_bool(LLVMValueRef i32) {
@@ -458,6 +441,96 @@ namespace wembed {
     LLVMAddIncoming(lPhi, lValues, lFroms, 2);
 
     return lPhi;
+  }
+
+  LLVMValueRef module::emit_quiet_nan(LLVMValueRef pInput) {
+    LLVMTypeRef lInputType = LLVMTypeOf(pInput);
+    if (lInputType == LLVMFloatType()) {
+      LLVMValueRef lBitcast = LLVMBuildBitCast(mBuilder, pInput, LLVMInt32Type(), "bitcast");
+      LLVMValueRef lMantissaMask = get_const(~(fp_bits<float>::sMantissaMask));
+      LLVMValueRef lMasked = LLVMBuildAnd(mBuilder, lBitcast, lMantissaMask, "masked");
+      LLVMValueRef lQuietNan = get_const(fp_bits<float>::sQuietNan);
+      LLVMValueRef lCorrected = LLVMBuildOr(mBuilder, lMasked, lQuietNan, "quietNaN");
+      return LLVMBuildBitCast(mBuilder, lCorrected, LLVMFloatType(), "castedBack");
+    }
+    else if (lInputType == LLVMDoubleType()) {
+      LLVMValueRef lBitcast = LLVMBuildBitCast(mBuilder, pInput, LLVMInt64Type(), "bitcast");
+      LLVMValueRef lMantissaMask = get_const(~(fp_bits<double>::sMantissaMask));
+      LLVMValueRef lMasked = LLVMBuildAnd(mBuilder, lBitcast, lMantissaMask, "masked");
+      LLVMValueRef lQuietNan = get_const(fp_bits<double>::sQuietNan);
+      LLVMValueRef lCorrected = LLVMBuildOr(mBuilder, lMasked, lQuietNan, "quietNaN");
+      return LLVMBuildBitCast(mBuilder, lCorrected, LLVMDoubleType(), "castedBack");
+    }
+    throw std::runtime_error("unexpcted type passed to emit_quiet_nan");
+  }
+
+  LLVMValueRef module::emit_quiet_nan_or_intrinsic(LLVMValueRef pInput, LLVMValueRef pF32Intr, LLVMValueRef pF64Intr) {
+    LLVMValueRef lNotNan = LLVMBuildFCmp(mBuilder, LLVMRealORD, pInput, pInput, "notNaN");
+    LLVMTypeRef lInputType = LLVMTypeOf(pInput);
+    assert(lInputType == LLVMFloatType() || lInputType == LLVMDoubleType());
+    LLVMValueRef lIntrinsic = lInputType == LLVMFloatType() ? pF32Intr : pF64Intr;
+    return LLVMBuildSelect(mBuilder, lNotNan, call_intrinsic(lIntrinsic, {pInput}), emit_quiet_nan(pInput), "quiet_nan_or_ceil");
+  }
+
+  LLVMValueRef module::emit_min(LLVMValueRef pLHS, LLVMValueRef pRHS) {
+    LLVMTypeRef lBitcastType;
+    if (LLVMTypeOf(pLHS) == LLVMFloatType() && LLVMTypeOf(pRHS) == LLVMFloatType())
+      lBitcastType = LLVMInt32Type();
+    else if (LLVMTypeOf(pLHS) == LLVMDoubleType() && LLVMTypeOf(pRHS) == LLVMDoubleType())
+      lBitcastType = LLVMInt64Type();
+    else
+      throw std::runtime_error("unexpected types for emit_min");
+
+    LLVMValueRef lBitcastLHS = LLVMBuildBitCast(mBuilder, pLHS, lBitcastType, "bitcastL");
+    LLVMValueRef lBitcastRHS = LLVMBuildBitCast(mBuilder, pRHS, lBitcastType, "bitcastR");
+    LLVMValueRef lBitcastCmp = LLVMBuildICmp(mBuilder, LLVMIntUGT, lBitcastLHS, lBitcastRHS, "bitcastCmp");
+
+    LLVMValueRef lRCmp = LLVMBuildFCmp(mBuilder, LLVMRealOGT, pLHS, pRHS, "RCmp");
+    LLVMValueRef lLCmp = LLVMBuildFCmp(mBuilder, LLVMRealOLT, pLHS, pRHS, "LCmp");
+    LLVMValueRef lLNan = LLVMBuildFCmp(mBuilder, LLVMRealUNO, pLHS, pLHS, "LNaN");
+    LLVMValueRef lRNan = LLVMBuildFCmp(mBuilder, LLVMRealUNO, pRHS, pRHS, "RNaN");
+
+    return LLVMBuildSelect(mBuilder, lRNan, emit_quiet_nan(pRHS),
+                           LLVMBuildSelect(mBuilder, lLNan, emit_quiet_nan(pLHS),
+                                           LLVMBuildSelect(mBuilder, lLCmp, pLHS,
+                                                           LLVMBuildSelect(mBuilder, lRCmp, pRHS,
+                                                                           LLVMBuildSelect(mBuilder, lBitcastCmp, pLHS, pRHS,
+                                                                                           "stepBitcast"),
+                                                                           "stepRCmp"),
+                                                           "stepLCmp"),
+                                           "cleanLHS"),
+                           "cleanRHS");
+  }
+
+  LLVMValueRef module::emit_max(LLVMValueRef pLHS, LLVMValueRef pRHS) {
+    LLVMTypeRef lBitcastType;
+    if (LLVMTypeOf(pLHS) == LLVMFloatType() && LLVMTypeOf(pRHS) == LLVMFloatType())
+      lBitcastType = LLVMInt32Type();
+    else if (LLVMTypeOf(pLHS) == LLVMDoubleType() && LLVMTypeOf(pRHS) == LLVMDoubleType())
+      lBitcastType = LLVMInt64Type();
+    else
+      throw std::runtime_error("unexpected types for emit_max");
+
+
+    LLVMValueRef lBitcastLHS = LLVMBuildBitCast(mBuilder, pLHS, lBitcastType, "bitcastL");
+    LLVMValueRef lBitcastRHS = LLVMBuildBitCast(mBuilder, pRHS, lBitcastType, "bitcastR");
+    LLVMValueRef lBitcastCmp = LLVMBuildICmp(mBuilder, LLVMIntULT, lBitcastLHS, lBitcastRHS, "bitcastCmp");
+
+    LLVMValueRef lRCmp = LLVMBuildFCmp(mBuilder, LLVMRealOLT, pLHS, pRHS, "RCmp");
+    LLVMValueRef lLCmp = LLVMBuildFCmp(mBuilder, LLVMRealOGT, pLHS, pRHS, "LCmp");
+    LLVMValueRef lLNan = LLVMBuildFCmp(mBuilder, LLVMRealUNO, pLHS, pLHS, "LNaN");
+    LLVMValueRef lRNan = LLVMBuildFCmp(mBuilder, LLVMRealUNO, pRHS, pRHS, "RNaN");
+
+    return LLVMBuildSelect(mBuilder, lRNan, emit_quiet_nan(pRHS),
+                           LLVMBuildSelect(mBuilder, lLNan, emit_quiet_nan(pLHS),
+                                           LLVMBuildSelect(mBuilder, lLCmp, pLHS,
+                                                           LLVMBuildSelect(mBuilder, lRCmp, pRHS,
+                                                                           LLVMBuildSelect(mBuilder, lBitcastCmp, pLHS, pRHS,
+                                                                                           "stepBitcast"),
+                                                                           "stepRCmp"),
+                                                           "stepLCmp"),
+                                           "cleanLHS"),
+                           "cleanRHS");
   }
 
   LLVMTypeRef module::parse_llvm_btype() {
@@ -1506,23 +1579,59 @@ namespace wembed {
           WEMBED_INTRINSIC(o_popcnt_i64, mCtpop_i64, pop(LLVMInt64Type()))
           WEMBED_INTRINSIC(o_sqrt_f32, mSqrt_f32, pop(LLVMFloatType()))
           WEMBED_INTRINSIC(o_sqrt_f64, mSqrt_f64, pop(LLVMDoubleType()))
-          WEMBED_INTRINSIC(o_ceil_f32, mCeil_f32, pop(LLVMFloatType()))
-          WEMBED_INTRINSIC(o_ceil_f64, mCeil_f64, pop(LLVMDoubleType()))
-          WEMBED_INTRINSIC(o_floor_f32, mFloor_f32, pop(LLVMFloatType()))
-          WEMBED_INTRINSIC(o_floor_f64, mFloor_f64, pop(LLVMDoubleType()))
-          WEMBED_INTRINSIC(o_trunc_f32, mTrunc_f32, pop(LLVMFloatType()))
-          WEMBED_INTRINSIC(o_trunc_f64, mTrunc_f64, pop(LLVMDoubleType()))
-          WEMBED_INTRINSIC(o_nearest_f32, mNearest_f32, pop(LLVMFloatType()))
-          WEMBED_INTRINSIC(o_nearest_f64, mNearest_f64, pop(LLVMDoubleType()))
           WEMBED_INTRINSIC(o_abs_f32, mAbs_f32, pop(LLVMFloatType()))
           WEMBED_INTRINSIC(o_abs_f64, mAbs_f64, pop(LLVMDoubleType()))
+
+          case o_ceil_f32: {
+            push(emit_quiet_nan_or_intrinsic(pop(LLVMFloatType()), mCeil_f32, mCeil_f64));
+          } break;
+          case o_ceil_f64: {
+            push(emit_quiet_nan_or_intrinsic(pop(LLVMDoubleType()), mCeil_f32, mCeil_f64));
+          } break;
+          case o_floor_f32: {
+            push(emit_quiet_nan_or_intrinsic(pop(LLVMFloatType()), mFloor_f32, mFloor_f64));
+          } break;
+          case o_floor_f64: {
+            push(emit_quiet_nan_or_intrinsic(pop(LLVMDoubleType()), mFloor_f32, mFloor_f64));
+          } break;
+          case o_trunc_f32: {
+            push(emit_quiet_nan_or_intrinsic(pop(LLVMFloatType()), mTrunc_f32, mTrunc_f64));
+          } break;
+          case o_trunc_f64: {
+            push(emit_quiet_nan_or_intrinsic(pop(LLVMDoubleType()), mTrunc_f32, mTrunc_f64));
+          } break;
+          case o_nearest_f32: {
+            push(emit_quiet_nan_or_intrinsic(pop(LLVMFloatType()), mNearest_f32, mNearest_f64));
+          } break;
+          case o_nearest_f64: {
+            push(emit_quiet_nan_or_intrinsic(pop(LLVMDoubleType()), mNearest_f32, mNearest_f64));
+          } break;
 
   #define WEMBED_INTRINSIC_BINARY(OPCODE, INTRINSIC, ...) WEMBED_BINARY(OPCODE, call_intrinsic(INTRINSIC, {lhs, rhs, __VA_ARGS__}));
   #define WEMBED_INTRINSIC_BINARY_MULTI(OPCODE, INTRINSIC, ...) WEMBED_INTRINSIC_BINARY(OPCODE##32, INTRINSIC##32, __VA_ARGS__) \
             WEMBED_INTRINSIC_BINARY(OPCODE##64, INTRINSIC##64, __VA_ARGS__)
 
-          WEMBED_INTRINSIC_BINARY_MULTI(o_min_f, mMin_f)
-          WEMBED_INTRINSIC_BINARY_MULTI(o_max_f, mMax_f)
+          case o_min_f32: {
+            LLVMValueRef rhs = pop(LLVMFloatType());
+            LLVMValueRef lhs = pop(LLVMFloatType());
+            push(emit_min(lhs, rhs));
+          } break;
+          case o_min_f64: {
+            LLVMValueRef rhs = pop(LLVMDoubleType());
+            LLVMValueRef lhs = pop(LLVMDoubleType());
+            push(emit_min(lhs, rhs));
+          } break;
+          case o_max_f32: {
+            LLVMValueRef rhs = pop(LLVMFloatType());
+            LLVMValueRef lhs = pop(LLVMFloatType());
+            push(emit_max(lhs, rhs));
+          } break;
+          case o_max_f64: {
+            LLVMValueRef rhs = pop(LLVMDoubleType());
+            LLVMValueRef lhs = pop(LLVMDoubleType());
+            push(emit_max(lhs, rhs));
+          } break;
+
           WEMBED_INTRINSIC_BINARY_MULTI(o_copysign_f, mCopysign_f)
 
           case o_neg_f32: {
@@ -1540,17 +1649,12 @@ namespace wembed {
           WEMBED_CAST(o_extend_si32, LLVMBuildSExt, LLVMInt32Type(), LLVMInt64Type())
           WEMBED_CAST(o_extend_ui32, LLVMBuildZExt, LLVMInt32Type(), LLVMInt64Type())
 
-  #ifdef WEMBED_FAST_MATH
-          WEMBED_CAST(o_demote_f64, LLVMBuildFPTrunc, LLVMDoubleType(), LLVMFloatType())
-          WEMBED_CAST(o_promote_f32, LLVMBuildFPExt, LLVMFloatType(), LLVMDoubleType())
-  #else
           case o_demote_f64: {
             push(clear_nan(LLVMBuildFPTrunc(mBuilder, pop(LLVMDoubleType()), LLVMFloatType(), "demote")));
           } break;
           case o_promote_f32: {
             push(clear_nan(LLVMBuildFPExt(mBuilder, pop(LLVMFloatType()), LLVMDoubleType(), "promote")));
           } break;
-  #endif
 
           WEMBED_CAST(o_convert_f32_si32, LLVMBuildSIToFP, LLVMInt32Type(), LLVMFloatType())
           WEMBED_CAST(o_convert_f32_si64, LLVMBuildSIToFP, LLVMInt64Type(), LLVMFloatType())

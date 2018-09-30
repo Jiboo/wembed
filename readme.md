@@ -10,7 +10,6 @@ Todo/Help wanted
 ----------------
 
  - [ ] Imports/exports between modules in same file
- - [ ] Refactor min/max/ceil... intrinsics into IR builder calls
 
 Known bugs
 ----------
