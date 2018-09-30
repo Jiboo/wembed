@@ -40,11 +40,6 @@ Cases in int_exprs.wast:
 
 - Some FPE errors are optimized out, preventing the crash in some assert_trap.
 
-Cases in names.wast:
-
-- The Clang C API doesn't allow to pass a string size to LLVMGetFunctionAddress,
-making it difficult to use names with '\0'.
-
 Cases in traps.wast:
 
 - assert_trap failures due to some dead code elimination.

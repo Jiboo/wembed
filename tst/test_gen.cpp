@@ -260,13 +260,7 @@ protected:
   }
 
   string func_return_type(const string &pFuncName) {
-#ifdef WEMBED_PREFIX_EXPORTED_FUNC
-    std::stringstream lPrefixed;
-    lPrefixed << "__wexport_" << pFuncName;
-    LLVMValueRef lFunc = LLVMGetNamedFunction(mModule->mModule, lPrefixed.str().c_str());
-#else
-    LLVMValueRef lFunc = LLVMGetNamedFunction(mModule->mModule, pFuncName.c_str());
-#endif
+    LLVMValueRef lFunc = mModule->symbol(pFuncName);
     assert(lFunc);
     LLVMTypeRef lFuncSig = LLVMGetElementType(LLVMTypeOf(lFunc));
     LLVMTypeRef lType = LLVMGetReturnType(lFuncSig);
@@ -286,7 +280,7 @@ protected:
 
   std::string fixescape(const std::string_view &pView) {
     static std::regex findEscape("\\\\([0-9a-zA-Z][0-9a-zA-Z])");
-    return std::regex_replace(std::string(pView), findEscape, "\\0x$1");
+    return std::regex_replace(std::string(pView), findEscape, "\\x$1");
   }
 
   bool parse_assertion(ostream &pOutput) {
@@ -310,7 +304,7 @@ protected:
       }
       string lArgsFormatted = lArgs.str().substr(0, lArgs.str().size() - 2);
       pOutput << "  lCtx.get_fn<" << "void" << lArgTypes.str() << ">("
-              << lFuncName << ")(" << lArgsFormatted << ");\n";
+              << lFuncName << "s)(" << lArgsFormatted << ");\n";
     }
     else if (lId.mView == "assert_return") {
       expect(token_t::OPAR);
@@ -346,7 +340,7 @@ protected:
         pOutput << "  ";
       string lArgsFormatted = lArgs.str().substr(0, lArgs.str().size() - 2);
       pOutput << "lCtx.get_fn<" << lReturnType << lArgTypes.str() << ">("
-              << lFuncName << ")(" << lArgsFormatted << ')';
+              << lFuncName << "s)(" << lArgsFormatted << ')';
       if (lReturnType != "void") {
         pOutput << "; EXPECT_EQ(" << lExpectedValue.str() << ", ";
         if (lReturnType[0] == 'i')
@@ -380,7 +374,7 @@ protected:
 
       pOutput << "  EXPECT_TRUE(canonical_nan<" << lReturnType << ">("
               << "lCtx.get_fn<" << lReturnType << lArgTypes.str() << ">("
-              << lFuncName.mView << ")(" << lArgsFormatted << ")));\n";
+              << lFuncName.mView << "s)(" << lArgsFormatted << ")));\n";
     }
     else if (lId.mView == "assert_return_arithmetic_nan") {
       expect(token_t::OPAR);
@@ -405,7 +399,7 @@ protected:
 
       pOutput << "  EXPECT_TRUE(arithmetic_nan<" << lReturnType << ">("
               << "lCtx.get_fn<" << lReturnType << lArgTypes.str() << ">("
-              << lFuncName.mView << ")(" << lArgsFormatted << ")));\n";
+              << lFuncName.mView << "s)(" << lArgsFormatted << ")));\n";
     }
     else if (lId.mView == "assert_malformed") {
       expect(token_t::OPAR);
@@ -472,17 +466,17 @@ protected:
                 << "  /*" << lCode << "*/\n"
                 << "  // Expected error: " << lError.mView << "\n"
                 << "  module lMod = wembed::module(lUnlinkableBin, sizeof(lUnlinkableBin));\n"
-                << "  EXPECT_THROW(wembed::context lContext(lMod, {\n"
-                   "    {\"spectest_global_i32\", (void*)&spectest_global_i32},\n"
-                   "    {\"spectest_global_f32\", (void*)&spectest_global_f32},\n"
-                   "    {\"spectest_global_f64\", (void*)&spectest_global_f64},\n"
-                   "    {\"spectest_print\", (void*)&spectest_print},\n"
-                   "    {\"spectest_print_i32\", (void*)&spectest_print_i32},\n"
-                   "    {\"spectest_print_i32_f32\", (void*)&spectest_print_i32_f32},\n"
-                   "    {\"spectest_print_f64_f64\", (void*)&spectest_print_f64_f64},\n"
-                   "    {\"spectest_print_f32\", (void*)&spectest_print_f32},\n"
-                   "    {\"spectest_print_f64\", (void*)&spectest_print_f64},\n"
-                   "    {\"spectest_memory\", (void*)&spectest_mem},\n"
+                << "  EXPECT_THROW(wembed::context lContext(lMod, \"spectest\", {\n"
+                   "    {\"global_i32\", (void*)&spectest_global_i32},\n"
+                   "    {\"global_f32\", (void*)&spectest_global_f32},\n"
+                   "    {\"global_f64\", (void*)&spectest_global_f64},\n"
+                   "    {\"print\", (void*)&spectest_print},\n"
+                   "    {\"print_i32\", (void*)&spectest_print_i32},\n"
+                   "    {\"print_i32_f32\", (void*)&spectest_print_i32_f32},\n"
+                   "    {\"print_f64_f64\", (void*)&spectest_print_f64_f64},\n"
+                   "    {\"print_f32\", (void*)&spectest_print_f32},\n"
+                   "    {\"print_f64\", (void*)&spectest_print_f64},\n"
+                   "    {\"memory\", (void*)&spectest_mem},\n"
                    "  }), wembed::unlinkable_exception);\n";
       }
     }
@@ -509,7 +503,7 @@ protected:
         pOutput << "  {\n"
                 << "    auto lThrow = [&lCtx]() {\n"
                 << "      lCtx.get_fn<" << lReturnType << lArgTypes.str() << ">("
-                << lFuncName.mView << ")(" << lArgsFormatted << ");\n"
+                << lFuncName.mView << "s)(" << lArgsFormatted << ");\n"
                 << "    };\n"
                 << "    EXPECT_THROW(lThrow(), vm_runtime_exception);\n"
                 << "  }\n";
@@ -546,17 +540,17 @@ protected:
       mOutput << "  uint8_t lCode[] = {" << lModuleHex << "};\n";
       mOutput << "/*" << lModuleSource << "*/\n\n";
       mOutput << "  module lModule(lCode, sizeof(lCode));\n";
-      mOutput << "  context lCtx(lModule, {\n"
-          "    {\"spectest_global_i32\", (void*)&spectest_global_i32},\n"
-          "    {\"spectest_global_f32\", (void*)&spectest_global_f32},\n"
-          "    {\"spectest_global_f64\", (void*)&spectest_global_f64},\n"
-          "    {\"spectest_print\", (void*)&spectest_print},\n"
-          "    {\"spectest_print_i32\", (void*)&spectest_print_i32},\n"
-          "    {\"spectest_print_i32_f32\", (void*)&spectest_print_i32_f32},\n"
-          "    {\"spectest_print_f64_f64\", (void*)&spectest_print_f64_f64},\n"
-          "    {\"spectest_print_f32\", (void*)&spectest_print_f32},\n"
-          "    {\"spectest_print_f64\", (void*)&spectest_print_f64},\n"
-          "    {\"spectest_memory\", (void*)&spectest_mem},\n"
+      mOutput << "  context lCtx(lModule, \"spectest\", {\n"
+          "    {\"global_i32\", (void*)&spectest_global_i32},\n"
+          "    {\"global_f32\", (void*)&spectest_global_f32},\n"
+          "    {\"global_f64\", (void*)&spectest_global_f64},\n"
+          "    {\"print\", (void*)&spectest_print},\n"
+          "    {\"print_i32\", (void*)&spectest_print_i32},\n"
+          "    {\"print_i32_f32\", (void*)&spectest_print_i32_f32},\n"
+          "    {\"print_f64_f64\", (void*)&spectest_print_f64_f64},\n"
+          "    {\"print_f32\", (void*)&spectest_print_f32},\n"
+          "    {\"print_f64\", (void*)&spectest_print_f64},\n"
+          "    {\"memory\", (void*)&spectest_mem},\n"
           "  });\n";
       mOutput.flush();
       try {
@@ -613,6 +607,7 @@ int main(int argc,char** argv) {
   lOutput << "#include <gtest/gtest.h>\n";
   lOutput << "#include \"wembed.hpp\"\n";
   lOutput << "#include \"test.hpp\"\n\n";
-  lOutput << "using namespace wembed;\n\n";
+  lOutput << "using namespace wembed;\n";
+  lOutput << "using namespace std::literals::string_literals;\n\n";
   handle(lInputPath, lOutput);
 }

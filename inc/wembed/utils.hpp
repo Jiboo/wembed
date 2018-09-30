@@ -3,11 +3,14 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <string>
 #include <string_view>
 
 #include <llvm-c/Core.h>
 
 namespace wembed {
+
+  using namespace std::literals::string_literals;
 
   // Zeroed huge chunk of memory mapped to host virtual address space
   // When resized, the pointers shall not be modified
@@ -24,6 +27,10 @@ namespace wembed {
   protected:
     uint8_t *mAddress = nullptr;
     size_t mCurSize = 0, mAllocatedSize = 0;
+  };
+
+  struct externsym {
+    std::string mModule, mField;
   };
 
   // FP info and bit manipulation

@@ -28,7 +28,7 @@ namespace wembed {
     mBaseMemory = LLVMAddGlobal(mModule, LLVMInt8Type(), "baseMemory");
     mContextRef = LLVMAddGlobal(mModule, LLVMInt8Type(), "ctxRef");
     mBuilder = LLVMCreateBuilder();
-    mStartFunc = LLVMAddFunction(mModule, "__start", lVoidFuncT);
+    mStartFunc = LLVMAddFunction(mModule, "__wstart", lVoidFuncT);
     mStartContinue = LLVMAppendBasicBlock(mStartFunc, "fContinue");
     LLVMPositionBuilderAtEnd(mBuilder, mStartContinue);
     init_intrinsics();
@@ -48,6 +48,13 @@ namespace wembed {
     char *lCode = LLVMPrintModuleToString(mModule);
     os << lCode;
     LLVMDisposeMessage(lCode);
+  }
+
+  LLVMValueRef module::symbol(const std::string_view &pName) {
+    auto lFound = mExports.find(std::string(pName));
+    if (lFound == mExports.end())
+      throw std::runtime_error(std::string("can't find symbol: ") + pName.data());
+    return mExports[std::string(pName)].mValue;
   }
 
   void module::pushCFEntry(CFInstr pInstr, LLVMTypeRef pType, LLVMBasicBlockRef pEnd, LLVMValueRef pPhi,
@@ -582,7 +589,7 @@ namespace wembed {
       std::string_view lField = parse_str(lSize);
       external_kind lKind = (external_kind)parse<uint8_t>();
       std::stringstream lName;
-      lName << lModule << '_' << lField;
+      lName << "__wimport_" << lModule << '_' << lField;
       switch (lKind) {
         case ek_function: {
           uint32_t lTypeIndex = parse_uleb128<uint32_t>();
@@ -595,9 +602,10 @@ namespace wembed {
           std::vector<LLVMTypeRef> lParams(lParamCount);
           LLVMGetParamTypes(lType, lParams.data());
 
-          LLVMValueRef lFunction = LLVMAddFunction(mModule, lName.str().c_str(), lType);
+          LLVMValueRef lFunction = LLVMAddFunction(mModule, WEMBED_USE_INTERNAL_NAMES ? lName.str().c_str() : "__wimport_func", lType);
           LLVMSetLinkage(lFunction, LLVMLinkage::LLVMExternalLinkage);
           mFunctions.emplace_back(lFunction);
+          mImports[std::string(lModule)].emplace(std::string(lField), symbol_t{ek_function, lFunction});
   #ifdef WEMBED_VERBOSE
           std::cout << "Extern func " << mFunctions.size() << ": " << LLVMPrintTypeToString(lType) << std::endl;
   #endif
@@ -607,23 +615,27 @@ namespace wembed {
           uint8_t lMutable = parse<uint8_t>();
           if (lMutable)
             throw invalid_exception("Globals import are required to be immutable");
-          LLVMValueRef lGlobal = LLVMAddGlobal(mModule, lType, lName.str().c_str());
+          LLVMValueRef lGlobal = LLVMAddGlobal(mModule, lType, WEMBED_USE_INTERNAL_NAMES ? lName.str().c_str() : "__wimport_glob");
           LLVMSetLinkage(lGlobal, LLVMLinkage::LLVMExternalLinkage);
           LLVMSetGlobalConstant(lGlobal, !lMutable);
           mGlobals.emplace_back(lGlobal);
+          mImports[std::string(lModule)].emplace(std::string(lField), symbol_t{ek_global, lGlobal});
         } break;
         case ek_table:
           parse_table_type();
+          throw std::runtime_error("table import not supported");
           break;
         case ek_memory:
           if (!mMemoryTypes.empty())
             throw invalid_exception("multiple memories");
-          mMemoryImport = lName.str();
+          mMemoryImport.mModule = lModule;
+          mMemoryImport.mField = lField;
           memory_type lMemType;
           lMemType.mLimits = parse_resizable_limits();
           if (lMemType.mLimits.mInitial > 65536 || (lMemType.mLimits.mFlags && lMemType.mLimits.mMaximum > 65536))
             throw invalid_exception("memory size too big, max 65536 pages");
           mMemoryTypes.emplace_back(lMemType);
+          mImports[std::string(lModule)].emplace(std::string(lField), symbol_t{ek_memory, mBaseMemory});
           break;
         default: throw malformed_exception("unexpected import kind");
       }
@@ -682,7 +694,7 @@ namespace wembed {
       std::cout << "Global " << lI << " " << LLVMPrintTypeToString(lType)
                 << ": " << LLVMPrintValueToString(lValue) << std::endl;
   #endif
-      LLVMValueRef lGlobal = LLVMAddGlobal(mModule, lType, "global");
+      LLVMValueRef lGlobal = LLVMAddGlobal(mModule, lType, "__wglobal");
       LLVMSetInitializer(lGlobal, lValue);
       LLVMSetGlobalConstant(lGlobal, !lMutable);
       mGlobals.emplace_back(lGlobal);
@@ -697,27 +709,23 @@ namespace wembed {
       external_kind lKind = parse_external_kind();
       uint32_t lIndex = parse_uleb128<uint32_t>();
       switch (lKind) {
-        case ek_function:
+        case ek_function: {
           if (lIndex >= mFunctions.size())
             throw invalid_exception("function index out of bounds");
-          mExports.emplace(lName, export_t{lKind, mFunctions[lIndex]});
-#ifdef WEMBED_PREFIX_EXPORTED_FUNC
-          {
-            std::stringstream lPrefixed;
-            lPrefixed << "__wexport_" << lName;
-            LLVMSetValueName2(mFunctions[lIndex], lPrefixed.str().data(), lPrefixed.str().size());
-          };
-#else
-          LLVMSetValueName2(mFunctions[lIndex], lName.data(), lName.size());
-#endif
-          break;
+          LLVMSetValueName2(mFunctions[lIndex],
+                            WEMBED_USE_INTERNAL_NAMES ? lName.data() : "__wexport_func",
+                            WEMBED_USE_INTERNAL_NAMES ? lName.size() : strlen("__wexport_func"));
+          mExports.emplace(std::string(lName), symbol_t{lKind, mFunctions[lIndex]});
+        } break;
         case ek_global: {
           if (lIndex >= mGlobals.size())
             throw invalid_exception("global index out of bounds");
           /*if (!LLVMIsGlobalConstant(mGlobals[lIndex]))
             throw invalid_exception("Globals export are required to be immutable");*/
-          mExports.emplace(lName, export_t{lKind, mGlobals[lIndex]});
-          LLVMSetValueName2(mGlobals[lIndex], lName.data(), lName.size());
+          mExports.emplace(lName, symbol_t{lKind, mGlobals[lIndex]});
+          LLVMSetValueName2(mGlobals[lIndex],
+                            WEMBED_USE_INTERNAL_NAMES ? lName.data() : "__wexport_glob",
+                            WEMBED_USE_INTERNAL_NAMES ? lName.size() : strlen("__wexport_glob"));
         } break;
         case ek_table:
         case ek_memory:
@@ -1645,7 +1653,7 @@ namespace wembed {
   #endif
 
     LLVMPositionBuilderAtEnd(mBuilder, mStartContinue);
-    LLVMBuildRetVoid(mBuilder); // finish __start
+    LLVMBuildRetVoid(mBuilder); // finish __wstart
     LLVMDisposeBuilder(mBuilder);
 
     //dump_ll(std::cout);

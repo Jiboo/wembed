@@ -10,6 +10,7 @@
 #include <llvm-c/Core.h>
 
 #include "lang.hpp"
+#include "utils.hpp"
 
 namespace wembed {
 
@@ -33,6 +34,8 @@ namespace wembed {
 
     LLVMModuleRef mModule;
 
+    LLVMValueRef symbol(const std::string_view &pName);
+
   protected:
     uint8_t *mCurrent, *mEnd;
     size_t mImportFuncOffset = 0;
@@ -40,7 +43,7 @@ namespace wembed {
 
     LLVMBuilderRef mBuilder;
     std::vector<memory_type> mMemoryTypes;
-    std::string mMemoryImport;
+    externsym mMemoryImport;
     LLVMValueRef mBaseMemory = nullptr;
     LLVMValueRef mContextRef;
     struct Table {
@@ -102,12 +105,14 @@ namespace wembed {
     std::vector<LLVMValueRef> mFunctions;
     std::vector<LLVMValueRef> mGlobals;
 
-    struct export_t {
+    struct symbol_t {
       external_kind mKind;
       LLVMValueRef mValue;
-      export_t(external_kind pKind, LLVMValueRef pValue) : mKind(pKind), mValue(pValue) {}
+      symbol_t() {}
+      symbol_t(external_kind pKind, LLVMValueRef pValue) : mKind(pKind), mValue(pValue) {}
     };
-    std::unordered_map<std::string_view, export_t> mExports;
+    std::unordered_map<std::string, symbol_t> mExports;
+    std::unordered_map<std::string, std::unordered_multimap<std::string, symbol_t>> mImports;
 
     void pushCFEntry(CFInstr pInstr, LLVMTypeRef pType, LLVMBasicBlockRef pEnd, LLVMValueRef pPhi,
                      LLVMBasicBlockRef pElse = nullptr);
