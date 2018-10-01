@@ -14,27 +14,6 @@ Todo/Help wanted
 Known bugs
 ----------
 
-Cases in call.wast:
-
-    (assert_exhaustion (invoke "runaway") "call stack exhausted")
-    (assert_exhaustion (invoke "mutual-runaway") "call stack exhausted")
-
-- Thus no-effect recursive calls gets removed by the optimizer.
-
-Cases in call_indirect.wast:
-
-    (assert_exhaustion (invoke "runaway") "call stack exhausted")
-    (assert_exhaustion (invoke "mutual-runaway") "call stack exhausted")
-
-- Thus recursive calls get optimized into jumps, not causing a stack overflow.
-- Were commented out in testsuite fork
-
-Cases in fac.wast:
-
-    (assert_exhaustion (invoke "fac-rec" (i64.const 1073741824)) "call stack exhausted")
-    
-- fac-rec gets optimized as a non recursive, preventing stack exhaust
-
 Cases in unreached_invalid.wast:
 
-- Lots of failed assert_invalid, due to the fact that we do no validation during unreachable skip path
+- Lots of failed assert_invalid, due to the fact that there is no validation during unreachable skip path

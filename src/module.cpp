@@ -1,9 +1,12 @@
 #include <sstream>
 
 #include <llvm-c/Analysis.h>
-#include <llvm-c/Transforms/PassManagerBuilder.h>
+#include <llvm-c/Transforms/AggressiveInstCombine.h>
+#include <llvm-c/Transforms/IPO.h>
+#include <llvm-c/Transforms/Scalar.h>
+#include <llvm-c/Transforms/Utils.h>
+#include <llvm-c/Transforms/Vectorize.h>
 #include <wembed/module.hpp>
-
 
 #include "wembed.hpp"
 
@@ -1810,22 +1813,33 @@ namespace wembed {
     }
     LLVMDisposeMessage(lError);
 
-    LLVMPassManagerBuilderRef passBuilder = LLVMPassManagerBuilderCreate();
-    LLVMPassManagerBuilderSetOptLevel(passBuilder, 4);
-    LLVMPassManagerBuilderSetSizeLevel(passBuilder, 4);
+    LLVMPassManagerRef lPass = LLVMCreatePassManager();
 
-    LLVMPassManagerRef functionPasses = LLVMCreateFunctionPassManagerForModule(mModule);
-    LLVMPassManagerRef modulePasses = LLVMCreatePassManager();
-    LLVMPassManagerBuilderPopulateFunctionPassManager(passBuilder, functionPasses);
-    LLVMPassManagerBuilderPopulateModulePassManager(passBuilder, modulePasses);
-    LLVMPassManagerBuilderDispose(passBuilder);
-    LLVMInitializeFunctionPassManager(functionPasses);
-    for (LLVMValueRef value = LLVMGetFirstFunction(mModule); value; value = LLVMGetNextFunction(value))
-      LLVMRunFunctionPassManager(functionPasses, value);
-    LLVMFinalizeFunctionPassManager(functionPasses);
-    LLVMRunPassManager(modulePasses, mModule);
-    LLVMDisposePassManager(functionPasses);
-    LLVMDisposePassManager(modulePasses);
+    // Same as the one in wasm-jit-prototype
+    LLVMAddPromoteMemoryToRegisterPass(lPass);
+    LLVMAddAggressiveInstCombinerPass(lPass);
+    LLVMAddCFGSimplificationPass(lPass);
+    LLVMAddJumpThreadingPass(lPass);
+    LLVMAddConstantPropagationPass(lPass);
+
+    // FIXME Probably not optimal, but at least doesn't break testsuite
+    LLVMAddConstantMergePass(lPass);
+    LLVMAddUnifyFunctionExitNodesPass(lPass);
+    LLVMAddScalarizerPass(lPass);
+    LLVMAddFunctionInliningPass(lPass);
+    LLVMAddLoopDeletionPass(lPass);
+    LLVMAddLoopIdiomPass(lPass);
+    LLVMAddLoopRotatePass(lPass);
+    LLVMAddLoopRerollPass(lPass);
+    LLVMAddLoopUnrollPass(lPass);
+    LLVMAddLoopUnrollAndJamPass(lPass);
+    LLVMAddLoopUnswitchPass(lPass);
+    LLVMAddMemCpyOptPass(lPass);
+    LLVMAddPartiallyInlineLibCallsPass(lPass);
+    LLVMAddSimplifyLibCallsPass(lPass);
+
+    LLVMRunPassManager(lPass, mModule);
+    LLVMDisposePassManager(lPass);
 
 #ifdef WEMBED_VERBOSE
     dump_ll(std::cout);
