@@ -35,14 +35,6 @@ Cases in fac.wast:
     
 - fac-rec gets optimized as a non recursive, preventing stack exhaust
 
-Cases in int_exprs.wast:
-
-- Some FPE errors are optimized out, preventing the crash in some assert_trap.
-
-Cases in traps.wast:
-
-- assert_trap failures due to some dead code elimination.
-
 Cases in unreached_invalid.wast:
 
 - Lots of failed assert_invalid, due to the fact that we do no validation during unreachable skip path

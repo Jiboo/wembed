@@ -185,6 +185,35 @@ namespace wembed {
     trap_if(lFunc, lBoundsError, mThrowUnlinkable, {get_string(lErrorString)});
   }
 
+  void module::trap_zero_div(LLVMValueRef lFunc, LLVMValueRef pLHS, LLVMValueRef pRHS) {
+    LLVMValueRef lDivZero = LLVMBuildICmp(mBuilder, LLVMIntEQ, pRHS, get_zero(LLVMTypeOf(pRHS)), "divZero");
+    static const char *lErrorString = "int div by zero";
+    trap_if(lFunc, lDivZero, mThrowVMException, {get_string(lErrorString)});
+  }
+
+  void module::trap_szero_div(LLVMValueRef lFunc, LLVMValueRef pLHS, LLVMValueRef pRHS) {
+    LLVMValueRef lMin, lMinus1;
+    LLVMTypeRef lLType = LLVMTypeOf(pLHS);
+    if (lLType == LLVMInt32Type()) {
+      lMin = get_const(std::numeric_limits<int32_t>::min());
+      lMinus1 = get_const(int32_t(-1));
+    }
+    else if (lLType == LLVMInt64Type()) {
+      lMin = get_const(std::numeric_limits<int64_t>::min());
+      lMinus1 = get_const(int64_t(-1));
+    }
+    else {
+      throw std::runtime_error("unexpected type in trap_szero_div");
+    }
+    LLVMValueRef lLHSIsMin = LLVMBuildICmp(mBuilder, LLVMIntEQ, pLHS, lMin, "lhsMin");
+    LLVMValueRef lRHSIsMinus1 = LLVMBuildICmp(mBuilder, LLVMIntEQ, pRHS, lMinus1, "rhsMinus1");
+    LLVMValueRef lOverflow = LLVMBuildAnd(mBuilder, lLHSIsMin, lRHSIsMinus1, "overflow");
+    LLVMValueRef lDivZero = LLVMBuildICmp(mBuilder, LLVMIntEQ, pRHS, get_zero(LLVMTypeOf(pRHS)), "divZero");
+    LLVMValueRef lSZeroDiv = LLVMBuildOr(mBuilder, lDivZero, lOverflow, "szero_div");
+    static const char *lErrorString = "int div by zero or overflow";
+    trap_if(lFunc, lSZeroDiv, mThrowVMException, {get_string(lErrorString)});
+  }
+
   void module::init_intrinsics() {
     mMemCpy = init_intrinsic("llvm.memcpy.p0i8.p0i8.i32", LLVMVoidType(), {
         LLVMPointerType(LLVMInt8Type(), 0), // dest
@@ -409,7 +438,24 @@ namespace wembed {
                        "rotl");
   }
 
+  LLVMValueRef module::emit_udiv(LLVMTypeRef pType, LLVMValueRef lFunc, LLVMValueRef pLHS, LLVMValueRef pRHS) {
+    trap_zero_div(lFunc, pLHS, pRHS);
+    return LLVMBuildUDiv(mBuilder, pLHS, pRHS, "udiv");
+  }
+
+  LLVMValueRef module::emit_sdiv(LLVMTypeRef pType, LLVMValueRef lFunc, LLVMValueRef pLHS, LLVMValueRef pRHS) {
+    trap_szero_div(lFunc, pLHS, pRHS);
+    return LLVMBuildSDiv(mBuilder, pLHS, pRHS, "sdiv");
+  }
+
+  LLVMValueRef module::emit_urem(LLVMTypeRef pType, LLVMValueRef lFunc, LLVMValueRef pLHS, LLVMValueRef pRHS) {
+    trap_zero_div(lFunc, pLHS, pRHS);
+    return LLVMBuildURem(mBuilder, pLHS, pRHS, "urem");
+  }
+
   LLVMValueRef module::emit_srem(LLVMTypeRef pType, LLVMValueRef lFunc, LLVMValueRef pLHS, LLVMValueRef pRHS) {
+    trap_zero_div(lFunc, pLHS, pRHS);
+
     LLVMBasicBlockRef lPreTest = LLVMGetInsertBlock(mBuilder);
     LLVMBasicBlockRef lSRemThen = LLVMAppendBasicBlock(lFunc, "sremElse");
     LLVMBasicBlockRef lSRemEnd = LLVMAppendBasicBlock(lFunc, "sremEnd");
@@ -1342,13 +1388,9 @@ namespace wembed {
           WEMBED_CONST(o_const_i32, LLVMConstInt(LLVMInt32Type(), static_cast<ull_t>(parse_sleb128<int32_t>()), true))
           WEMBED_CONST(o_const_i64, LLVMConstInt(LLVMInt64Type(), static_cast<ull_t>(parse_sleb128<int64_t>()), true))
           case o_const_f32: {
-  #ifdef WEMBED_FAST_MATH
-              push(LLVMConstReal(LLVMFloatType(), parse<float>()));
-  #else
               fp_bits<float> components(parse<float>());
               push(LLVMConstBitCast(LLVMConstInt(LLVMInt32Type(), static_cast<ull_t>(components.mRaw), false),
                                     LLVMFloatType()));
-  #endif
           } break;
           WEMBED_CONST(o_const_f64, LLVMConstReal(LLVMDoubleType(), parse<double>()))
 
@@ -1533,21 +1575,20 @@ namespace wembed {
           WEMBED_BINARY_LLVM(o_add_i, LLVMBuildAdd)
           WEMBED_BINARY_LLVM(o_sub_i, LLVMBuildSub)
           WEMBED_BINARY_LLVM(o_mul_i, LLVMBuildMul)
-          WEMBED_BINARY_LLVM(o_div_si, LLVMBuildSDiv)
-          WEMBED_BINARY_LLVM(o_div_ui, LLVMBuildUDiv)
-          WEMBED_BINARY_LLVM(o_rem_ui, LLVMBuildURem)
 
-  #ifdef WEMBED_FAST_MATH
-          WEMBED_BINARY_LLVM(o_add_f, LLVMBuildFAdd)
-          WEMBED_BINARY_LLVM(o_sub_f, LLVMBuildFSub)
-          WEMBED_BINARY_LLVM(o_mul_f, LLVMBuildFMul)
-          WEMBED_BINARY_LLVM(o_div_f, LLVMBuildFDiv)
-  #else
+          WEMBED_BINARY(o_div_ui32, emit_udiv(LLVMInt32Type(), lFunc, lhs, rhs))
+          WEMBED_BINARY(o_div_ui64, emit_udiv(LLVMInt64Type(), lFunc, lhs, rhs))
+          WEMBED_BINARY(o_div_si32, emit_sdiv(LLVMInt32Type(), lFunc, lhs, rhs))
+          WEMBED_BINARY(o_div_si64, emit_sdiv(LLVMInt64Type(), lFunc, lhs, rhs))
+          WEMBED_BINARY(o_rem_ui32, emit_urem(LLVMInt32Type(), lFunc, lhs, rhs))
+          WEMBED_BINARY(o_rem_ui64, emit_urem(LLVMInt64Type(), lFunc, lhs, rhs))
+          WEMBED_BINARY(o_rem_si32, emit_srem(LLVMInt32Type(), lFunc, lhs, rhs))
+          WEMBED_BINARY(o_rem_si64, emit_srem(LLVMInt64Type(), lFunc, lhs, rhs))
+
           WEMBED_BINARY_MULTI(o_add_f, clear_nan(LLVMBuildFAdd(mBuilder, lhs, rhs, "fadd")))
           WEMBED_BINARY_MULTI(o_sub_f, clear_nan(LLVMBuildFSub(mBuilder, lhs, rhs, "fsub")))
           WEMBED_BINARY_MULTI(o_mul_f, clear_nan(LLVMBuildFMul(mBuilder, lhs, rhs, "fadd")))
           WEMBED_BINARY_MULTI(o_div_f, clear_nan(LLVMBuildFDiv(mBuilder, lhs, rhs, "fsub")))
-  #endif
 
           WEMBED_BINARY_LLVM(o_and_i, LLVMBuildAnd)
           WEMBED_BINARY_LLVM(o_or_i, LLVMBuildOr)
@@ -1557,8 +1598,6 @@ namespace wembed {
           WEMBED_BINARY(o_rotl_i64, emit_rotl(LLVMInt64Type(), lhs, rhs))
           WEMBED_BINARY(o_rotr_i32, emit_rotr(LLVMInt32Type(), lhs, rhs))
           WEMBED_BINARY(o_rotr_i64, emit_rotr(LLVMInt64Type(), lhs, rhs))
-          WEMBED_BINARY(o_rem_si32, emit_srem(LLVMInt32Type(), lFunc, lhs, rhs))
-          WEMBED_BINARY(o_rem_si64, emit_srem(LLVMInt64Type(), lFunc, lhs, rhs))
 
           WEMBED_BINARY(o_shl_i32, LLVMBuildShl(mBuilder, lhs, emit_shift_mask(LLVMInt32Type(), rhs), "shl"))
           WEMBED_BINARY(o_shl_i64, LLVMBuildShl(mBuilder, lhs, emit_shift_mask(LLVMInt64Type(), rhs), "shl"))

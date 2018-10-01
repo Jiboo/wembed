@@ -184,6 +184,9 @@ namespace wembed {
     LLVMValueRef emit_shift_mask(LLVMTypeRef pType, LLVMValueRef pCount) ;
     LLVMValueRef emit_rotl(LLVMTypeRef pType, LLVMValueRef pLHS, LLVMValueRef pRHS);
     LLVMValueRef emit_rotr(LLVMTypeRef pType, LLVMValueRef pLHS, LLVMValueRef pRHS);
+    LLVMValueRef emit_udiv(LLVMTypeRef pType, LLVMValueRef lFunc, LLVMValueRef pLHS, LLVMValueRef pRHS);
+    LLVMValueRef emit_sdiv(LLVMTypeRef pType, LLVMValueRef lFunc, LLVMValueRef pLHS, LLVMValueRef pRHS);
+    LLVMValueRef emit_urem(LLVMTypeRef pType, LLVMValueRef lFunc, LLVMValueRef pLHS, LLVMValueRef pRHS);
     LLVMValueRef emit_srem(LLVMTypeRef pType, LLVMValueRef lFunc, LLVMValueRef pLHS, LLVMValueRef pRHS);
     LLVMValueRef emit_quiet_nan(LLVMValueRef pInput);
     LLVMValueRef emit_quiet_nan_or_intrinsic(LLVMValueRef pInput, LLVMValueRef pF32Intr, LLVMValueRef pF64Intr);
@@ -217,6 +220,8 @@ namespace wembed {
     void trap_if(LLVMValueRef lFunc, LLVMValueRef pCondition, LLVMValueRef pIntrinsic,
                                    const std::initializer_list<LLVMValueRef> &pArgs);
     void trap_data_copy(LLVMValueRef lFunc, LLVMValueRef pOffset, size_t pSize);
+    void trap_zero_div(LLVMValueRef lFunc, LLVMValueRef pLHS, LLVMValueRef pRHS);
+    void trap_szero_div(LLVMValueRef lFunc, LLVMValueRef pLHS, LLVMValueRef pRHS);
 
     LLVMValueRef clear_nan(LLVMValueRef pInput);
     LLVMValueRef clear_nan_internal(LLVMTypeRef pInputType, LLVMTypeRef pIntType, LLVMValueRef pInput,
