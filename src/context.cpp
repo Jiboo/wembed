@@ -1,16 +1,19 @@
-#include "wembed.hpp"
+#if defined(WEMBED_VERBOSE) or defined(WEMBED_NATIVE_CODE_DUMP)
+#include <iostream>
+#endif
 
 #ifdef WEMBED_NATIVE_CODE_DUMP
 #include <llvm-c/Disassembler.h>
 #endif
 
-#if defined(WEMBED_VERBOSE) or defined(WEMBED_NATIVE_CODE_DUMP)
-#include <iostream>
-#endif
+#include "try_signal.hpp"
+
+#include "wembed.hpp"
+
 
 namespace wembed {
 
-  context::context(module &pModule, const std::string_view &pMappingsNamespace, mappings_t pMappings) : mModule(pModule) {
+  context::context(module &pModule, resolvers_t pResolver) : mModule(pModule) {
     char *lError = NULL;
     if(LLVMCreateExecutionEngineForModule(&mEngine, pModule.mModule, &lError) != 0) {
       std::string lErrorStr(lError);
@@ -18,38 +21,56 @@ namespace wembed {
       throw std::runtime_error(lErrorStr);
     }
 
-    if (mModule.mImports.size() > 1)
-      throw unlinkable_exception("wembed don't accept multi module yet");
-    else if (mModule.mImports.size() >= 1) {
-      if (mModule.mImports.begin()->first != pMappingsNamespace)
-        throw unlinkable_exception("imports from other module");
-      auto lImports = mModule.mImports[std::string(pMappingsNamespace)];
-      for (const auto &lImport : lImports) {
-        if (value_name(lImport.second.mValue).empty()) // Note: was optimized away
-          continue;
+    LLVMValueRef lContextRef = LLVMGetNamedGlobal(pModule.mModule, "ctxRef");
+    if (lContextRef != nullptr)
+      map_global(lContextRef, this);
+
+    map_intrinsic(pModule.mModule, "wembed.memory.grow.i32", (void*) &wembed::intrinsics::memory_grow);
+    map_intrinsic(pModule.mModule, "wembed.memory.size.i32", (void*) &wembed::intrinsics::memory_size);
+    map_intrinsic(pModule.mModule, "wembed.table.size.i32", (void*) &wembed::intrinsics::table_size);
+    map_intrinsic(pModule.mModule, "wembed.throw.unlinkable", (void*) &wembed::intrinsics::throw_unlinkable);
+    map_intrinsic(pModule.mModule, "wembed.throw.vm_exception", (void*) &wembed::intrinsics::throw_vm_exception);
+
+    if (mModule.mImports.size() >= 1) {
+      for (const auto &lImportModule : mModule.mImports) {
+        auto lFields = lImportModule.second;
+        auto lResolverSearch = pResolver.find(lImportModule.first);
+        if (lResolverSearch == pResolver.end())
+          throw unlinkable_exception("import from unknown module: "s + std::string(lImportModule.first));
+        for (const auto &lImportField : lFields) {
+          auto lResolverResult = lResolverSearch->second(lImportField.first);
+          if (lResolverResult.mPointer == nullptr || lResolverResult.mKind != lImportField.second.mKind || lResolverResult.mTypeHash != lImportField.second.mTypeHash)
+            throw unlinkable_exception(
+                "can't import symbol: "s + lImportField.first + " in module " + std::string(lImportModule.first));
+          if (value_name(lImportField.second.mValues[0]).empty())
+            continue;
 #ifdef WEMBED_VERBOSE
-        std::cout << "import " << lImport.first << " aka " << value_name(lImport.second.mValue) << " of type "
-                  << LLVMTypeOf(lImport.second.mValue) << std::endl;
+          std::cout << "import " << lImportModule.first << "::" << lImportField.first << ", aka " << value_name(lImportField.second.mValues[0]) << " of type "
+                    << LLVMPrintTypeToString(LLVMTypeOf(lImportField.second.mValues[0])) << ", at " << lResolverResult.mPointer << std::endl;
 #endif
-        auto lMapping = pMappings.find(lImport.first);
-        if (lMapping == pMappings.end())
-          throw unlinkable_exception("can't import symbol: "s + lImport.first);
-        LLVMAddGlobalMapping(mEngine, lImport.second.mValue, lMapping->second);
+          LLVMAddGlobalMapping(mEngine, lImportField.second.mValues[0], lResolverResult.mPointer);
+        }
       }
     }
 
-    constexpr auto lPageSize = 64 * 1024;
     if (pModule.mMemoryTypes.size()) {
-      mMemoryLimits = pModule.mMemoryTypes[0].mLimits;
+      auto &lMemory = pModule.mMemoryTypes[0];
+      mMemoryLimits = lMemory.mLimits;
       mBaseMemory = LLVMGetNamedGlobal(pModule.mModule, "baseMemory");
       if (!pModule.mMemoryImport.mModule.empty()) {
+        auto &lImport = pModule.mMemoryImport;
         if (mBaseMemory != nullptr) {
-          if (pMappingsNamespace != pModule.mMemoryImport.mModule)
-            throw unlinkable_exception("importing memory from different module");
-          if (pMappings.find(pModule.mMemoryImport.mField) == pMappings.end())
-            throw unlinkable_exception("can't find memory import in mapping list");
-          mExternalMemory = static_cast<virtual_mapping *>(pMappings[pModule.mMemoryImport.mField]);
-          mExternalMemory->resize(std::max(mExternalMemory->size(), size_t(mMemoryLimits.mInitial * lPageSize)));
+          auto lResolverSearch = pResolver.find(lImport.mModule);
+          if (lResolverSearch == pResolver.end())
+            throw unlinkable_exception("import memory from unknown module: "s + std::string(lImport.mModule));
+          auto lResolverResult = lResolverSearch->second(lImport.mField);
+          if (lResolverResult.mPointer == nullptr)
+            throw unlinkable_exception("can't memory symbol: "s + lImport.mField + " in module " + std::string(lImport.mModule));
+          mExternalMemory = static_cast<memory*>(lResolverResult.mPointer);
+          if (lMemory.initial() > mExternalMemory->size())
+            throw unlinkable_exception("can't import memory: "s + lImport.mField + " in module " + std::string(lImport.mModule) + ", too small");
+          if (lMemory.mLimits.mFlags & 0x1 && lMemory.maximum() < mExternalMemory->capacity())
+            throw unlinkable_exception("can't import memory: "s + lImport.mField + " in module " + std::string(lImport.mModule) + ", too large");
           map_global(mBaseMemory, mExternalMemory->data());
 #ifdef WEMBED_VERBOSE
           std::cout << "bound external memory: " << mExternalMemory->size() << ", reserved "
@@ -58,9 +79,7 @@ namespace wembed {
         }
       }
       else {
-        auto lAllocatedSize = (mMemoryLimits.mFlags & 0x1)
-                              ? (mMemoryLimits.mMaximum + 1) * lPageSize : 256UL * 1024 * 1024;
-        mSelfMemory.emplace(mMemoryLimits.mInitial * lPageSize, lAllocatedSize);
+        mSelfMemory.emplace(lMemory);
         if (mBaseMemory != nullptr)
           map_global(mBaseMemory, mSelfMemory->data());
 #ifdef WEMBED_VERBOSE
@@ -70,31 +89,58 @@ namespace wembed {
       }
     }
 
-    LLVMValueRef lContextRef = LLVMGetNamedGlobal(pModule.mModule, "ctxRef");
-    if (lContextRef != nullptr)
-      map_global(lContextRef, this);
-
-    map_intrinsic(pModule.mModule, "wembed.memory.grow.i32", (void*) &wembed::intrinsics::memory_grow);
-    map_intrinsic(pModule.mModule, "wembed.memory.size.i32", (void*) &wembed::intrinsics::memory_size);
-    map_intrinsic(pModule.mModule, "wembed.throw.unlinkable", (void*) &wembed::intrinsics::throw_unlinkable);
-    map_intrinsic(pModule.mModule, "wembed.throw.vm_exception", (void*) &wembed::intrinsics::throw_vm_exception);
-
-    const size_t lTableCount = pModule.mTables.size();
-    mTables.resize(lTableCount);
-    for (size_t i = 0; i < lTableCount; i++) {
-      module::Table lTableSpec = pModule.mTables[i];
-      mTables[i].mPointers.resize(lTableSpec.mType.mLimits.mInitial, nullptr);
-      mTables[i].mTypes.resize(lTableSpec.mType.mLimits.mInitial, 0);
-      map_global(lTableSpec.mPointers, mTables[i].mPointers.data());
-      map_global(lTableSpec.mTypes, mTables[i].mTypes.data());
+    const auto lTableCount = pModule.mTables.size();
+    if (lTableCount > 1)
+      throw unlinkable_exception("multiple tables not supproted");
+    if (lTableCount > 0) {
+      if (mModule.mTableImport.mModule.empty()) {
+        module::Table lTableSpec = pModule.mTables[0];
+        mSelfTable.emplace(lTableSpec.mType);
+        map_global(lTableSpec.mPointers, mSelfTable->data_ptrs());
+        map_global(lTableSpec.mTypes, mSelfTable->data_types());
+#ifdef WEMBED_VERBOSE
+        std::cout << "initial table size: " << mSelfTable->size() << ", at " << (void *) mSelfTable->data_ptrs() << std::endl;
+#endif
+      }
+      else {
+        auto &lImport = pModule.mTableImport;
+        auto &lTable = mModule.mTables[0];
+        auto lResolverSearch = pResolver.find(lImport.mModule);
+        if (lResolverSearch == pResolver.end())
+          throw unlinkable_exception("import table from unknown module: "s + std::string(lImport.mModule));
+        auto lResolverResult = lResolverSearch->second(lImport.mField);
+        if (lResolverResult.mPointer == nullptr)
+          throw unlinkable_exception("can't import table: "s + lImport.mField + " in module " + std::string(lImport.mModule));
+        mExternalTable = static_cast<table*>(lResolverResult.mPointer);
+        if (lTable.mType.initial() > mExternalTable->size())
+          throw unlinkable_exception("can't import table: "s + lImport.mField + " in module " + std::string(lImport.mModule) + ", too small");
+        if (lTable.mType.mLimits.mFlags & 0x1 && lTable.mType.maximum() < mExternalTable->capacity())
+          throw unlinkable_exception("can't import table: "s + lImport.mField + " in module " + std::string(lImport.mModule) + ", too large");
+        map_global(lTable.mPointers, mExternalTable->data_ptrs());
+        map_global(lTable.mTypes, mExternalTable->data_types());
+#ifdef WEMBED_VERBOSE
+        std::cout << "bound external table: " << mExternalTable->size() << ", at " << (void *) mExternalTable->data_ptrs() << std::endl;
+#endif
+      }
     }
+
+#ifdef WEMBED_VERBOSE
+    for (const auto &lExportField : mModule.mExports) {
+      if (value_name(lExportField.second.mValues[0]).empty())
+        continue;
+      auto lExport = get_export(lExportField.first);
+      std::cout << "export " << lExportField.first << ", aka " << value_name(lExportField.second.mValues[0])
+                << " of type " << LLVMPrintTypeToString(LLVMTypeOf(lExportField.second.mValues[0])) << ", hash "
+                << lExport.mTypeHash << ", at " << lExport.mPointer << std::endl;
+    }
+#endif
 
     // Execute __wstart, init table/memory
     auto lStartPtr = LLVMGetFunctionAddress(mEngine, "__wstart");
     if (lStartPtr) {
       auto lFnPtr = reinterpret_cast<void (*)()>(lStartPtr);
       try {
-        lFnPtr();
+        sig::try_signal(lFnPtr);
       }
       catch(const std::system_error &pError) {
         throw vm_runtime_exception(pError.what());
@@ -103,23 +149,26 @@ namespace wembed {
 
     // Replaces indices loaded in tables
     for (size_t i = 0; i < lTableCount; i++) {
-      RuntimeTable &lContainer = mTables[i];
+      table *lTable = tab();
       table_type &lType = pModule.mTables[i].mType;
-      for (size_t ptr = 0; ptr < lType.mLimits.mInitial; ptr++) {
-        void *lIndice = lContainer.mPointers[ptr];
-        LLVMValueRef lFunc = pModule.mFunctions[(size_t)lIndice];
+      for (size_t lIndex = 0; lIndex < lType.mLimits.mInitial; lIndex++) {
+        void *lIndice = lTable->data_ptrs()[lIndex];
+        if ((size_t)lIndice == 0 || (size_t)lIndice > pModule.mFunctions.size())
+          continue;
+        LLVMValueRef lFunc = pModule.mFunctions[(size_t)lIndice - 1];
         void *lAddress = LLVMGetPointerToGlobal(mEngine, lFunc);
         if (!lAddress)
           throw unlinkable_exception("func in table was opt out");
         auto lTypeHash = hash_fn_type(LLVMGetElementType(LLVMTypeOf(lFunc)));
   #ifdef WEMBED_VERBOSE
-        std::cout << "remap table element for " << i << ", " << ptr << " aka "
+        std::cout << "remap table element for " << i << ", " << lIndex << " aka "
                   << value_name(lFunc) << ": " << lAddress << ", type: " << lTypeHash << std::endl;
   #endif
-        lContainer.mPointers[ptr] = lAddress;
-        lContainer.mTypes[ptr] = lTypeHash;
+        lTable->data_ptrs()[lIndex] = lAddress;
+        lTable->data_types()[lIndex] = lTypeHash;
       }
     }
+
   #if defined(WEMBED_NATIVE_CODE_DUMP) && defined(WEMBED_VERBOSE)
     dump_native();
   #endif
@@ -147,7 +196,7 @@ namespace wembed {
       auto lName = value_name(mModule.mFunctions[lIndex]);
       if (lName == nullptr || lName.size() == 0)
         continue;
-      uint8_t* lAddress = (uint8_t*)LLVMGetFunctionAddress2(mEngine, lName.data(), lName.size());
+      uint8_t* lAddress = (uint8_t*)LLVMGetFunctionAddress(mEngine, lName.data());
       std::cout << "Function " << lName << " at " << (void*)lAddress << std::endl;
 
       uint8_t *lEnd = lAddress + 128;
@@ -179,17 +228,20 @@ namespace wembed {
   }
 
   void context::map_global(LLVMValueRef pDest, void *pSource) {
-    auto lName = value_name(pDest); // If no name, probably optimised out
-    if (lName != nullptr && lName.size() > 0) {
+    if (!value_name(pDest).empty()) {
       LLVMAddGlobalMapping(mEngine, pDest, pSource);
   #ifdef WEMBED_VERBOSE
-      std::cout << "remap " << lName << " to " << pSource << std::endl;
+      std::cout << "remap " << value_name(pDest) << " to " << pSource << std::endl;
   #endif
     }
   }
 
-  virtual_mapping *context::mem() {
+  memory *context::mem() {
     return mExternalMemory ? mExternalMemory : &(mSelfMemory.value());
+  }
+
+  table *context::tab() {
+    return mExternalTable ? mExternalTable : &(mSelfTable.value());
   }
 
 }  // namespace wembed

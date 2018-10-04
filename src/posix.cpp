@@ -23,9 +23,9 @@ namespace wembed {
   void virtual_mapping::resize(size_t pNewSize) {
     if (pNewSize > mAllocatedSize)
       throw std::bad_array_new_length();
-    mCurSize = pNewSize;
-    if (mprotect(mAddress, mCurSize, PROT_READ | PROT_WRITE))
+    if (mprotect(mAddress, pNewSize, PROT_READ | PROT_WRITE))
       throw std::bad_alloc();
+    mCurSize = pNewSize;
   }
 
 }  // namespace wembed

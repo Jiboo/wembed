@@ -10,6 +10,10 @@ namespace wembed {
   using f32 = float;
   using f64 = double;
 
+  constexpr uint32_t sPageSize = 64 * 1024;
+  constexpr uint32_t sMaxPages = 64 * 1024;
+  constexpr uint32_t sMaxTableSize = 256;
+
   enum value_type : uint8_t {
     vt_i32 = 127,
     vt_i64 = 126,
@@ -43,10 +47,14 @@ namespace wembed {
   struct table_type {
     elem_type mType;
     resizable_limits mLimits;
+    inline size_t initial() const { return mLimits.mInitial; }
+    inline size_t maximum() const { return mLimits.mFlags & 0x1 ? mLimits.mMaximum : sMaxTableSize; }
   };
 
   struct memory_type {
     resizable_limits mLimits;
+    inline size_t initial() const { return mLimits.mInitial; }
+    inline size_t maximum() const { return mLimits.mFlags & 0x1 ? mLimits.mMaximum : sMaxPages; }
   };
 
   enum external_kind {

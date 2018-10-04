@@ -6,18 +6,19 @@
 
 #include "wembed.hpp"
 
-void spectest_print(uint8_t* base);
-void spectest_print_i32(uint8_t* base, int32_t param);
-void spectest_print_i32_f32(uint8_t* base, int32_t param, float param2);
-void spectest_print_f64_f64(uint8_t* base, double param, double param2);
-void spectest_print_f32(uint8_t* base, float param);
-void spectest_print_f64(uint8_t* base, double param);
+void spectest_print();
+void spectest_print_i32(int32_t param);
+void spectest_print_i32_f32(int32_t param, float param2);
+void spectest_print_f64_f64(double param, double param2);
+void spectest_print_f32(float param);
+void spectest_print_f64(double param);
 
 extern int32_t spectest_global_i32;
 extern float spectest_global_f32;
 extern double spectest_global_f64;
-
-extern wembed::virtual_mapping spectest_mem;
+extern wembed::memory spectest_mem;
+extern wembed::table spectest_tab;
+void spectest_reset();
 
 void dump(const void* data, size_t size);
 

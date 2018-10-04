@@ -8,17 +8,17 @@ namespace wembed {
   i32 intrinsics::memory_grow(uint8_t *pContext, uint32_t pDelta) {
     context *lCtx = (context*)pContext;
     assert(lCtx->mem() != nullptr);
-    const size_t lPageBytes = 64 * 1024;
-    size_t lPrevSize = lCtx->mem()->size() / lPageBytes;
+    memory *lMem = lCtx->mem();
+    resizable_limits lLimits = lMem->limits();
+    size_t lPrevSize = lMem->size();
     size_t lNewSize = lPrevSize + pDelta;
-    bool lReachedLimit = (lCtx->mMemoryLimits.mFlags & 0x1)
-                         && lNewSize > lCtx->mMemoryLimits.mMaximum;
-    if (lNewSize > 0x10000 || lReachedLimit)
+    bool lReachedLimit = (lLimits.mFlags & 0x1) && lNewSize > lLimits.mMaximum;
+    if (lNewSize > sMaxPages || lReachedLimit)
       return -1;
 
     try {
       if (pDelta > 0)
-        lCtx->mem()->resize(lNewSize * lPageBytes);
+        lCtx->mem()->resize(lNewSize);
     }
     catch(const std::bad_array_new_length &e) {
       return -1;
@@ -29,9 +29,18 @@ namespace wembed {
 
   i32 intrinsics::memory_size(uint8_t *pContext) {
     context *lCtx = (context*)pContext;
+    assert(lCtx->mem() != nullptr);
     if (lCtx->mExternalMemory == nullptr && !lCtx->mSelfMemory.has_value())
       return 0;
-    return static_cast<i32>(lCtx->mem()->size() / (64 * 1024));
+    return static_cast<i32>(lCtx->mem()->size());
+  }
+
+  i32 intrinsics::table_size(uint8_t *pContext) {
+    context *lCtx = (context*)pContext;
+    assert(lCtx->tab() != nullptr);
+    if (lCtx->mExternalTable == nullptr && !lCtx->mSelfTable.has_value())
+      return 0;
+    return static_cast<i32>(lCtx->tab()->size());
   }
 
   void intrinsics::throw_unlinkable(const char *pErrorString) {

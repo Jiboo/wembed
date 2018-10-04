@@ -14,14 +14,16 @@
 
 namespace wembed {
 
-  class malformed_exception : std::runtime_error {
+  class malformed_exception : public std::runtime_error {
   public:
     malformed_exception(const std::string &pCause) : runtime_error(pCause) {}
+    virtual ~malformed_exception() throw () {}
   };
 
-  class invalid_exception : std::runtime_error {
+  class invalid_exception : public std::runtime_error {
   public:
     invalid_exception(const std::string &pCause) : runtime_error(pCause) {}
+    virtual ~invalid_exception() throw () {}
   };
 
   class module {
@@ -34,7 +36,7 @@ namespace wembed {
 
     LLVMModuleRef mModule;
 
-    LLVMValueRef symbol(const std::string_view &pName);
+    LLVMValueRef symbol1(const std::string_view &pName);
 
   protected:
     uint8_t *mCurrent, *mEnd;
@@ -43,7 +45,7 @@ namespace wembed {
 
     LLVMBuilderRef mBuilder;
     std::vector<memory_type> mMemoryTypes;
-    externsym mMemoryImport;
+    externsym mMemoryImport, mTableImport;
     LLVMValueRef mBaseMemory = nullptr;
     LLVMValueRef mContextRef;
     struct Table {
@@ -57,13 +59,14 @@ namespace wembed {
     };
     std::vector<Table> mTables;
     LLVMValueRef mStartFunc;
-    LLVMBasicBlockRef mStartContinue;
+    LLVMBasicBlockRef mStartInit, mStartUser;
     LLVMValueRef mMemCpy,
         mCtlz_i32, mCtlz_i64, mCttz_i32, mCttz_i64, mCtpop_i32, mCtpop_i64,
         mSqrt_f32, mSqrt_f64, mCeil_f32, mCeil_f64, mFloor_f32, mFloor_f64,
         mTrunc_f32, mTrunc_f64, mNearest_f32, mNearest_f64,
         mAbs_f32, mAbs_f64, mMin_f32, mMin_f64, mMax_f32, mMax_f64,
-        mCopysign_f32, mCopysign_f64, mMemoryGrow, mMemorySize,
+        mCopysign_f32, mCopysign_f64,
+        mMemoryGrow, mMemorySize, mTableSize,
         mUAddWithOverflow_i32, mUAddWithOverflow_i64,
         mThrowUnlinkable, mThrowVMException;
     std::vector<LLVMValueRef> mEvalStack;
@@ -107,9 +110,14 @@ namespace wembed {
 
     struct symbol_t {
       external_kind mKind;
-      LLVMValueRef mValue;
+      uint64_t mTypeHash;
+      std::vector<LLVMValueRef> mValues; // Only tables have 2 values
       symbol_t() {}
-      symbol_t(external_kind pKind, LLVMValueRef pValue) : mKind(pKind), mValue(pValue) {}
+      symbol_t(external_kind pKind, uint64_t pTypeHash, LLVMValueRef pValue) : mKind(pKind), mTypeHash(pTypeHash) {
+        mValues.emplace_back(pValue);
+      }
+      symbol_t(external_kind pKind, uint64_t pTypeHash, std::initializer_list<LLVMValueRef> pValues)
+        : mKind(pKind), mTypeHash(pTypeHash), mValues(pValues) {}
     };
     std::unordered_map<std::string, symbol_t> mExports;
     std::unordered_map<std::string, std::unordered_multimap<std::string, symbol_t>> mImports;
@@ -220,6 +228,7 @@ namespace wembed {
     void trap_if(LLVMValueRef lFunc, LLVMValueRef pCondition, LLVMValueRef pIntrinsic,
                                    const std::initializer_list<LLVMValueRef> &pArgs);
     void trap_data_copy(LLVMValueRef lFunc, LLVMValueRef pOffset, size_t pSize);
+    void trap_elem_copy(LLVMValueRef lFunc, LLVMValueRef pOffset);
     void trap_zero_div(LLVMValueRef lFunc, LLVMValueRef pLHS, LLVMValueRef pRHS);
     void trap_szero_div(LLVMValueRef lFunc, LLVMValueRef pLHS, LLVMValueRef pRHS);
 

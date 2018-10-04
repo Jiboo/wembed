@@ -3,8 +3,11 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <stdexcept>
 #include <string>
 #include <string_view>
+
+#include <boost/functional/hash.hpp>
 
 #include <llvm-c/Core.h>
 
@@ -16,14 +19,14 @@ namespace wembed {
   // When resized, the pointers shall not be modified
   class virtual_mapping {
   public:
-    virtual_mapping() {}
     virtual_mapping(size_t pInitialSize, size_t pMaximumSize);
-    ~virtual_mapping();
+    virtual ~virtual_mapping();
 
     void resize(size_t pNewSize);
     uint8_t *data() { return mAddress; }
     size_t size() { return mCurSize; }
     size_t capacity() { return mAllocatedSize; }
+
   protected:
     uint8_t *mAddress = nullptr;
     size_t mCurSize = 0, mAllocatedSize = 0;
@@ -82,7 +85,60 @@ namespace wembed {
     operator double() const { return mValue; }
   };
 
+  uint64_t hash_type(LLVMTypeRef pType, bool pConst = false);
   uint64_t hash_fn_type(LLVMTypeRef pType);
+
+  template <typename T>
+  inline uint64_t hash_ctype() {
+    throw std::runtime_error("invalid type in hash_ctype");
+  }
+
+  template<> inline uint64_t hash_ctype<void>()    { return hash_type(LLVMVoidType(), false); }
+  template<> inline uint64_t hash_ctype<int32_t>() { return hash_type(LLVMInt32Type(), false); }
+  template<> inline uint64_t hash_ctype<int64_t>() { return hash_type(LLVMInt64Type(), false); }
+  template<> inline uint64_t hash_ctype<float>()   { return hash_type(LLVMFloatType(), false); }
+  template<> inline uint64_t hash_ctype<double>()  { return hash_type(LLVMDoubleType(), false); }
+  template<> inline uint64_t hash_ctype<const int32_t>() { return hash_type(LLVMInt32Type(), true); }
+  template<> inline uint64_t hash_ctype<const int64_t>() { return hash_type(LLVMInt64Type(), true); }
+  template<> inline uint64_t hash_ctype<const float>()   { return hash_type(LLVMFloatType(), true); }
+  template<> inline uint64_t hash_ctype<const double>()  { return hash_type(LLVMDoubleType(), true); }
+
+  template <typename TLast>
+  void typehash_combine(uint64_t &pSeed) {
+    boost::hash_combine(pSeed, hash_ctype<TLast>());
+  }
+
+  template <typename TFirst, typename TSecond, typename...TRest>
+  void typehash_combine(uint64_t &pSeed) {
+    boost::hash_combine(pSeed, hash_ctype<TFirst>());
+    typehash_combine<TSecond, TRest...>(pSeed);
+  }
+
+  template <typename TFunc>
+  struct __hash_fn_ctype {
+    uint64_t operator()() {
+      throw std::runtime_error("invalid type in hash_fn_ctype");
+    }
+  };
+
+  template <typename TReturn, typename...TParams>
+  struct __hash_fn_ctype<TReturn (TParams...)> {
+    uint64_t operator()() {
+      uint64_t lSeed = 1;
+      typehash_combine<TReturn, TParams...>(lSeed);
+      return lSeed;
+    }
+  };
+
+  template <typename T>
+  inline uint64_t hash_fn_ctype() {
+    return __hash_fn_ctype<T>{}();
+  }
+
+  template <typename TReturn, typename...TParams>
+  inline uint64_t hash_fn_ctype_ptr(TReturn (*)(TParams...)) {
+    return __hash_fn_ctype<TReturn(TParams...)>{}();
+  }
 
   inline std::string_view value_name(LLVMValueRef pRef) {
     size_t lSize;

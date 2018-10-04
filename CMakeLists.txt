@@ -60,5 +60,5 @@ foreach(TESTCASE_WAST ${TESTSUITE_FILES})
 endforeach()
 
 include_directories(tst)
-add_executable(generated_tests tst/test.cpp ${TESTSUITE_SRC} tst/test.hpp tst/try_signal.cpp)
+add_executable(generated_tests tst/test.cpp ${TESTSUITE_SRC} tst/test.hpp tst/try_signal.cpp tst/hashtype.cpp)
 target_link_libraries(generated_tests gtest wembed try_signal ${LLVM_LIBS} stdc++fs)
