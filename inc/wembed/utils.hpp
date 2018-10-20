@@ -140,10 +140,4 @@ namespace wembed {
     return __hash_fn_ctype<TReturn(TParams...)>{}();
   }
 
-  inline std::string_view value_name(LLVMValueRef pRef) {
-    size_t lSize;
-    const char *lData = LLVMGetValueName2(pRef, &lSize);
-    return std::string_view(lData, lSize);
-  }
-
 }  // namespace wembed

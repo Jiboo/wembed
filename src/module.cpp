@@ -28,10 +28,10 @@ namespace wembed {
 
     LLVMTypeRef lVoidFuncT = LLVMFunctionType(LLVMVoidType(), nullptr, 0, false);
     mModule = LLVMModuleCreateWithName("module");
-    mBaseMemory = LLVMAddGlobal(mModule, LLVMInt8Type(), "baseMemory");
-    mContextRef = LLVMAddGlobal(mModule, LLVMInt8Type(), "ctxRef");
+    mBaseMemory = LLVMAddGlobal(mModule, LLVMInt8Type(), "wembed.baseMemory");
+    mContextRef = LLVMAddGlobal(mModule, LLVMInt8Type(), "wembed.ctxRef");
     mBuilder = LLVMCreateBuilder();
-    mStartFunc = LLVMAddFunction(mModule, "__wstart", lVoidFuncT);
+    mStartFunc = LLVMAddFunction(mModule, "wembed.start", lVoidFuncT);
     mStartInit = LLVMAppendBasicBlock(mStartFunc, "entry");
     mStartUser = LLVMAppendBasicBlock(mStartFunc, "callStart");
     LLVMPositionBuilderAtEnd(mBuilder, mStartInit);
@@ -45,7 +45,7 @@ namespace wembed {
   }
 
   module::~module() {
-    LLVMDisposeModule(mModule);
+    //LLVMDisposeModule(mModule);
   }
 
   void module::dump_ll(std::ostream &os) {
@@ -162,7 +162,7 @@ namespace wembed {
     return LLVMAddFunction(mModule, pName.c_str(), lType);
   }
 
-  void module::trap_if(LLVMValueRef lFunc, LLVMValueRef pCondition, LLVMValueRef pIntrinsic,
+  LLVMBasicBlockRef module::trap_if(LLVMValueRef lFunc, LLVMValueRef pCondition, LLVMValueRef pIntrinsic,
                                          const std::initializer_list<LLVMValueRef> &pArgs) {
     LLVMBasicBlockRef lTrapThen = LLVMAppendBasicBlock(lFunc, "trapThen");
     LLVMBasicBlockRef lTrapSkip = LLVMAppendBasicBlock(lFunc, "trapSkip");
@@ -178,9 +178,10 @@ namespace wembed {
     LLVMBuildUnreachable(mBuilder);
 
     LLVMPositionBuilderAtEnd(mBuilder, lTrapSkip);
+    return lTrapSkip;
   }
 
-  void module::trap_data_copy(LLVMValueRef lFunc, LLVMValueRef pOffset, size_t pSize) {
+  LLVMBasicBlockRef module::trap_data_copy(LLVMValueRef lFunc, LLVMValueRef pOffset, size_t pSize) {
     LLVMValueRef lMemorySizePage = LLVMBuildCall(mBuilder, mMemorySize, &mContextRef, 1, "curMemPage");
     LLVMValueRef lMemorySizeBytes = LLVMBuildMul(mBuilder, lMemorySizePage, get_const(64 * 1024), "curMemByte");
     LLVMValueRef lUnderflow = LLVMBuildICmp(mBuilder, LLVMIntSLT, pOffset, get_zero(LLVMTypeOf(pOffset)), "testOverflow");
@@ -188,23 +189,23 @@ namespace wembed {
     LLVMValueRef lOverflow = LLVMBuildICmp(mBuilder, LLVMIntUGT, lTotalOffset, lMemorySizeBytes, "testOverflow");
     LLVMValueRef lBoundsError = LLVMBuildOr(mBuilder, lUnderflow, lOverflow, "boundsError");
     static const char *lErrorString = "data segment does not fit";
-    trap_if(lFunc, lBoundsError, mThrowUnlinkable, {get_string(lErrorString)});
+    return trap_if(lFunc, lBoundsError, mThrowUnlinkable, {get_string(lErrorString)});
   }
 
-  void module::trap_elem_copy(LLVMValueRef lFunc, LLVMValueRef pOffset) {
+  LLVMBasicBlockRef module::trap_elem_copy(LLVMValueRef lFunc, LLVMValueRef pOffset) {
     LLVMValueRef lTabSize = LLVMBuildCall(mBuilder, mTableSize, &mContextRef, 1, "curTabSize");
     LLVMValueRef lOverflow = LLVMBuildICmp(mBuilder, LLVMIntUGE, pOffset, lTabSize, "testOverflow");
-    static const char *lErrorString = "elements segment does not fit";
-    trap_if(lFunc, lOverflow, mThrowUnlinkable, {get_string(lErrorString)});
+    static const char *lErrorString = "elements segment does not fit trap_elem_copy";
+    return trap_if(lFunc, lOverflow, mThrowUnlinkable, {get_string(lErrorString)});
   }
 
-  void module::trap_zero_div(LLVMValueRef lFunc, LLVMValueRef pLHS, LLVMValueRef pRHS) {
+  LLVMBasicBlockRef module::trap_zero_div(LLVMValueRef lFunc, LLVMValueRef pLHS, LLVMValueRef pRHS) {
     LLVMValueRef lDivZero = LLVMBuildICmp(mBuilder, LLVMIntEQ, pRHS, get_zero(LLVMTypeOf(pRHS)), "divZero");
     static const char *lErrorString = "int div by zero";
-    trap_if(lFunc, lDivZero, mThrowVMException, {get_string(lErrorString)});
+    return trap_if(lFunc, lDivZero, mThrowVMException, {get_string(lErrorString)});
   }
 
-  void module::trap_szero_div(LLVMValueRef lFunc, LLVMValueRef pLHS, LLVMValueRef pRHS) {
+  LLVMBasicBlockRef module::trap_szero_div(LLVMValueRef lFunc, LLVMValueRef pLHS, LLVMValueRef pRHS) {
     LLVMValueRef lMin, lMinus1;
     LLVMTypeRef lLType = LLVMTypeOf(pLHS);
     if (lLType == LLVMInt32Type()) {
@@ -224,7 +225,7 @@ namespace wembed {
     LLVMValueRef lDivZero = LLVMBuildICmp(mBuilder, LLVMIntEQ, pRHS, get_zero(LLVMTypeOf(pRHS)), "divZero");
     LLVMValueRef lSZeroDiv = LLVMBuildOr(mBuilder, lDivZero, lOverflow, "szero_div");
     static const char *lErrorString = "int div by zero or overflow";
-    trap_if(lFunc, lSZeroDiv, mThrowVMException, {get_string(lErrorString)});
+    return trap_if(lFunc, lSZeroDiv, mThrowVMException, {get_string(lErrorString)});
   }
 
   void module::init_intrinsics() {
@@ -277,14 +278,14 @@ namespace wembed {
     mUAddWithOverflow_i32 = init_mv_intrinsic("llvm.uadd.with.overflow.i32", {LLVMInt32Type(), LLVMInt1Type()}, {LLVMInt32Type(), LLVMInt32Type()});
     mUAddWithOverflow_i64 = init_mv_intrinsic("llvm.uadd.with.overflow.i64", {LLVMInt64Type(), LLVMInt1Type()}, {LLVMInt64Type(), LLVMInt64Type()});
 
-    mMemoryGrow = init_intrinsic("wembed.memory.grow.i32", LLVMInt32Type(), {
+    mMemoryGrow = init_intrinsic("wembed.memory.grow", LLVMInt32Type(), {
         LLVMPointerType(LLVMInt8Type(), 0),
         LLVMInt32Type()
     });
-    mMemorySize = init_intrinsic("wembed.memory.size.i32", LLVMInt32Type(), {
+    mMemorySize = init_intrinsic("wembed.memory.size", LLVMInt32Type(), {
         LLVMPointerType(LLVMInt8Type(), 0)
     });
-    mTableSize = init_intrinsic("wembed.table.size.i32", LLVMInt32Type(), {
+    mTableSize = init_intrinsic("wembed.table.size", LLVMInt32Type(), {
         LLVMPointerType(LLVMInt8Type(), 0)
     });
     mThrowUnlinkable = init_intrinsic("wembed.throw.unlinkable", LLVMVoidType(), {LLVMPointerType(LLVMInt8Type(), 0)});
@@ -410,7 +411,7 @@ namespace wembed {
             std::string lNameStr(parse_str(lNameSize));
             if (lIndex >= mFunctions.size())
               throw invalid_exception("function index out of bounds");
-            LLVMSetValueName2(mFunctions[lIndex], lNameStr.data(), lNameStr.size());
+            LLVMSetValueName2(mFunctions[lIndex].mValue, lNameStr.data(), lNameStr.size());
           }
         } break;
       }
@@ -620,29 +621,49 @@ namespace wembed {
     }
   }
 
-  LLVMValueRef module::parse_llvm_init() {
-    LLVMValueRef lResult;
+  std::function<LLVMValueRef()> module::parse_llvm_init(LLVMTypeRef pType) {
+    std::function<LLVMValueRef()> lResult;
     uint8_t lInstr = parse<uint8_t>();
     switch (lInstr) {
-      case o_const_i32: lResult = LLVMConstInt(LLVMInt32Type(), parse_sleb128<int32_t>(), true);
-        break;
-      case o_const_i64: lResult = LLVMConstInt(LLVMInt64Type(), parse_sleb128<int64_t>(), true);
-        break;
-      case o_const_f32: lResult = LLVMConstReal(LLVMFloatType(), parse<float>());
-        break;
-      case o_const_f64: lResult = LLVMConstReal(LLVMDoubleType(), parse<double>());
-        break;
+      case o_const_i32: {
+        if (pType != LLVMInt32Type())
+          throw invalid_exception("init i32, expected other type");
+        int32_t lValue = parse_sleb128<int32_t>();
+        lResult = [lValue] { return LLVMConstInt(LLVMInt32Type(), lValue, true); };
+      } break;
+      case o_const_i64: {
+        if (pType != LLVMInt64Type())
+          throw invalid_exception("init i64, expected other type");
+        int64_t lValue = parse_sleb128<int64_t>();
+        lResult = [lValue] { return LLVMConstInt(LLVMInt64Type(), lValue, true); };
+      } break;
+      case o_const_f32: {
+        if (pType != LLVMFloatType())
+          throw invalid_exception("init f32, expected other type");
+        float lValue = parse<float>();
+        lResult = [lValue] { return LLVMConstReal(LLVMFloatType(), lValue); };
+      } break;
+      case o_const_f64: {
+        if (pType != LLVMDoubleType())
+          throw invalid_exception("init f64, expected other type");
+        double lValue = parse<double>();
+        lResult = [lValue] { return LLVMConstReal(LLVMDoubleType(), lValue); };
+      } break;
       case o_get_global: {
         uint32_t lIndex = parse_sleb128<uint32_t>();
         if (lIndex >= mGlobals.size())
           throw invalid_exception("global index out of bounds");
-        lResult = LLVMBuildLoad(mBuilder, mGlobals[lIndex], "globalInit");
+        if (pType != LLVMGetElementType(LLVMTypeOf(mGlobals[lIndex]))) {
+          throw invalid_exception("init global, expected other type");
+        }
+        lResult = [this, lIndex] { return LLVMBuildLoad(mBuilder, mGlobals[lIndex], "globalInit"); };
       } break;
       default: throw invalid_exception("unsupported init expr instr");
     }
     uint8_t lEnd = parse<uint8_t>();
     if (lEnd != o_end)
       throw invalid_exception("expected end after init expr");
+    assert(lResult);
     return lResult;
   }
 
@@ -737,9 +758,10 @@ namespace wembed {
           std::vector<LLVMTypeRef> lParams(lParamCount);
           LLVMGetParamTypes(lType, lParams.data());
 
-          LLVMValueRef lFunction = LLVMAddFunction(mModule, WEMBED_USE_INTERNAL_NAMES ? lName.str().c_str() : "__wimport_func", lType);
+          LLVMValueRef lFunction = LLVMAddFunction(mModule, "wembed.func", lType);
           LLVMSetLinkage(lFunction, LLVMLinkage::LLVMExternalLinkage);
-          mFunctions.emplace_back(lFunction);
+          const uint64_t lTypeHash = hash_fn_type(lType);
+          mFunctions.emplace_back(lFunction, LLVMGetValueName(lFunction), lTypeHash);
           mImports[std::string(lModule)].emplace(std::string(lField), symbol_t{ek_function, hash_fn_type(lType), lFunction});
   #ifdef WEMBED_VERBOSE
           std::cout << "Import func " << mFunctions.size() << ": " << LLVMPrintTypeToString(lType) << ", hash:" << hash_fn_type(lType) << std::endl;
@@ -748,7 +770,7 @@ namespace wembed {
         case ek_global: {
           LLVMTypeRef lType = parse_llvm_vtype();
           uint8_t lMutable = parse<uint8_t>();
-          LLVMValueRef lGlobal = LLVMAddGlobal(mModule, lType, WEMBED_USE_INTERNAL_NAMES ? lName.str().c_str() : "__wimport_glob");
+          LLVMValueRef lGlobal = LLVMAddGlobal(mModule, lType, "wembed.glob");
           LLVMSetLinkage(lGlobal, LLVMLinkage::LLVMExternalLinkage);
           LLVMSetGlobalConstant(lGlobal, !lMutable);
 #ifdef WEMBED_VERBOSE
@@ -764,8 +786,8 @@ namespace wembed {
             throw invalid_exception("multiple tables not supported");
           table_type lType = parse_table_type();
           LLVMTypeRef lContainerType = LLVMPointerType(LLVMInt8Type(), 0);
-          LLVMValueRef lPointers = LLVMAddGlobal(mModule, lContainerType, "tablePtrs");
-          LLVMValueRef lTypes = LLVMAddGlobal(mModule, LLVMInt64Type(), "tableTypes");
+          LLVMValueRef lPointers = LLVMAddGlobal(mModule, lContainerType, "wembed.tablePtrs");
+          LLVMValueRef lTypes = LLVMAddGlobal(mModule, LLVMInt64Type(), "wembed.tableTypes");
           mTables.emplace_back(lType, lPointers, lTypes);
           LLVMSetLinkage(lPointers, LLVMLinkage::LLVMExternalLinkage);
           LLVMSetLinkage(lTypes, LLVMLinkage::LLVMExternalLinkage);
@@ -796,7 +818,8 @@ namespace wembed {
       uint32_t lTIndex = parse_uleb128<uint32_t>();
       if (lTIndex >= mTypes.size())
         throw invalid_exception("type index out of range");
-      mFunctions.emplace_back(LLVMAddFunction(mModule, "func", mTypes[lTIndex]));
+      LLVMValueRef lFuncRef = LLVMAddFunction(mModule, "wembed.func", mTypes[lTIndex]);
+      mFunctions.emplace_back(lFuncRef, LLVMGetValueName(lFuncRef), hash_fn_type(mTypes[lTIndex]));
     }
   }
 
@@ -807,11 +830,9 @@ namespace wembed {
         throw invalid_exception("multiple tables not supported");
       table_type lType = parse_table_type();
       LLVMTypeRef lContainerType = LLVMPointerType(LLVMInt8Type(), 0);
-      LLVMValueRef lPointers = LLVMAddGlobal(mModule, lContainerType, "tablePtrs");
-      LLVMValueRef lTypes = LLVMAddGlobal(mModule, LLVMInt64Type(), "tableTypes");
+      LLVMValueRef lPointers = LLVMAddGlobal(mModule, lContainerType, "wembed.tablePtrs");
+      LLVMValueRef lTypes = LLVMAddGlobal(mModule, LLVMInt64Type(), "wembed.tableTypes");
       mTables.emplace_back(lType, lPointers, lTypes);
-      LLVMSetLinkage(lPointers, LLVMLinkage::LLVMExternalLinkage);
-      LLVMSetLinkage(lTypes, LLVMLinkage::LLVMExternalLinkage);
     }
   }
 
@@ -831,7 +852,7 @@ namespace wembed {
   }
 
   void module::parse_globals() {
-    LLVMValueRef lInit = LLVMAddFunction(mModule, "__wstart_globals", LLVMFunctionType(LLVMVoidType(), nullptr, 0, false));
+    LLVMValueRef lInit = LLVMAddFunction(mModule, "wembed.start.globals", LLVMFunctionType(LLVMVoidType(), nullptr, 0, false));
     LLVMBasicBlockRef lBlock = LLVMAppendBasicBlock(lInit, "entry");
     LLVMPositionBuilderAtEnd(mBuilder, lBlock);
 
@@ -839,14 +860,13 @@ namespace wembed {
     for (size_t lI = 0; lI < lCount; lI++) {
       LLVMTypeRef lType = parse_llvm_vtype();
       uint8_t lMutable = parse<uint8_t>();
-      LLVMValueRef lValue = parse_llvm_init();
-      if (LLVMTypeOf(lValue) != lType)
-        throw invalid_exception("global value don't match type");
+      auto lInitValue = parse_llvm_init(lType);
+      auto lValue = lInitValue();
   #ifdef WEMBED_VERBOSE
       std::cout << "Global " << mGlobals.size() << " " << LLVMPrintTypeToString(lType)
                 << ": " << LLVMPrintValueToString(lValue) << std::endl;
   #endif
-      LLVMValueRef lGlobal = LLVMAddGlobal(mModule, lType, "__wglobal");
+      LLVMValueRef lGlobal = LLVMAddGlobal(mModule, lType, "wembed.global");
       LLVMSetGlobalConstant(lGlobal, !lMutable);
       if (LLVMIsConstant(lValue)) {
         LLVMSetInitializer(lGlobal, lValue);
@@ -877,22 +897,16 @@ namespace wembed {
         case ek_function: {
           if (lIndex >= mFunctions.size())
             throw invalid_exception("function index out of bounds");
-          LLVMSetValueName2(mFunctions[lIndex],
-                            WEMBED_USE_INTERNAL_NAMES ? lName.data() : "__wexport_func",
-                            WEMBED_USE_INTERNAL_NAMES ? lName.size() : strlen("__wexport_func"));
-          LLVMTypeRef lType = LLVMGetElementType(LLVMTypeOf(mFunctions[lIndex]));
-          mExports.emplace(std::string(lName), symbol_t{lKind, hash_fn_type(lType), {mFunctions[lIndex]}});
+          auto lFuncDef = mFunctions[lIndex];
+          mExports.emplace(std::string(lName), symbol_t{lKind, lFuncDef.mType, {mFunctions[lIndex].mValue}});
           //LLVMSetLinkage(mFunctions[lIndex], LLVMInternalLinkage);
 #ifdef WEMBED_VERBOSE
-          std::cout << "Export func " << lIndex << ": " << LLVMPrintTypeToString(lType) << ", hash:" << hash_fn_type(lType) << std::endl;
+          std::cout << "Export func " << lIndex << ": " << LLVMPrintTypeToString(LLVMTypeOf(lFuncDef.mValue)) << ", hash:" << lFuncDef.mType << std::endl;
 #endif
         } break;
         case ek_global: {
           if (lIndex >= mGlobals.size())
             throw invalid_exception("global index out of bounds");
-          LLVMSetValueName2(mGlobals[lIndex],
-                            WEMBED_USE_INTERNAL_NAMES ? lName.data() : "__wexport_glob",
-                            WEMBED_USE_INTERNAL_NAMES ? lName.size() : strlen("__wexport_glob"));
           LLVMTypeRef lType = LLVMGetElementType(LLVMTypeOf(mGlobals[lIndex]));
           mExports.emplace(lName, symbol_t{lKind, hash_type(lType, LLVMIsGlobalConstant(mGlobals[lIndex]) != 0), {mGlobals[lIndex]}});
           //LLVMSetLinkage(mGlobals[lIndex], LLVMInternalLinkage);
@@ -925,19 +939,19 @@ namespace wembed {
     uint32_t lIndex = parse_uleb128<uint32_t>();
     if (lIndex >= mFunctions.size())
       throw invalid_exception("function index out of bounds");
-    LLVMTypeRef lStartSignature = LLVMGetElementType(LLVMTypeOf(mFunctions[lIndex]));
+    LLVMTypeRef lStartSignature = LLVMGetElementType(LLVMTypeOf(mFunctions[lIndex].mValue));
     if (LLVMGetReturnType(lStartSignature) != LLVMVoidType())
       throw invalid_exception("start function required to return void");
     if (LLVMCountParamTypes(lStartSignature) > 0)
       throw invalid_exception("start function require no input param");
 
-    LLVMBuildCall(mBuilder, mFunctions[lIndex], nullptr, 0, "");
+    LLVMBuildCall(mBuilder, mFunctions[lIndex].mValue, nullptr, 0, "");
   }
 
   void module::parse_section_element(uint32_t pSectionSize) {
-    LLVMValueRef lInit = LLVMAddFunction(mModule, "__wstart_element", LLVMFunctionType(LLVMVoidType(), nullptr, 0, false));
-    LLVMBasicBlockRef lBlock = LLVMAppendBasicBlock(lInit, "entry");
-    LLVMPositionBuilderAtEnd(mBuilder, lBlock);
+    LLVMValueRef lInit = LLVMAddFunction(mModule, "wembed.start.element", LLVMFunctionType(LLVMVoidType(), nullptr, 0, false));
+    LLVMBasicBlockRef lChecks = LLVMAppendBasicBlock(lInit, "checks");
+    LLVMBasicBlockRef lCopies = LLVMAppendBasicBlock(lInit, "copies");
 
     uint32_t lCount = parse_uleb128<uint32_t>();
     for (size_t lI = 0; lI < lCount; lI++) {
@@ -945,14 +959,16 @@ namespace wembed {
       if (lIndex >= mTables.size())
         throw invalid_exception("table index out of bounds");
       const Table &lTable = mTables[lIndex];
-      LLVMValueRef lOffset = parse_llvm_init();
-      if (LLVMTypeOf(lOffset) != LLVMInt32Type())
-        throw invalid_exception("table offset expected to be i32");
 
-      LLVMValueRef lTabSize = LLVMBuildCall(mBuilder, mTableSize, &mContextRef, 1, "curTabSize");
-      LLVMValueRef lOffsetOverflow = LLVMBuildICmp(mBuilder, LLVMIntUGT, lOffset, lTabSize, "offsetOverflow");
-      static const char *lErrorString = "elements segment does not fit";
-      trap_if(lInit, lOffsetOverflow, mThrowUnlinkable, {get_string(lErrorString)});
+      LLVMPositionBuilderAtEnd(mBuilder, lChecks);
+      auto lOffsetInit = parse_llvm_init(LLVMInt32Type());
+      {
+        LLVMValueRef lOffset = lOffsetInit();
+        LLVMValueRef lTabSize = LLVMBuildCall(mBuilder, mTableSize, &mContextRef, 1, "curTabSize");
+        LLVMValueRef lOffsetOverflow = LLVMBuildICmp(mBuilder, LLVMIntUGT, lOffset, lTabSize, "offsetOverflow");
+        static const char *lErrorString = "elements segment does not fit";
+        lChecks = trap_if(lInit, lOffsetOverflow, mThrowUnlinkable, {get_string(lErrorString)});
+      }
 
       if (lTable.mType.mType == e_anyfunc) {
         uint32_t lElemCount = parse_uleb128<uint32_t>();
@@ -960,19 +976,34 @@ namespace wembed {
           uint32_t lFuncIndex = parse_uleb128<uint32_t>();
           if (lFuncIndex >= mFunctions.size())
             throw invalid_exception("function index out of bounds");
-          LLVMValueRef lTotalOffset = LLVMBuildAdd(mBuilder, lOffset, get_const(lElemIndex), "totalOffset");
-          trap_elem_copy(lInit, lTotalOffset);
-          LLVMValueRef lTablePtr = LLVMBuildPointerCast(mBuilder, lTable.mPointers,
-                                                        LLVMPointerType(LLVMPointerType(LLVMInt8Type(), 0), 0),
-                                                        "table");
-          LLVMValueRef lPointer = LLVMBuildInBoundsGEP(mBuilder, lTablePtr, &lTotalOffset, 1, "gep");
-          // Stores the indices, it's the context that will replace them to func ptr
-          LLVMBuildStore(mBuilder, LLVMBuildIntToPtr(mBuilder, get_const(lFuncIndex + 1),
-                                                     LLVMPointerType(LLVMInt8Type(), 0), "cast"), lPointer);
+
+          LLVMPositionBuilderAtEnd(mBuilder, lChecks);
+          {
+            LLVMValueRef lOffset = lOffsetInit();
+            LLVMValueRef lTotalOffset = LLVMBuildAdd(mBuilder, lOffset, get_const(lElemIndex), "totalOffset");
+            lChecks = trap_elem_copy(lInit, lTotalOffset);
+          }
+
+          LLVMPositionBuilderAtEnd(mBuilder, lCopies);
+          {
+            LLVMValueRef lOffset = lOffsetInit();
+            LLVMValueRef lTotalOffset = LLVMBuildAdd(mBuilder, lOffset, get_const(lElemIndex), "totalOffset");
+            LLVMValueRef lTablePtr = LLVMBuildPointerCast(mBuilder, lTable.mPointers,
+                                                          LLVMPointerType(LLVMPointerType(LLVMInt8Type(), 0), 0),
+                                                          "table");
+            LLVMValueRef lPointer = LLVMBuildInBoundsGEP(mBuilder, lTablePtr, &lTotalOffset, 1, "gep");
+            // Stores the indices, it's the context that will replace them to func ptr
+            LLVMBuildStore(mBuilder, LLVMBuildIntToPtr(mBuilder, get_const(lFuncIndex + 1),
+                                                       LLVMPointerType(LLVMInt8Type(), 0), "cast"), lPointer);
+          }
         }
       }
     }
 
+    LLVMPositionBuilderAtEnd(mBuilder, lChecks);
+    LLVMBuildBr(mBuilder, lCopies);
+
+    LLVMPositionBuilderAtEnd(mBuilder, lCopies);
     LLVMBuildRetVoid(mBuilder);
     LLVMPositionBuilderAtEnd(mBuilder, mStartInit);
     LLVMBuildCall(mBuilder, lInit, nullptr, 0, "");
@@ -982,21 +1013,24 @@ namespace wembed {
     if (mMemoryTypes.empty())
       throw invalid_exception("data provided without memory section");
 
-    LLVMValueRef lInit = LLVMAddFunction(mModule, "__wstart_data", LLVMFunctionType(LLVMVoidType(), nullptr, 0, false));
-    LLVMBasicBlockRef lBlock = LLVMAppendBasicBlock(lInit, "entry");
-    LLVMPositionBuilderAtEnd(mBuilder, lBlock);
+    LLVMValueRef lInit = LLVMAddFunction(mModule, "wembed.start.data", LLVMFunctionType(LLVMVoidType(), nullptr, 0, false));
+    LLVMBasicBlockRef lChecks = LLVMAppendBasicBlock(lInit, "checks");
+    LLVMBasicBlockRef lCopies = LLVMAppendBasicBlock(lInit, "copies");
+    LLVMPositionBuilderAtEnd(mBuilder, lChecks);
 
     uint32_t lCount = parse_uleb128<uint32_t>();
     for (size_t lI = 0; lI < lCount; lI++) {
       uint32_t lIndex = parse_uleb128<uint32_t>();
       if (lIndex != 0)
         throw invalid_exception("multiple memory block not supported");
-      LLVMValueRef lOffset = parse_llvm_init();
-      if (LLVMTypeOf(lOffset) != LLVMInt32Type())
-        throw invalid_exception("data offset expects i32");
+      auto lOffsetInit = parse_llvm_init(LLVMInt32Type());
+      LLVMValueRef lOffset = lOffsetInit();
       uint32_t lSize = parse_uleb128<uint32_t>();
-      trap_data_copy(lInit, lOffset, lSize);
+
+      LLVMPositionBuilderAtEnd(mBuilder, lChecks);
+      lChecks = trap_data_copy(lInit, lOffset, lSize);
       if (lSize > 0) {
+        LLVMPositionBuilderAtEnd(mBuilder, lCopies);
         call_intrinsic(mMemCpy, {
             LLVMBuildInBoundsGEP(mBuilder, mBaseMemory, &lOffset, 1, "offseted"),
             LLVMConstIntToPtr(LLVMConstInt(LLVMInt64Type(), ull_t(mCurrent), false),
@@ -1011,6 +1045,10 @@ namespace wembed {
       }
     }
 
+    LLVMPositionBuilderAtEnd(mBuilder, lChecks);
+    LLVMBuildBr(mBuilder, lCopies);
+
+    LLVMPositionBuilderAtEnd(mBuilder, lCopies);
     LLVMBuildRetVoid(mBuilder);
     LLVMPositionBuilderAtEnd(mBuilder, mStartInit);
     LLVMBuildCall(mBuilder, lInit, nullptr, 0, "");
@@ -1031,11 +1069,11 @@ namespace wembed {
       size_t lFIndex = mImportFuncOffset + lCode;
       if (lFIndex >= mFunctions.size())
         throw invalid_exception("function index out of bounds");
-      LLVMValueRef lFunc = mFunctions[lFIndex];
+      LLVMValueRef lFunc = mFunctions[lFIndex].mValue;
       LLVMTypeRef lFuncType = LLVMGetElementType(LLVMTypeOf(lFunc));
       LLVMTypeRef lReturnType = LLVMGetReturnType(lFuncType);
   #ifdef WEMBED_VERBOSE
-      std::cout << "Parsing code for func " << lFIndex << ": " << value_name(lFunc) << ", type " << LLVMPrintTypeToString(lFuncType) << std::endl;
+      std::cout << "Parsing code for func " << lFIndex << ": " << LLVMGetValueName(lFunc) << ", type " << LLVMPrintTypeToString(lFuncType) << std::endl;
   #endif
 
       std::vector<LLVMValueRef> lParams(LLVMCountParams(lFunc));
@@ -1364,7 +1402,7 @@ namespace wembed {
             uint32_t lCalleeIndex = parse_uleb128<uint32_t>();
             if (lCalleeIndex >= mFunctions.size())
               throw invalid_exception("function index out of bounds");
-            LLVMValueRef lCallee = mFunctions[lCalleeIndex];
+            LLVMValueRef lCallee = mFunctions[lCalleeIndex].mValue;
             LLVMTypeRef lCalleeType = LLVMGetElementType(LLVMTypeOf(lCallee));
             size_t lCalleeParamCount = LLVMCountParams(lCallee);
             if (lCalleeParamCount > mEvalStack.size())

@@ -2,13 +2,15 @@
 
 #include <gtest/gtest.h>
 
+#include <llvm-c/Support.h>
+
 #include "wembed.hpp"
 #include "test.hpp"
 
 using namespace wembed;
 
 void spectest_print() {
-  std::cout << "spectest_print: " << std::endl;
+  std::cout << "spectest_print" << std::endl;
 }
 void spectest_print_i32(int32_t param) {
   std::cout << "spectest_print_i32: " << param << std::endl;
@@ -46,15 +48,8 @@ void spectest_reset() {
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  LLVMLinkInMCJIT();
   LLVMInitializeNativeTarget();
   LLVMInitializeNativeAsmPrinter();
-
-#ifdef WEMBED_NATIVE_CODE_DUMP
-  LLVMInitializeAllTargetInfos();
-  LLVMInitializeAllTargetMCs();
-  LLVMInitializeAllDisassemblers();
-#endif
 
   return RUN_ALL_TESTS();
 }

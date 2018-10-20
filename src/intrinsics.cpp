@@ -1,6 +1,3 @@
-
-#include <wembed/context.hpp>
-
 #include "wembed.hpp"
 
 namespace wembed {

@@ -7,7 +7,7 @@
 #include <iostream>
 #endif
 
-#include <llvm-c/ExecutionEngine.h>
+#include <llvm-c/OrcBindings.h>
 
 #include "try_signal.hpp"
 
@@ -89,18 +89,31 @@ namespace wembed {
 
   class context {
   public:
+    friend uint64_t orc_sym_resolver(const char *pName, void *pCtx);
 
     context(module &pModule, resolvers_t pResolvers = {});
     ~context();
 
-    void map_intrinsic(LLVMModuleRef pModule, const char *pName, void *pPtr);
-    void map_global(LLVMValueRef pDest, void *pSource);
+    template<typename T = void>
+    T *get_pointer(const char *pName) {
+      auto lPredefined = mSymbols.find(pName);
+      if (lPredefined != mSymbols.end())
+        return (T*)lPredefined->second;
+
+      uint64_t lAddr;
+      LLVMErrorRef lError = LLVMOrcGetSymbolAddress(mEngine, &lAddr, pName);
+      if (lError) {
+        char *lErrorMsg = LLVMGetErrorMessage(lError);
+        std::string lErrorStr(lErrorMsg);
+        LLVMDisposeErrorMessage(lErrorMsg);
+        throw std::runtime_error(lErrorStr);
+      }
+      return reinterpret_cast<T*>(lAddr);
+    }
 
     resolve_result_t get_export(const std::string &pName) {
       auto lValue = mModule.mExports.find(pName);
       if (lValue == mModule.mExports.end())
-        return {nullptr, ek_global, 0};
-      if (value_name(lValue->second.mValues[0]).empty())
         return {nullptr, ek_global, 0};
       resolve_result_t lResult;
       lResult.mKind = lValue->second.mKind;
@@ -108,17 +121,10 @@ namespace wembed {
       switch (lValue->second.mKind) {
         case ek_table: lResult.mPointer = tab(); break;
         case ek_memory: lResult.mPointer = mem(); break;
-        default:
-#if defined(WEMBED_VERBOSE) && 0
-          std::cout << "Getting address for global " << pName << ", of type "
-                    << LLVMPrintTypeToString(LLVMTypeOf(lValue->second.mValues[0]))
-                    << ", " << LLVMPrintValueToString(lValue->second.mValues[0])
-                    << std::endl;
-#endif
-          lResult.mPointer = LLVMGetPointerToGlobal(mEngine, lValue->second.mValues[0]);
+        default: lResult.mPointer = get_pointer(lValue->second.mValueNames[0].c_str());
       }
       return lResult;
-    };
+    }
 
     template<typename TReturn, typename... TParams>
     std::function<TReturn(TParams...)> get_fn(const std::string &pName) {
@@ -136,7 +142,7 @@ namespace wembed {
           throw vm_runtime_exception(pError.what());
         }
       };
-    };
+    }
 
     template<typename TGlobal>
     TGlobal *get_global(const std::string &pName) {
@@ -146,11 +152,7 @@ namespace wembed {
       if (lResolve.mKind != ek_global)
         throw std::runtime_error("global not found");
       return reinterpret_cast<TGlobal*>(lResolve.mPointer);
-    };
-
-#ifdef WEMBED_NATIVE_CODE_DUMP
-    void dump_native();
-#endif
+    }
 
   protected:
     friend i32 intrinsics::memory_grow(uint8_t *pContext, uint32_t pDelta);
@@ -158,14 +160,16 @@ namespace wembed {
     friend i32 intrinsics::table_size(uint8_t *pContext);
 
     module &mModule;
-    resizable_limits mMemoryLimits;
-    LLVMValueRef mBaseMemory;
 
-    LLVMExecutionEngineRef mEngine = nullptr;
+    LLVMOrcJITStackRef mEngine = nullptr;
+    LLVMOrcModuleHandle mHandle = 0;
+
     std::optional<memory> mSelfMemory;
     memory *mExternalMemory = nullptr;
     std::optional<table> mSelfTable;
     table *mExternalTable = nullptr;
+
+    std::unordered_map<std::string, void*> mSymbols;
 
   public:
     memory *mem();

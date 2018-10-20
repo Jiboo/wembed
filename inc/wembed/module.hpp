@@ -105,19 +105,33 @@ namespace wembed {
     std::vector<BlockEntry> mBlockEntries;
 
     std::vector<LLVMTypeRef> mTypes;
-    std::vector<LLVMValueRef> mFunctions;
     std::vector<LLVMValueRef> mGlobals;
+
+    struct FuncDef {
+      LLVMValueRef mValue;
+      std::string mName;
+      uint64_t mType;
+
+      FuncDef(LLVMValueRef pValue, const std::string &pName, uint64_t pTypeHash)
+        : mValue(pValue), mName(pName), mType(pTypeHash) {}
+    };
+    std::vector<FuncDef> mFunctions;
 
     struct symbol_t {
       external_kind mKind;
       uint64_t mTypeHash;
       std::vector<LLVMValueRef> mValues; // Only tables have 2 values
+      std::vector<std::string> mValueNames;
       symbol_t() {}
       symbol_t(external_kind pKind, uint64_t pTypeHash, LLVMValueRef pValue) : mKind(pKind), mTypeHash(pTypeHash) {
         mValues.emplace_back(pValue);
+        mValueNames.emplace_back(LLVMGetValueName(pValue));
       }
       symbol_t(external_kind pKind, uint64_t pTypeHash, std::initializer_list<LLVMValueRef> pValues)
-        : mKind(pKind), mTypeHash(pTypeHash), mValues(pValues) {}
+        : mKind(pKind), mTypeHash(pTypeHash), mValues(pValues) {
+        for (const auto &lValue : mValues)
+          mValueNames.emplace_back(LLVMGetValueName(lValue));
+      }
     };
     std::unordered_map<std::string, symbol_t> mExports;
     std::unordered_map<std::string, std::unordered_multimap<std::string, symbol_t>> mImports;
@@ -203,7 +217,8 @@ namespace wembed {
 
     LLVMTypeRef parse_llvm_btype();
     LLVMTypeRef parse_llvm_vtype();
-    LLVMValueRef parse_llvm_init();
+
+    std::function<LLVMValueRef()> parse_llvm_init(LLVMTypeRef pType);
 
     void init_intrinsics();
 
@@ -225,12 +240,12 @@ namespace wembed {
         lResult[lIndex] = LLVMBuildExtractValue(mBuilder, lCallResult, lIndex, "elem");
       return lResult;
     }
-    void trap_if(LLVMValueRef lFunc, LLVMValueRef pCondition, LLVMValueRef pIntrinsic,
+    LLVMBasicBlockRef trap_if(LLVMValueRef lFunc, LLVMValueRef pCondition, LLVMValueRef pIntrinsic,
                                    const std::initializer_list<LLVMValueRef> &pArgs);
-    void trap_data_copy(LLVMValueRef lFunc, LLVMValueRef pOffset, size_t pSize);
-    void trap_elem_copy(LLVMValueRef lFunc, LLVMValueRef pOffset);
-    void trap_zero_div(LLVMValueRef lFunc, LLVMValueRef pLHS, LLVMValueRef pRHS);
-    void trap_szero_div(LLVMValueRef lFunc, LLVMValueRef pLHS, LLVMValueRef pRHS);
+    LLVMBasicBlockRef trap_data_copy(LLVMValueRef lFunc, LLVMValueRef pOffset, size_t pSize);
+    LLVMBasicBlockRef trap_elem_copy(LLVMValueRef lFunc, LLVMValueRef pOffset);
+    LLVMBasicBlockRef trap_zero_div(LLVMValueRef lFunc, LLVMValueRef pLHS, LLVMValueRef pRHS);
+    LLVMBasicBlockRef trap_szero_div(LLVMValueRef lFunc, LLVMValueRef pLHS, LLVMValueRef pRHS);
 
     LLVMValueRef clear_nan(LLVMValueRef pInput);
     LLVMValueRef clear_nan_internal(LLVMTypeRef pInputType, LLVMTypeRef pIntType, LLVMValueRef pInput,
