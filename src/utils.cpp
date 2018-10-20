@@ -1,4 +1,4 @@
-#include "wembed/utils.hpp"
+#include "wembed.hpp"
 
 uint64_t wembed::hash_type(LLVMTypeRef pType, bool pConst) {
   uint64_t lSeed = 0;
@@ -16,4 +16,9 @@ uint64_t wembed::hash_fn_type(LLVMTypeRef pType) {
   for (const auto &lArgType : lArgTypes)
     boost::hash_combine(lSeed, hash_type(lArgType));
   return lSeed;
+}
+
+void wembed::llvm_init() {
+  LLVMInitializeNativeTarget();
+  LLVMInitializeNativeAsmPrinter();
 }

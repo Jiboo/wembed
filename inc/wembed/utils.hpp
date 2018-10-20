@@ -140,4 +140,6 @@ namespace wembed {
     return __hash_fn_ctype<TReturn(TParams...)>{}();
   }
 
+  void llvm_init();
+
 }  // namespace wembed

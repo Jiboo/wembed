@@ -48,9 +48,7 @@ void spectest_reset() {
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  LLVMInitializeNativeTarget();
-  LLVMInitializeNativeAsmPrinter();
-
+  wembed::llvm_init();
   return RUN_ALL_TESTS();
 }
 

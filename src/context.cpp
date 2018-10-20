@@ -23,8 +23,10 @@ namespace wembed {
   context::context(module &pModule, resolvers_t pResolver) : mModule(pModule) {
     char *lTriple = LLVMGetDefaultTargetTriple();
     LLVMTargetRef lTarget;
-    assert(!LLVMGetTargetFromTriple(lTriple, &lTarget, nullptr));
-    assert(LLVMTargetHasJIT(lTarget));
+    if (LLVMGetTargetFromTriple(lTriple, &lTarget, nullptr))
+      throw std::runtime_error("can't get triple for host");
+    if (!LLVMTargetHasJIT(lTarget))
+      throw std::runtime_error("can't jit on this host");
 
     LLVMTargetMachineRef lTMachine =
         LLVMCreateTargetMachine(lTarget, lTriple, "", "",

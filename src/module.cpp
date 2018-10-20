@@ -16,7 +16,7 @@
 
 namespace wembed {
 
-  module::module(uint8_t *pInput, size_t pLen) {
+  module::module(uint8_t *pInput, size_t pLen, uint8_t pOptLevel) {
     if (pInput == nullptr || pLen < 4)
       throw malformed_exception("invalid input");
 
@@ -41,7 +41,7 @@ namespace wembed {
       case 1: parse_sections(); break;
       default: throw malformed_exception("unexpected version");
     }
-    finalize();
+    finalize(pOptLevel);
   }
 
   module::~module() {
@@ -1912,7 +1912,7 @@ namespace wembed {
     }
   }
 
-  void module::finalize() {
+  void module::finalize(uint8_t pOptLevel) {
   #ifdef WEMBED_VERBOSE
     std::cout << "Finalizing module..." << std::endl;
   #endif
@@ -1939,29 +1939,33 @@ namespace wembed {
     LLVMPassManagerRef lPass = LLVMCreatePassManager();
 
     // Same as the one in wasm-jit-prototype
-    /*LLVMAddPromoteMemoryToRegisterPass(lPass);
-    LLVMAddAggressiveInstCombinerPass(lPass);
-    LLVMAddCFGSimplificationPass(lPass);
-    LLVMAddJumpThreadingPass(lPass);
-    LLVMAddConstantPropagationPass(lPass);*/
+    if (pOptLevel > 0) {
+      LLVMAddPromoteMemoryToRegisterPass(lPass);
+      LLVMAddAggressiveInstCombinerPass(lPass);
+      LLVMAddCFGSimplificationPass(lPass);
+      LLVMAddJumpThreadingPass(lPass);
+      LLVMAddConstantPropagationPass(lPass);
+    }
 
     // FIXME Probably not optimal, but at least doesn't break testsuite
-    /*LLVMAddConstantMergePass(lPass);
-    LLVMAddUnifyFunctionExitNodesPass(lPass);
-    LLVMAddScalarizerPass(lPass);
-    LLVMAddFunctionInliningPass(lPass);
-    LLVMAddLoopDeletionPass(lPass);
-    LLVMAddLoopIdiomPass(lPass);
-    LLVMAddLoopRotatePass(lPass);
-    LLVMAddLoopRerollPass(lPass);
-    LLVMAddLoopUnrollPass(lPass);
-    LLVMAddLoopUnrollAndJamPass(lPass);
-    LLVMAddLoopUnswitchPass(lPass);
-    LLVMAddMemCpyOptPass(lPass);
-    LLVMAddPartiallyInlineLibCallsPass(lPass);
-    LLVMAddSimplifyLibCallsPass(lPass);
-    LLVMAddStripSymbolsPass(lPass);
-    LLVMAddStripDeadPrototypesPass(lPass);*/
+    if (pOptLevel > 1) {
+      LLVMAddConstantMergePass(lPass);
+      LLVMAddUnifyFunctionExitNodesPass(lPass);
+      LLVMAddScalarizerPass(lPass);
+      LLVMAddFunctionInliningPass(lPass);
+      LLVMAddLoopDeletionPass(lPass);
+      LLVMAddLoopIdiomPass(lPass);
+      LLVMAddLoopRotatePass(lPass);
+      LLVMAddLoopRerollPass(lPass);
+      LLVMAddLoopUnrollPass(lPass);
+      LLVMAddLoopUnrollAndJamPass(lPass);
+      LLVMAddLoopUnswitchPass(lPass);
+      LLVMAddMemCpyOptPass(lPass);
+      LLVMAddPartiallyInlineLibCallsPass(lPass);
+      LLVMAddSimplifyLibCallsPass(lPass);
+      LLVMAddStripSymbolsPass(lPass);
+      LLVMAddStripDeadPrototypesPass(lPass);
+    }
 
     LLVMRunPassManager(lPass, mModule);
     LLVMDisposePassManager(lPass);
