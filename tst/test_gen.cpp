@@ -558,7 +558,7 @@ protected:
       }
     }
     else if (lId.mView == "assert_trap" || lId.mView == "assert_exhaustion") {
-      expect(token_t::OPAR);
+      auto lCodeStart = expect(token_t::OPAR);
       auto lType = expect(token_t::NAME);
       if (lType.mView == "invoke") {
         auto lModule = mTokenizer.next();
@@ -597,6 +597,22 @@ protected:
                 << "    };\n"
                 << "    EXPECT_THROW(lThrow(" << lModulePtr.str() << "), vm_runtime_exception);\n"
                 << "  }\n" << std::endl;
+      }
+      else if (lType.mView == "module") {
+        auto lEnd = match_par();
+
+        string_view lCode(lCodeStart.mView.data(), lEnd.mView.data() - lCodeStart.mView.data() + 1);
+        string lBin = wast2wasm(lCode);
+        if (lBin.size() > 0) {
+          ++mModuleCount;
+          string lHex = bin2hex(lBin);
+          pOutput << "  uint8_t lTrappingBin" << mModuleCount << "[] = {" << lHex << "};\n"
+                  << "  /*" << lCode << "*/\n"
+                  << "  module lMod" << mModuleCount << " = wembed::module(lTrappingBin" << mModuleCount
+                  << ", sizeof(lTrappingBin" << mModuleCount << "));\n"
+                  << "  EXPECT_THROW(wembed::context lContext" << mModuleCount << "(lMod"
+                  << mModuleCount << ", resolvers), wembed::vm_runtime_exception);\n\n";
+        }
       }
       else {
         std::cerr << "unsuported assert trap: " << lType.mView << std::endl;
