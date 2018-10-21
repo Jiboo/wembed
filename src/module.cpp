@@ -17,7 +17,7 @@
 
 namespace wembed {
 
-  module::module(uint8_t *pInput, size_t pLen, uint8_t pOptLevel) {
+  module::module(uint8_t *pInput, size_t pLen) {
     if (pInput == nullptr || pLen < 4)
       throw malformed_exception("invalid input");
 
@@ -42,7 +42,27 @@ namespace wembed {
       case 1: parse_sections(); break;
       default: throw malformed_exception("unexpected version");
     }
-    finalize(pOptLevel);
+
+#ifdef WEMBED_VERBOSE
+    std::cout << "Finalizing module..." << std::endl;
+#endif
+
+    // finish __wstart
+    LLVMPositionBuilderAtEnd(mBuilder, mStartInit);
+    LLVMBuildBr(mBuilder, mStartUser);
+    LLVMPositionBuilderAtEnd(mBuilder, mStartUser);
+    LLVMBuildRetVoid(mBuilder);
+    LLVMDisposeBuilder(mBuilder);
+
+    char *lError = nullptr;
+    if (LLVMVerifyModule(mModule, LLVMReturnStatusAction, &lError)) {
+      std::stringstream lMessage;
+      lMessage << "module failed verification: " << lError << "\n\n";
+      dump_ll(lMessage);
+      LLVMDisposeMessage(lError);
+      throw invalid_exception(lMessage.str());
+    }
+    LLVMDisposeMessage(lError);
   }
 
   module::~module() {
@@ -1913,30 +1933,7 @@ namespace wembed {
     }
   }
 
-  void module::finalize(uint8_t pOptLevel) {
-  #ifdef WEMBED_VERBOSE
-    std::cout << "Finalizing module..." << std::endl;
-  #endif
-
-    // finish __wstart
-    LLVMPositionBuilderAtEnd(mBuilder, mStartInit);
-    LLVMBuildBr(mBuilder, mStartUser);
-    LLVMPositionBuilderAtEnd(mBuilder, mStartUser);
-    LLVMBuildRetVoid(mBuilder);
-    LLVMDisposeBuilder(mBuilder);
-
-    //dump_ll(std::cout);
-
-    char *lError = nullptr;
-    if (LLVMVerifyModule(mModule, LLVMReturnStatusAction, &lError)) {
-      std::stringstream lMessage;
-      lMessage << "module failed verification: " << lError << "\n\n";
-      dump_ll(lMessage);
-      LLVMDisposeMessage(lError);
-      throw invalid_exception(lMessage.str());
-    }
-    LLVMDisposeMessage(lError);
-
+  void module::optimize(uint8_t pOptLevel) {
     LLVMPassManagerRef lPass = LLVMCreatePassManager();
 
     if (pOptLevel > 0) {

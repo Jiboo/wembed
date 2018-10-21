@@ -188,17 +188,17 @@ public:
             << "  std::unordered_map<std::string_view, context*> declared, registered;\n"
             << "  auto lSpectestResolver = [](std::string_view pFieldName) -> resolve_result_t {\n"
                "    const static std::unordered_map<std::string_view, resolve_result_t> sSpectestMappings = {\n"
-               "      {\"global_i32\",    {(void*) &spectest_global_i32, ek_global, hash_ctype<const i32>()}},\n"
-               "      {\"global_f32\",    {(void*) &spectest_global_f32, ek_global, hash_ctype<const f32>()}},\n"
-               "      {\"global_f64\",    {(void*) &spectest_global_f64, ek_global, hash_ctype<const f64>()}},\n"
-               "      {\"print\",         {(void*) &spectest_print, ek_function, hash_fn_ctype_ptr(spectest_print)}},\n"
-               "      {\"print_i32\",     {(void*) &spectest_print_i32, ek_function, hash_fn_ctype_ptr(spectest_print_i32)}},\n"
-               "      {\"print_i32_f32\", {(void*) &spectest_print_i32_f32, ek_function, hash_fn_ctype_ptr(spectest_print_i32_f32)}},\n"
-               "      {\"print_f64_f64\", {(void*) &spectest_print_f64_f64, ek_function, hash_fn_ctype_ptr(spectest_print_f64_f64)}},\n"
-               "      {\"print_f32\",     {(void*) &spectest_print_f32, ek_function, hash_fn_ctype_ptr(spectest_print_f32)}},\n"
-               "      {\"print_f64\",     {(void*) &spectest_print_f64, ek_function, hash_fn_ctype_ptr(spectest_print_f64)}},\n"
-               "      {\"table\",         {(void*) &spectest_tab, ek_table, 0x10}},\n"
-               "      {\"memory\",        {(void*) &spectest_mem, ek_memory, 0x11}},\n"
+               "      {\"global_i32\",    expose_cglob(&spectest_global_i32)},\n"
+               "      {\"global_f32\",    expose_cglob(&spectest_global_f32)},\n"
+               "      {\"global_f64\",    expose_cglob(&spectest_global_f64)},\n"
+               "      {\"print\",         expose_func(&spectest_print)},\n"
+               "      {\"print_i32\",     expose_func(&spectest_print_i32)},\n"
+               "      {\"print_i32_f32\", expose_func(&spectest_print_i32_f32)},\n"
+               "      {\"print_f64_f64\", expose_func(&spectest_print_f64_f64)},\n"
+               "      {\"print_f32\",     expose_func(&spectest_print_f32)},\n"
+               "      {\"print_f64\",     expose_func(&spectest_print_f64)},\n"
+               "      {\"table\",         expose_table(&spectest_tab)},\n"
+               "      {\"memory\",        expose_memory(&spectest_mem)},\n"
                "    };\n"
                "    auto lFound = sSpectestMappings.find(pFieldName);\n"
                "    if (lFound == sSpectestMappings.end())\n"
@@ -346,13 +346,14 @@ protected:
         auto lType = mTokenizer.next().mView.substr(0, 3);
         auto lValue = mTokenizer.next();
         expect(token_t::CPAR);
-        lArgTypes << ", " << lType;
+        lArgTypes << lType << ", ";
         lArgs << dump_value(lType, lValue.mView) << ", ";
         lNext = mTokenizer.next();
       }
       string lArgsFormatted = lArgs.str().substr(0, lArgs.str().size() - 2);
+      string lArgTypesFormatted = lArgTypes.str().substr(0, lArgTypes.str().size() - 2);
       pOutput << "/* " << std::string_view(lStart.mView.data(), lNext.mView.data() - lStart.mView.data() + 1) << "*/\n";
-      pOutput << "  lCtx" << mModuleCount << ".get_fn<" << "void" << lArgTypes.str() << ">("
+      pOutput << "  lCtx" << mModuleCount << ".get_fn<" << "void(" << lArgTypesFormatted << ")>("
               << lFuncName << "s)(" << lArgsFormatted << ");\n\n";
     }
     else if (lId.mView == "assert_return") {
@@ -380,7 +381,7 @@ protected:
           auto lType = mTokenizer.next().mView.substr(0, 3);
           auto lValue = mTokenizer.next();
           expect(token_t::CPAR);
-          lArgTypes << ", " << lType;
+          lArgTypes << lType << ", ";
           lArgs << dump_value(lType, lValue.mView) << ", ";
           lNext = mTokenizer.next();
         }
@@ -403,7 +404,8 @@ protected:
         } else
           pOutput << "  ";
         string lArgsFormatted = lArgs.str().substr(0, lArgs.str().size() - 2);
-        pOutput << lModulePtr.str() << "->get_fn<" << lReturnType << lArgTypes.str() << ">("
+        string lArgTypesFormatted = lArgTypes.str().substr(0, lArgTypes.str().size() - 2);
+        pOutput << lModulePtr.str() << "->get_fn<" << lReturnType << '(' << lArgTypesFormatted << ")>("
                 << fixescape(lFuncName.mView) << "s)(" << lArgsFormatted << ')';
         if (lReturnType != "void") {
           pOutput << "; EXPECT_EQ(" << lExpectedValue.str() << ", ";
@@ -449,7 +451,7 @@ protected:
         auto lType = mTokenizer.next().mView.substr(0, 3);
         auto lValue = mTokenizer.next();
         expect(token_t::CPAR);
-        lArgTypes << ", " << lType;
+        lArgTypes << lType << ", ";
         lArgs << dump_value(lType, lValue.mView) << ", ";
         lNext = mTokenizer.next();
       }
@@ -458,10 +460,11 @@ protected:
       string lCleanedName = string(lFuncName.mView.data() + 1, lFuncName.mView.size() - 2);
       string lReturnType = func_return_type(lCleanedName);
       string lArgsFormatted = lArgs.str().substr(0, lArgs.str().size() - 2);
+      string lArgTypesFormatted = lArgTypes.str().substr(0, lArgTypes.str().size() - 2);
 
       pOutput << "/* " << std::string_view(lStart.mView.data(), lNext.mView.data() - lStart.mView.data() + 1) << "*/\n";
       pOutput << "  EXPECT_TRUE(canonical_nan<" << lReturnType << ">("
-              << "lCtx" << mModuleCount << ".get_fn<" << lReturnType << lArgTypes.str() << ">("
+              << "lCtx" << mModuleCount << ".get_fn<" << lReturnType << '(' << lArgTypesFormatted << ")>("
               << lFuncName.mView << "s)(" << lArgsFormatted << ")));\n\n";
     }
     else if (lId.mView == "assert_return_arithmetic_nan") {
@@ -475,7 +478,7 @@ protected:
         auto lType = mTokenizer.next().mView.substr(0, 3);
         auto lValue = mTokenizer.next();
         expect(token_t::CPAR);
-        lArgTypes << ", " << lType;
+        lArgTypes << lType << ", ";
         lArgs << dump_value(lType, lValue.mView) << ", ";
         lNext = mTokenizer.next();
       }
@@ -484,10 +487,11 @@ protected:
       string lCleanedName = string(lFuncName.mView.data() + 1, lFuncName.mView.size() - 2);
       string lReturnType = func_return_type(lCleanedName);
       string lArgsFormatted = lArgs.str().substr(0, lArgs.str().size() - 2);
+      string lArgTypesFormatted = lArgTypes.str().substr(0, lArgTypes.str().size() - 2);
 
       pOutput << "/* " << std::string_view(lStart.mView.data(), lNext.mView.data() - lStart.mView.data() + 1) << "*/\n";
       pOutput << "  EXPECT_TRUE(arithmetic_nan<" << lReturnType << ">("
-              << "lCtx" << mModuleCount << ".get_fn<" << lReturnType << lArgTypes.str() << ">("
+              << "lCtx" << mModuleCount << ".get_fn<" << lReturnType << '(' << lArgTypesFormatted << ")>("
               << lFuncName.mView << "s)(" << lArgsFormatted << ")));\n\n";
     }
     else if (lId.mView == "assert_malformed") {
@@ -580,7 +584,7 @@ protected:
           auto lType = mTokenizer.next().mView.substr(0, 3);
           auto lValue = mTokenizer.next();
           expect(token_t::CPAR);
-          lArgTypes << ", " << lType;
+          lArgTypes << lType << ", ";
           lArgs << dump_value(lType, lValue.mView) << ", ";
           lNext = mTokenizer.next();
         }
@@ -588,11 +592,12 @@ protected:
         string lCleanedName = string(lFuncName.mView.data() + 1, lFuncName.mView.size() - 2);
         string lReturnType = func_return_type(lCleanedName, lModule.mView);
         string lArgsFormatted = lArgs.str().substr(0, lArgs.str().size() - 2);
+        string lArgTypesFormatted = lArgTypes.str().substr(0, lArgTypes.str().size() - 2);
 
         pOutput << "  {\n"
                 << "  /* " << std::string_view(lStart.mView.data(), lNext.mView.data() - lStart.mView.data() + 1) << "*/\n"
                 << "    auto lThrow = [](context *pContext) {\n"
-                << "      pContext->get_fn<" << lReturnType << lArgTypes.str() << ">("
+                << "      pContext->get_fn<" << lReturnType << '(' << lArgTypesFormatted << ")>("
                 << lFuncName.mView << "s)(" << lArgsFormatted << ");\n"
                 << "    };\n"
                 << "    EXPECT_THROW(lThrow(" << lModulePtr.str() << "), vm_runtime_exception);\n"
@@ -659,6 +664,7 @@ protected:
       mOutput << "/*" << lParseResult.mCompleteCode << "*/\n\n";
       mOutput << "  module lModule" << mModuleCount << "(lCode" << mModuleCount
               << ", sizeof(lCode" << mModuleCount << "));\n"
+              << "  lModule" << mModuleCount << ".optimize();\n"
               << "  context lCtx" << mModuleCount << "(lModule"
               << mModuleCount << ", resolvers);\n";
       if (!lParseResult.mName.empty())

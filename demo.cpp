@@ -53,8 +53,8 @@ int main(int argc, char **argv) {
 
     // Static hardcoded table
     const static std::unordered_map<std::string_view, wembed::resolve_result_t> sSpectestMappings = {
-      {"glob_i32", {(void*) &glob, wembed::ek_global, wembed::hash_ctype<int32_t>()}},
-      {"print_i32", {(void*) &print_i32, wembed::ek_function, wembed::hash_fn_ctype_ptr(print_i32)}},
+      {"glob_i32", wembed::expose_glob(&glob)},
+      {"print_i32", wembed::expose_func(&print_i32)},
     };
 
     auto lFound = sSpectestMappings.find(pFieldName);
@@ -70,26 +70,27 @@ int main(int argc, char **argv) {
 
   // Parse the module bytecode and translate it to LLVM IR
   wembed::module mod(demo_wasm, demo_wasm_len);
+  mod.optimize();
 
   // Create a JIT context, and generate native code
   wembed::context ctx(mod, lResolvers);
 
   // Access to an exported function, allowing to call it
-  auto lGetGlob = ctx.get_fn<int32_t>("get");
+  auto lGetGlob = ctx.get_fn<int32_t()>("get");
   std::cout << "glob = " << lGetGlob() << std::endl;
 
-  auto lSetGlob = ctx.get_fn<void, int32_t>("set");
+  auto lSetGlob = ctx.get_fn<void(int32_t)>("set");
   lSetGlob(42);
 
   // Access to an exported global in memory, allowing to read/write to it
   int32_t *lGlobPtr = ctx.get_global<int32_t>("glob");
   std::cout << "glob = " << *lGlobPtr << std::endl;
 
-  auto lPrintArg = ctx.get_fn<void, int32_t>("print_arg");
+  auto lPrintArg = ctx.get_fn<void(int32_t)>("print_arg");
   lPrintArg(1);
 
   // This export ends up just being an "alias"
-  auto lMainPrint = ctx.get_fn<void, int32_t>("main.print_i32");
+  auto lMainPrint = ctx.get_fn<void(int32_t)>("main.print_i32");
   lMainPrint(2);
 
   // Compare the address of the global "alias" vs our global on the stack

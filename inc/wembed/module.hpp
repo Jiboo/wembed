@@ -29,8 +29,10 @@ namespace wembed {
   class module {
     friend class context;
   public:
-    module(uint8_t *pInput, size_t pLen, uint8_t pOptLevel = 4);
+    module(uint8_t *pInput, size_t pLen);
     virtual ~module();
+
+    void optimize(uint8_t pOptLevel = 4);
 
     void dump_ll(std::ostream &os);
 
@@ -264,8 +266,6 @@ namespace wembed {
     void skip_unreachable(uint8_t *pPastEnd);
     void parse_section_code(uint32_t pSectionSize);
     void parse_section_data(uint32_t pSectionSize);
-
-    void finalize(uint8_t pOptLevel);
   };  // class module
 
 }  // namespace wembed

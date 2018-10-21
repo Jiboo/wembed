@@ -87,6 +87,29 @@ namespace wembed {
   using resolver_t = std::function<resolve_result_t(std::string_view)>;
   using resolvers_t = std::unordered_map<std::string_view, resolver_t>;
 
+  template<typename T>
+  resolve_result_t expose_glob(T* pAddr) {
+    return {(void*) pAddr, wembed::ek_global, wembed::hash_ctype<T>()};
+  }
+
+  template<typename T>
+  resolve_result_t expose_cglob(T* pAddr) {
+    return {(void*) pAddr, wembed::ek_global, wembed::hash_ctype<const T>()};
+  }
+
+  template<typename TReturn, typename...TParams>
+  resolve_result_t expose_func(TReturn (*pAddr)(TParams...)) {
+    return {(void*) pAddr, wembed::ek_function, wembed::hash_fn_ctype_ptr(pAddr)};
+  }
+
+  inline resolve_result_t expose_table(table* pTable) {
+    return {(void*) pTable, wembed::ek_table, 0x10};
+  }
+
+  inline resolve_result_t expose_memory(memory* pMem) {
+    return {(void*) pMem, wembed::ek_memory, 0x11};
+  }
+
   class context {
   public:
     friend uint64_t orc_sym_resolver(const char *pName, void *pCtx);
@@ -126,22 +149,37 @@ namespace wembed {
       return lResult;
     }
 
+    template <typename TFunc>
+    struct __get_fn;
+
+    template <typename TReturn, typename...TParams>
+    struct __get_fn<TReturn (TParams...)> {
+      std::function<TReturn(TParams...)> operator()(context *pThis, const std::string &pName) {
+        auto lResolve = pThis->get_export(pName);
+        if (lResolve.mPointer == nullptr)
+          throw std::runtime_error("function not found");
+        if (lResolve.mKind != ek_function)
+          throw std::runtime_error("function not found");
+        auto lPointer = reinterpret_cast<TReturn (*)(TParams...)>(lResolve.mPointer);
+        return [lPointer](TParams...pParams) -> TReturn {
+          try {
+            return sig::try_signal(lPointer, pParams...);
+          }
+          catch(const std::system_error &pError) {
+            throw vm_runtime_exception(pError.what());
+          }
+        };
+      }
+    };
+
     template<typename TReturn, typename... TParams>
     std::function<TReturn(TParams...)> get_fn(const std::string &pName) {
-      auto lResolve = get_export(pName);
-      if (lResolve.mPointer == nullptr)
-        throw std::runtime_error("function not found");
-      if (lResolve.mKind != ek_function)
-        throw std::runtime_error("function not found");
-      auto lPointer = reinterpret_cast<TReturn (*)(TParams...)>(lResolve.mPointer);
-      return [lPointer](TParams...pParams) -> TReturn {
-        try {
-          return sig::try_signal(lPointer, pParams...);
-        }
-        catch(const std::system_error &pError) {
-          throw vm_runtime_exception(pError.what());
-        }
-      };
+      return __get_fn<TReturn (TParams...)>{}(this, pName);
+    }
+
+    template<typename T>
+    std::function<T> get_fn(const std::string &pName) {
+      return __get_fn<T>{}(this, pName);
     }
 
     template<typename TGlobal>
