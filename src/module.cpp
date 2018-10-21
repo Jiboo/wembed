@@ -2,6 +2,7 @@
 
 #include <llvm-c/Analysis.h>
 #include <llvm-c/Transforms/AggressiveInstCombine.h>
+#include <llvm-c/Transforms/InstCombine.h>
 #include <llvm-c/Transforms/IPO.h>
 #include <llvm-c/Transforms/Scalar.h>
 #include <llvm-c/Transforms/Utils.h>
@@ -1938,33 +1939,36 @@ namespace wembed {
 
     LLVMPassManagerRef lPass = LLVMCreatePassManager();
 
-    // Same as the one in wasm-jit-prototype
     if (pOptLevel > 0) {
+      LLVMAddDeadStoreEliminationPass(lPass);
+      //LLVMAddFunctionAttrsPass(lPass); // Makes call.wast fail
+      LLVMAddGlobalDCEPass(lPass);
+      //LLVMAddGlobalOptimizerPass(lPass);
+      LLVMAddIndVarSimplifyPass(lPass);
+      LLVMAddInstructionCombiningPass(lPass);
+      LLVMAddIPSCCPPass(lPass);
+      //LLVMAddJumpThreadingPass(lPass);
+      LLVMAddLoopDeletionPass(lPass);
+      LLVMAddLoopRotatePass(lPass);
+      LLVMAddLoopUnrollPass(lPass);
+      LLVMAddLoopUnswitchPass(lPass);
       LLVMAddPromoteMemoryToRegisterPass(lPass);
-      LLVMAddAggressiveInstCombinerPass(lPass);
+      LLVMAddMemCpyOptPass(lPass);
+      LLVMAddPruneEHPass(lPass);
+      LLVMAddReassociatePass(lPass);
+      LLVMAddScalarReplAggregatesPass(lPass);
       LLVMAddCFGSimplificationPass(lPass);
-      LLVMAddJumpThreadingPass(lPass);
-      LLVMAddConstantPropagationPass(lPass);
+      //LLVMAddStripSymbolsPass(lPass);
+      //LLVMAddStripDeadPrototypesPass(lPass);
+      //LLVMAddTailCallEliminationPass(lPass); // Makes call.wast fail
     }
-
-    // FIXME Probably not optimal, but at least doesn't break testsuite
     if (pOptLevel > 1) {
       LLVMAddConstantMergePass(lPass);
-      LLVMAddUnifyFunctionExitNodesPass(lPass);
-      LLVMAddScalarizerPass(lPass);
-      LLVMAddFunctionInliningPass(lPass);
-      LLVMAddLoopDeletionPass(lPass);
-      LLVMAddLoopIdiomPass(lPass);
-      LLVMAddLoopRotatePass(lPass);
-      LLVMAddLoopRerollPass(lPass);
-      LLVMAddLoopUnrollPass(lPass);
-      LLVMAddLoopUnrollAndJamPass(lPass);
-      LLVMAddLoopUnswitchPass(lPass);
-      LLVMAddMemCpyOptPass(lPass);
-      LLVMAddPartiallyInlineLibCallsPass(lPass);
-      LLVMAddSimplifyLibCallsPass(lPass);
-      LLVMAddStripSymbolsPass(lPass);
-      LLVMAddStripDeadPrototypesPass(lPass);
+      LLVMAddGVNPass(lPass);
+    }
+    if (pOptLevel > 2) {
+      //LLVMAddArgumentPromotionPass(lPass);
+      LLVMAddAggressiveInstCombinerPass(lPass);
     }
 
     LLVMRunPassManager(lPass, mModule);
