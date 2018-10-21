@@ -812,7 +812,7 @@ namespace wembed {
           mTables.emplace_back(lType, lPointers, lTypes);
           LLVMSetLinkage(lPointers, LLVMLinkage::LLVMExternalLinkage);
           LLVMSetLinkage(lTypes, LLVMLinkage::LLVMExternalLinkage);
-          mImports[std::string(lModule)].emplace(std::string(lField), symbol_t{ek_table, 0x10, {lPointers, lTypes}});
+          mImports[std::string(lModule)].emplace(std::string(lField), symbol_t{ek_table, WEMBED_HASH_TABLE, {lPointers, lTypes}});
         } break;
         case ek_memory: {
           if (!mMemoryTypes.empty())
@@ -824,7 +824,7 @@ namespace wembed {
           if (lMemType.mLimits.mInitial > 65536 || (lMemType.mLimits.mFlags && lMemType.mLimits.mMaximum > 65536))
             throw invalid_exception("memory size too big, max 65536 pages");
           mMemoryTypes.emplace_back(lMemType);
-          mImports[std::string(lModule)].emplace(std::string(lField), symbol_t{ek_memory, 0x11, mBaseMemory});
+          mImports[std::string(lModule)].emplace(std::string(lField), symbol_t{ek_memory, WEMBED_HASH_MEMORY, mBaseMemory});
         } break;
         default: throw malformed_exception("unexpected import kind");
       }
@@ -938,14 +938,14 @@ namespace wembed {
         case ek_table: {
           if (lIndex >= mTables.size())
             throw invalid_exception("table index out of bounds");
-          mExports.emplace(lName, symbol_t{lKind, 0x10, {mTables[0].mPointers, mTables[0].mTypes}});
+          mExports.emplace(lName, symbol_t{lKind, WEMBED_HASH_TABLE, {mTables[0].mPointers, mTables[0].mTypes}});
           //LLVMSetLinkage(mTables[0].mPointers, LLVMInternalLinkage);
           //LLVMSetLinkage(mTables[0].mTypes, LLVMInternalLinkage);
         } break;
         case ek_memory: {
           if (lIndex >= mMemoryTypes.size())
             throw invalid_exception("memory index out of bounds");
-          mExports.emplace(lName, symbol_t{lKind, 0x11, {mBaseMemory}});
+          mExports.emplace(lName, symbol_t{lKind, WEMBED_HASH_MEMORY, {mBaseMemory}});
           //(mBaseMemory, LLVMInternalLinkage);
         } break;
         default:

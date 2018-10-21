@@ -85,6 +85,9 @@ namespace wembed {
     operator double() const { return mValue; }
   };
 
+  constexpr uint64_t WEMBED_HASH_TABLE = 0x10;
+  constexpr uint64_t WEMBED_HASH_MEMORY = 0x11;
+
   uint64_t hash_type(LLVMTypeRef pType, bool pConst = false);
   uint64_t hash_fn_type(LLVMTypeRef pType);
 

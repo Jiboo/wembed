@@ -103,11 +103,11 @@ namespace wembed {
   }
 
   inline resolve_result_t expose_table(table* pTable) {
-    return {(void*) pTable, wembed::ek_table, 0x10};
+    return {(void*) pTable, wembed::ek_table, WEMBED_HASH_TABLE};
   }
 
   inline resolve_result_t expose_memory(memory* pMem) {
-    return {(void*) pMem, wembed::ek_memory, 0x11};
+    return {(void*) pMem, wembed::ek_memory, WEMBED_HASH_MEMORY};
   }
 
   class context {
