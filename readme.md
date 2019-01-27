@@ -25,7 +25,7 @@ Phase 5 (The Feature is Standardized):
 Phase 4 (Standardize the Feature):
 
 - [x] [Sign-extension operators](https://github.com/WebAssembly/proposals/issues/9)
-- [ ] [Non-trapping float-to-int conversions](https://github.com/WebAssembly/proposals/issues/11)
+- [x] [Non-trapping float-to-int conversions](https://github.com/WebAssembly/proposals/issues/11)
 
 TODO/Help wanted
 ----------------

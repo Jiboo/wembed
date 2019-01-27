@@ -37,7 +37,10 @@ file(MAKE_DIRECTORY ${TESTSUITE_OUTPUT})
 
 set(TESTSUITE_SRC)
 set(TESTSUITE_PATH "${CMAKE_SOURCE_DIR}/dep/testsuite")
-file(GLOB TESTSUITE_FILES "${TESTSUITE_PATH}/*.wast" "${TESTSUITE_PATH}/proposals/sign-extension-ops/*.wast")
+file(GLOB TESTSUITE_FILES
+    "${TESTSUITE_PATH}/*.wast"
+    "${TESTSUITE_PATH}/proposals/sign-extension-ops/*.wast"
+    "${TESTSUITE_PATH}/proposals/nontrapping-float-to-int-conversions/*.wast")
 #set(TESTSUITE_FILES "${TESTSUITE_PATH}/linking.wast")
 foreach(TESTCASE_WAST ${TESTSUITE_FILES})
   string(REGEX REPLACE "${TESTSUITE_PATH}/(.*).wast" "${TESTSUITE_OUTPUT}/\\1.cpp" TESTCASE_CPP "${TESTCASE_WAST}")

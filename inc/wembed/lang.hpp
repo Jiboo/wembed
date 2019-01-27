@@ -251,6 +251,19 @@ namespace wembed {
     o_extend_i64_s8 = 0xc2,
     o_extend_i64_s16 = 0xc3,
     o_extend_i64_s32 = 0xc4,
+
+    o_prefix_numeric = 0xfc,
+  };
+
+  enum opcode_numeric {
+    o_trunc_sat_f32_si32 = 0x00,
+    o_trunc_sat_f32_ui32 = 0x01,
+    o_trunc_sat_f64_si32 = 0x02,
+    o_trunc_sat_f64_ui32 = 0x03,
+    o_trunc_sat_f32_si64 = 0x04,
+    o_trunc_sat_f32_ui64 = 0x05,
+    o_trunc_sat_f64_si64 = 0x06,
+    o_trunc_sat_f64_ui64 = 0x07,
   };
 
 }  // namespace wembed

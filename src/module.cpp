@@ -1235,6 +1235,10 @@ namespace wembed {
               continue;
             }
 
+            case o_prefix_numeric:
+              mCurrent++;
+              continue;
+
             default:
               continue;
           }
@@ -1896,6 +1900,40 @@ namespace wembed {
           WEMBED_CAST(o_reinterpret_i64_f64, LLVMBuildBitCast, LLVMDoubleType(), LLVMInt64Type())
           WEMBED_CAST(o_reinterpret_f32_i32, LLVMBuildBitCast, LLVMInt32Type(), LLVMFloatType())
           WEMBED_CAST(o_reinterpret_f64_i64, LLVMBuildBitCast, LLVMInt64Type(), LLVMDoubleType())
+
+          case o_prefix_numeric: {
+            switch(*mCurrent++) {
+
+            #define WEMBED_SAT_TRUNC(OPCODE, OPCONV, ITYPE, OTYPE, ICTYPE, OCTYPE, FBITSTYPE, OMIN, OMAX) case OPCODE: { \
+                LLVMValueRef lValue = pop(ITYPE); \
+                LLVMValueRef lBitcast = LLVMBuildBitCast(mBuilder, lValue, FBITSTYPE, "bitcast"); \
+                LLVMValueRef lExponent = LLVMBuildAnd(mBuilder, lBitcast, get_const(fp_bits<ICTYPE>::sExponentMask), "exponent"); \
+                LLVMValueRef lExponentTest = LLVMBuildICmp(mBuilder, LLVMIntEQ, lExponent, get_const(fp_bits<ICTYPE>::sExponentMask), "exponentTest"); \
+                LLVMValueRef lMantissa = LLVMBuildAnd(mBuilder, lBitcast, get_const(fp_bits<ICTYPE>::sMantissaMask), "mantissa"); \
+                LLVMValueRef lMantissaTest = LLVMBuildICmp(mBuilder, LLVMIntNE, lMantissa, get_zero(FBITSTYPE), "mantissaTest"); \
+                LLVMValueRef lNan = LLVMBuildAnd(mBuilder, lExponentTest, lMantissaTest, "isNan"); \
+                LLVMValueRef lMinBoundsTest = LLVMBuildFCmp(mBuilder, LLVMRealOLE, lValue, get_const(OMIN), "minBounds"); \
+                LLVMValueRef lMaxBoundsTest = LLVMBuildFCmp(mBuilder, LLVMRealOGE, lValue, get_const(OMAX), "maxBounds"); \
+                LLVMValueRef lConverted = OPCONV(mBuilder, lValue, OTYPE, #OPCODE); \
+                LLVMValueRef lValueOrMin = LLVMBuildSelect(mBuilder, lMinBoundsTest, get_const(std::numeric_limits<OCTYPE>::min()), lConverted, "valueOrMin"); \
+                LLVMValueRef lValueOrMax = LLVMBuildSelect(mBuilder, lMaxBoundsTest, get_const(std::numeric_limits<OCTYPE>::max()), lValueOrMin, "valueOrMax"); \
+                LLVMValueRef lValueOrZero = LLVMBuildSelect(mBuilder, lNan, get_zero(OTYPE), lValueOrMax, "valueOrZero"); \
+                push(lValueOrZero); \
+              } break;
+
+              WEMBED_SAT_TRUNC(o_trunc_sat_f32_si32, LLVMBuildFPToSI, LLVMFloatType(), LLVMInt32Type(), float, int32_t, LLVMInt32Type(), -2147483904.0f, 2147483648.0f);
+              WEMBED_SAT_TRUNC(o_trunc_sat_f64_si32, LLVMBuildFPToSI, LLVMDoubleType(), LLVMInt32Type(), double, int32_t, LLVMInt64Type(), -2147483649.0, 2147483648.0);
+              WEMBED_SAT_TRUNC(o_trunc_sat_f32_ui32, LLVMBuildFPToUI, LLVMFloatType(), LLVMInt32Type(), float, uint32_t, LLVMInt32Type(), -1.0f, 4294967296.0f);
+              WEMBED_SAT_TRUNC(o_trunc_sat_f64_ui32, LLVMBuildFPToUI, LLVMDoubleType(), LLVMInt32Type(), double, uint32_t, LLVMInt64Type(), -1.0, 4294967296.0);
+              WEMBED_SAT_TRUNC(o_trunc_sat_f32_si64, LLVMBuildFPToSI, LLVMFloatType(), LLVMInt64Type(), float, int64_t, LLVMInt32Type(), -9223373136366403584.0f, 9223372036854775808.0f);
+              WEMBED_SAT_TRUNC(o_trunc_sat_f64_si64, LLVMBuildFPToSI, LLVMDoubleType(), LLVMInt64Type(), double, int64_t, LLVMInt64Type(), -9223372036854777856.0, 9223372036854775808.0);
+              WEMBED_SAT_TRUNC(o_trunc_sat_f32_ui64, LLVMBuildFPToUI, LLVMFloatType(), LLVMInt64Type(), float, uint64_t, LLVMInt32Type(), -1.0f, 18446744073709551616.0f);
+              WEMBED_SAT_TRUNC(o_trunc_sat_f64_ui64, LLVMBuildFPToUI, LLVMDoubleType(), LLVMInt64Type(), double, uint64_t, LLVMInt64Type(), -1.0, 18446744073709551616.0);
+
+              default:
+                throw malformed_exception("unknown numeric instruction");
+            }
+          } break;
 
           default:
             throw malformed_exception("unknown instruction");

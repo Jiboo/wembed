@@ -36,7 +36,7 @@ string wast2wasm(string_view pCode) {
   owast.close();
 
   stringstream command;
-  command << "wat2wasm --enable-sign-extension --no-check -o " << wasm.string() << ' ' << wast.string();
+  command << "wat2wasm --enable-sign-extension --enable-saturating-float-to-int --no-check -o " << wasm.string() << ' ' << wast.string();
   if (system(command.str().c_str()) != 0)
     throw std::runtime_error(string("couldn't compile module: ") + command.str());
 
