@@ -1865,6 +1865,17 @@ namespace wembed {
           WEMBED_CAST(o_extend_si32, LLVMBuildSExt, LLVMInt32Type(), LLVMInt64Type())
           WEMBED_CAST(o_extend_ui32, LLVMBuildZExt, LLVMInt32Type(), LLVMInt64Type())
 
+
+#define WEMBED_SIGN_EXT(OPCODE, INSTR, ITYPE, OTYPE) case OPCODE: { \
+            push(INSTR(mBuilder, LLVMBuildTrunc(mBuilder, pop(), ITYPE, #INSTR"-signext"), OTYPE, #INSTR)); \
+          } break;
+
+          WEMBED_SIGN_EXT(o_extend_i32_s8, LLVMBuildSExt, LLVMInt8Type(), LLVMInt32Type())
+          WEMBED_SIGN_EXT(o_extend_i32_s16, LLVMBuildSExt, LLVMInt16Type(), LLVMInt32Type())
+          WEMBED_SIGN_EXT(o_extend_i64_s8, LLVMBuildSExt, LLVMInt8Type(), LLVMInt64Type())
+          WEMBED_SIGN_EXT(o_extend_i64_s16, LLVMBuildSExt, LLVMInt16Type(), LLVMInt64Type())
+          WEMBED_SIGN_EXT(o_extend_i64_s32, LLVMBuildSExt, LLVMInt32Type(), LLVMInt64Type())
+
           case o_demote_f64: {
             push(clear_nan(LLVMBuildFPTrunc(mBuilder, pop(LLVMDoubleType()), LLVMFloatType(), "demote")));
           } break;

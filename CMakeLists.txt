@@ -4,7 +4,7 @@ project(wembed)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 
-find_package(LLVM 8.0 REQUIRED CONFIG)
+find_package(LLVM 9.0 REQUIRED CONFIG)
 include_directories(${LLVM_INCLUDE_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
 llvm_map_components_to_libnames(LLVM_LIBS
@@ -12,6 +12,9 @@ llvm_map_components_to_libnames(LLVM_LIBS
   ScalarOpts Support Target
   nativecodegen
 )
+
+find_package(Boost)
+include_directories(${Boost_INCLUDE_DIRS})
 
 add_subdirectory(dep/try_signal)
 include_directories(dep/try_signal)
@@ -34,7 +37,7 @@ file(MAKE_DIRECTORY ${TESTSUITE_OUTPUT})
 
 set(TESTSUITE_SRC)
 set(TESTSUITE_PATH "${CMAKE_SOURCE_DIR}/dep/testsuite")
-file(GLOB TESTSUITE_FILES "${TESTSUITE_PATH}/*.wast")
+file(GLOB TESTSUITE_FILES "${TESTSUITE_PATH}/*.wast" "${TESTSUITE_PATH}/proposals/sign-extension-ops/*.wast")
 #set(TESTSUITE_FILES "${TESTSUITE_PATH}/linking.wast")
 foreach(TESTCASE_WAST ${TESTSUITE_FILES})
   string(REGEX REPLACE "${TESTSUITE_PATH}/(.*).wast" "${TESTSUITE_OUTPUT}/\\1.cpp" TESTCASE_CPP "${TESTCASE_WAST}")
@@ -43,6 +46,7 @@ foreach(TESTCASE_WAST ${TESTSUITE_FILES})
     DEPENDS tstgen ${TESTCASE_WAST}
   )
   list(APPEND TESTSUITE_SRC ${TESTCASE_CPP})
+  #message(STATUS "Adding testsuite file ${TESTCASE_WAST} as ${TESTCASE_CPP}")
 endforeach()
 
 file(GLOB_RECURSE TESTSUITE_EXTRA_INC "tst/testsuite/**.hpp")

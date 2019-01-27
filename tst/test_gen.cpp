@@ -36,7 +36,7 @@ string wast2wasm(string_view pCode) {
   owast.close();
 
   stringstream command;
-  command << "wat2wasm --no-check -o " << wasm.string() << ' ' << wast.string();
+  command << "wat2wasm --enable-sign-extension --no-check -o " << wasm.string() << ' ' << wast.string();
   if (system(command.str().c_str()) != 0)
     throw std::runtime_error(string("couldn't compile module: ") + command.str());
 
@@ -291,7 +291,9 @@ protected:
   string dump_value(const std::string_view &pType, const std::string_view &pValue) {
     stringstream lOutput;
     if (pType[0] == 'i') {
-      lOutput << pType << "(strtoul(\"" << pValue << "\", nullptr, 0))";
+      std::string lValue(pValue);
+      lValue.erase(std::remove(lValue.begin(), lValue.end(), '_'), lValue.end());
+      lOutput << pType << "(strtoul(\"" << lValue << "\", nullptr, 0))";
     }
     else {
       lOutput << "fp<" << pType << ">(\"" << pValue << "\")";
@@ -691,6 +693,11 @@ protected:
 
 void handle(path pInputFile, ostream &pOutput) {
   string lTestName = pInputFile.stem().string();
+  if (pInputFile.parent_path().stem() != "testsuite") {
+    string lProposalName = pInputFile.parent_path().stem().string();
+    std::replace(lProposalName.begin(), lProposalName.end(), '-', '_');
+    lTestName = lProposalName + '_' + lTestName;
+  }
   if (sBlacklist.find(lTestName) != sBlacklist.end())
     return;
   ifstream is(pInputFile, ios::ate);
@@ -715,7 +722,7 @@ int main(int argc,char** argv) {
     return EXIT_FAILURE;
   }
 
-  //bool lOutputMain = false;
+  create_directories(path(argv[2]).parent_path());
   ofstream lOutput(argv[2]);
   if (!lOutput.is_open()) {
     cerr << "i/o error: can't open " << argv[2] << std::endl;
