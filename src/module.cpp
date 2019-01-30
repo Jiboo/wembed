@@ -400,7 +400,8 @@ namespace wembed {
   void module::parse_custom_section(const std::string_view &pName, size_t pInternalSize) {
     if (pName == "name") {
       // "name" http://webassembly.org/docs/binary-encoding/#name-section
-      parse_names(pInternalSize);
+      // parse_names(pInternalSize);
+      mCurrent += pInternalSize;
     }
     else if (pName == "dylink") {
       // TODO https://github.com/WebAssembly/tool-conventions/blob/master/DynamicLinking.md

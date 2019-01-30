@@ -4,6 +4,8 @@ project(wembed)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 
+enable_testing()
+
 find_package(LLVM 9.0 REQUIRED CONFIG)
 include_directories(${LLVM_INCLUDE_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
@@ -32,7 +34,7 @@ target_link_libraries(demo wembed try_signal ${LLVM_LIBS})
 add_executable(tstgen tst/test_gen.cpp)
 target_link_libraries(tstgen wembed stdc++fs)
 
-set(TESTSUITE_OUTPUT ${CMAKE_BINARY_DIR}/tests)
+set(TESTSUITE_OUTPUT ${CMAKE_BINARY_DIR}/tst/testsuite)
 file(MAKE_DIRECTORY ${TESTSUITE_OUTPUT})
 
 set(TESTSUITE_SRC)
@@ -49,7 +51,7 @@ foreach(TESTCASE_WAST ${TESTSUITE_FILES})
     DEPENDS tstgen ${TESTCASE_WAST}
   )
   list(APPEND TESTSUITE_SRC ${TESTCASE_CPP})
-  #message(STATUS "Adding testsuite file ${TESTCASE_WAST} as ${TESTCASE_CPP}")
+  message(STATUS "Adding testsuite file ${TESTCASE_WAST} as ${TESTCASE_CPP}")
 endforeach()
 
 file(GLOB_RECURSE TESTSUITE_EXTRA_INC "tst/testsuite/**.hpp")
@@ -58,5 +60,28 @@ file(GLOB_RECURSE TESTSUITE_EXTRA_SRC "tst/testsuite/**.cpp")
 file(GLOB_RECURSE GTESTS_EXTRA_SRC "tst/gtests/**.cpp")
 
 include_directories(tst/testsuite)
-add_executable(generated_tests ${TESTSUITE_SRC} ${TESTSUITE_EXTRA_INC} ${TESTSUITE_EXTRA_SRC} ${GTESTS_EXTRA_SRC})
-target_link_libraries(generated_tests gtest wembed try_signal ${LLVM_LIBS} stdc++fs)
+add_executable(testsuite ${TESTSUITE_SRC} ${TESTSUITE_EXTRA_INC} ${TESTSUITE_EXTRA_SRC} ${GTESTS_EXTRA_SRC})
+target_link_libraries(testsuite gtest wembed try_signal ${LLVM_LIBS} stdc++fs)
+
+add_executable(wembed-driver cli/driver.cpp)
+target_link_libraries(wembed-driver wembed try_signal ${LLVM_LIBS} stdc++fs)
+
+if (NOT "$ENV{WASMCEPTION}" STREQUAL "")
+  set(WASMCEPTION_MODULES)
+  set(WASMCEPTION_PATH "${CMAKE_SOURCE_DIR}/tst/wasmception")
+  set(WASMCEPTION_OUTPUT ${CMAKE_BINARY_DIR}/tst/wasmception)
+  file(MAKE_DIRECTORY ${WASMCEPTION_OUTPUT})
+  file(GLOB WASMCEPTION_FILES "${WASMCEPTION_PATH}/*.c")
+  foreach(TESTCASE_C ${WASMCEPTION_FILES})
+    string(REGEX REPLACE "${WASMCEPTION_PATH}/(.*).c" "\\1" TESTCASE "${TESTCASE_C}")
+    set(TESTCASE_WASM "${WASMCEPTION_OUTPUT}/${TESTCASE}.wasm")
+    add_custom_command(OUTPUT "${TESTCASE_WASM}"
+        COMMAND $ENV{WASMCEPTION}/dist/bin/clang --sysroot=$ENV{WASMCEPTION}/sysroot/ "${TESTCASE_C}" -Oz -o "${TESTCASE_WASM}" -Wl,--export=main
+        DEPENDS ${TESTCASE_C}
+        )
+    message(STATUS "Adding wasmception file ${TESTCASE_C} as ${TESTCASE_WASM}")
+    add_test(NAME "wasmception_${TESTCASE}" COMMAND wembed-driver "${TESTCASE_WASM}")
+    list(APPEND WASMCEPTION_MODULES ${TESTCASE_WASM})
+  endforeach()
+  add_custom_target(wasmception_modules ALL DEPENDS ${WASMCEPTION_MODULES})
+endif()

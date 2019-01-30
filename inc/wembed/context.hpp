@@ -157,9 +157,9 @@ namespace wembed {
       std::function<TReturn(TParams...)> operator()(context *pThis, const std::string &pName) {
         auto lResolve = pThis->get_export(pName);
         if (lResolve.mPointer == nullptr)
-          throw std::runtime_error("function not found");
+          throw std::runtime_error(std::string("function not found: ") + pName);
         if (lResolve.mKind != ek_function)
-          throw std::runtime_error("function not found");
+          throw std::runtime_error(std::string(pName) + " is not a function");
         auto lPointer = reinterpret_cast<TReturn (*)(TParams...)>(lResolve.mPointer);
         return [lPointer](TParams...pParams) -> TReturn {
           try {

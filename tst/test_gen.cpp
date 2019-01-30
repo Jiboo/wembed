@@ -1,3 +1,7 @@
+/**
+ * This file is used to generate CPP from the official testsuite syntax.
+ */
+
 #include <cassert>
 
 #include <fstream>

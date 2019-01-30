@@ -44,8 +44,8 @@ namespace wembed {
   struct fp_bits<float> {
     using bits = uint32_t;
     static constexpr size_t sSignificandBits = 23;
-    static constexpr bits sMaxExponent = 0xff;
-    static constexpr bits sQuietNan = bits(1) << (sSignificandBits - 1);
+    static constexpr bits sMaxExponent  = 0xff;
+    static constexpr bits sQuietNan     = bits(1) << (sSignificandBits - 1);
     static constexpr bits sSignMask     = 0b10000000'00000000'00000000'00000000;
     static constexpr bits sExponentMask = 0b01111111'10000000'00000000'00000000;
     static constexpr bits sMantissaMask = 0b00000000'01111111'11111111'11111111;
@@ -66,8 +66,8 @@ namespace wembed {
   struct fp_bits<double> {
     using bits = uint64_t;
     static constexpr size_t sSignificandBits = 52;
-    static constexpr bits sMaxExponent = 0x7ff;
-    static constexpr bits sQuietNan = bits(1) << (sSignificandBits - 1);
+    static constexpr bits sMaxExponent  = 0x7ff;
+    static constexpr bits sQuietNan     = bits(1) << (sSignificandBits - 1);
     static constexpr bits sSignMask     = 0b10000000'00000000'00000000'00000000'00000000'00000000'00000000'00000000;
     static constexpr bits sExponentMask = 0b01111111'11110000'00000000'00000000'00000000'00000000'00000000'00000000;
     static constexpr bits sMantissaMask = 0b00000000'00001111'11111111'11111111'11111111'11111111'11111111'11111111;
