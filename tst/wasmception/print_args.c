@@ -8,4 +8,3 @@ int main(int argc, char** argv) {
 		printf("arg %d: %s at %p\n", i, argv[i], argv[i]);
 	}
 }
-

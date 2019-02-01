@@ -1,10 +1,11 @@
-#ifdef WEMBED_VERBOSE
-#include <iostream>
-#endif
-
 #include "try_signal.hpp"
 
 #include "wembed.hpp"
+
+#ifdef WEMBED_VERBOSE
+#include <fstream>
+#include <iostream>
+#endif
 
 namespace wembed {
 
@@ -66,8 +67,8 @@ namespace wembed {
             throw unlinkable_exception(
                 "can't import symbol: "s + lImportField.first + " in module " + std::string(lImportModule.first));
 #ifdef WEMBED_VERBOSE
-          std::cout << "import " << lImportModule.first << "::" << lImportField.first << ", aka " << lImportField.second.mValueNames[0] << " of type "
-                    << LLVMPrintTypeToString(LLVMTypeOf(lImportField.second.mValues[0])) << ", at " << lResolverResult.mPointer << std::endl;
+          std::cout << "import " << lImportModule.first << "::" << lImportField.first << ", aka " << lImportField.second.mValueNames[0] /*<< " of type "
+                    << LLVMPrintTypeToString(LLVMTypeOf(lImportField.second.mValues[0]))*/ << ", at " << lResolverResult.mPointer << std::endl;
 #endif
           switch(lResolverResult.mKind) {
             // mem/tab imports are handled below

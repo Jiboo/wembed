@@ -3,6 +3,7 @@
 #include "gtest/gtest.h"
 
 #include "try_signal.hpp"
+#include "wembed.hpp"
 
 TEST(try_signal, voidvoid) {
   try {
@@ -92,6 +93,55 @@ TEST(try_signal, trap_segv) {
   try {
     sig::try_signal([] {
       int *lTarget = nullptr;
+      std::cout << *lTarget;
+      ASSERT_FALSE(true); // Should be unreachable
+    });
+    ASSERT_FALSE(true); // Should be unreachable
+  }
+  catch (std::system_error const& e)
+  {
+    EXPECT_EQ(e.code(), std::error_condition(sig::errors::segmentation));
+  }
+  ASSERT_FALSE(false); // Should be executed
+}
+
+TEST(try_signal, trap_segv_map) {
+  wembed::memory lMemory(0);
+
+  try {
+    sig::try_signal([&lMemory] {
+      uint8_t *lTarget = lMemory.data();
+      std::cout << *lTarget;
+      ASSERT_FALSE(true); // Should be unreachable
+    });
+    ASSERT_FALSE(true); // Should be unreachable
+  }
+  catch (std::system_error const& e)
+  {
+    EXPECT_EQ(e.code(), std::error_condition(sig::errors::segmentation));
+  }
+  ASSERT_FALSE(false); // Should be executed
+
+  lMemory.resize(1);
+
+  try {
+    sig::try_signal([&lMemory] {
+      uint8_t *lTarget = lMemory.data();
+      std::cout << *lTarget;
+      ASSERT_FALSE(false); // Should be reachable
+    });
+    ASSERT_FALSE(false); // Should be reachable
+  }
+  catch (std::system_error const& e)
+  {
+    ASSERT_FALSE(true); // Should be unreachable
+  }
+  ASSERT_FALSE(false); // Should be executed
+
+
+  try {
+    sig::try_signal([&lMemory] {
+      uint8_t *lTarget = lMemory.data() + wembed::sPageSize;
       std::cout << *lTarget;
       ASSERT_FALSE(true); // Should be unreachable
     });

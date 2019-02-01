@@ -43,7 +43,7 @@ file(GLOB TESTSUITE_FILES
     "${TESTSUITE_PATH}/*.wast"
     "${TESTSUITE_PATH}/proposals/sign-extension-ops/*.wast"
     "${TESTSUITE_PATH}/proposals/nontrapping-float-to-int-conversions/*.wast")
-#set(TESTSUITE_FILES "${TESTSUITE_PATH}/linking.wast")
+#set(TESTSUITE_FILES "${TESTSUITE_PATH}/address.wast")
 foreach(TESTCASE_WAST ${TESTSUITE_FILES})
   string(REGEX REPLACE "${TESTSUITE_PATH}/(.*).wast" "${TESTSUITE_OUTPUT}/\\1.cpp" TESTCASE_CPP "${TESTCASE_WAST}")
   add_custom_command(OUTPUT ${TESTCASE_CPP}
@@ -53,11 +53,13 @@ foreach(TESTCASE_WAST ${TESTSUITE_FILES})
   list(APPEND TESTSUITE_SRC ${TESTCASE_CPP})
   message(STATUS "Adding testsuite file ${TESTCASE_WAST} as ${TESTCASE_CPP}")
 endforeach()
+#set(TESTSUITE_SRC "")
 
 file(GLOB_RECURSE TESTSUITE_EXTRA_INC "tst/testsuite/**.hpp")
 file(GLOB_RECURSE TESTSUITE_EXTRA_SRC "tst/testsuite/**.cpp")
 
 file(GLOB_RECURSE GTESTS_EXTRA_SRC "tst/gtests/**.cpp")
+#set(GTESTS_EXTRA_SRC "")
 
 include_directories(tst/testsuite)
 add_executable(testsuite ${TESTSUITE_SRC} ${TESTSUITE_EXTRA_INC} ${TESTSUITE_EXTRA_SRC} ${GTESTS_EXTRA_SRC})

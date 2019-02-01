@@ -6,9 +6,9 @@
 
 namespace wembed {
 
-  virtual_mapping::virtual_mapping(size_t pInitialSize, size_t pMaximumSize)
-      : mCurSize(0), mAllocatedSize(pMaximumSize) {
-    mAddress = (uint8_t*)mmap(nullptr, pMaximumSize, 0, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  virtual_mapping::virtual_mapping(size_t pInitialSize)
+      : mCurSize(0) {
+    mAddress = (uint8_t*)mmap(nullptr, capacity(), 0, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (mAddress == MAP_FAILED)
       throw std::bad_alloc();
     if (pInitialSize > 0)
@@ -17,12 +17,10 @@ namespace wembed {
 
   virtual_mapping::~virtual_mapping() {
     if (mAddress != nullptr)
-      munmap(mAddress, mAllocatedSize);
+      munmap(mAddress, capacity());
   }
 
   void virtual_mapping::resize(size_t pNewSize) {
-    if (pNewSize > mAllocatedSize)
-      throw std::bad_array_new_length();
     if (mprotect(mAddress, pNewSize, PROT_READ | PROT_WRITE))
       throw std::bad_alloc();
     mCurSize = pNewSize;

@@ -183,10 +183,10 @@ namespace wembed {
     return LLVMAddFunction(mModule, pName.c_str(), lType);
   }
 
-  LLVMBasicBlockRef module::trap_if(LLVMValueRef lFunc, LLVMValueRef pCondition, LLVMValueRef pIntrinsic,
+  LLVMBasicBlockRef module::trap_if(LLVMValueRef pFunc, LLVMValueRef pCondition, LLVMValueRef pIntrinsic,
                                          const std::initializer_list<LLVMValueRef> &pArgs) {
-    LLVMBasicBlockRef lTrapThen = LLVMAppendBasicBlock(lFunc, "trapThen");
-    LLVMBasicBlockRef lTrapSkip = LLVMAppendBasicBlock(lFunc, "trapSkip");
+    LLVMBasicBlockRef lTrapThen = LLVMAppendBasicBlock(pFunc, "trapThen");
+    LLVMBasicBlockRef lTrapSkip = LLVMAppendBasicBlock(pFunc, "trapSkip");
 
     LLVMBuildCondBr(mBuilder, pCondition, lTrapThen, lTrapSkip);
 
@@ -202,7 +202,7 @@ namespace wembed {
     return lTrapSkip;
   }
 
-  LLVMBasicBlockRef module::trap_data_copy(LLVMValueRef lFunc, LLVMValueRef pOffset, size_t pSize) {
+  LLVMBasicBlockRef module::trap_data_copy(LLVMValueRef pFunc, LLVMValueRef pOffset, size_t pSize) {
     LLVMValueRef lMemorySizePage = LLVMBuildCall(mBuilder, mMemorySize, &mContextRef, 1, "curMemPage");
     LLVMValueRef lMemorySizeBytes = LLVMBuildMul(mBuilder, lMemorySizePage, get_const(64 * 1024), "curMemByte");
     LLVMValueRef lUnderflow = LLVMBuildICmp(mBuilder, LLVMIntSLT, pOffset, get_zero(LLVMTypeOf(pOffset)), "testOverflow");
@@ -210,7 +210,7 @@ namespace wembed {
     LLVMValueRef lOverflow = LLVMBuildICmp(mBuilder, LLVMIntUGT, lTotalOffset, lMemorySizeBytes, "testOverflow");
     LLVMValueRef lBoundsError = LLVMBuildOr(mBuilder, lUnderflow, lOverflow, "boundsError");
     static const char *lErrorString = "data segment does not fit";
-    return trap_if(lFunc, lBoundsError, mThrowUnlinkable, {get_string(lErrorString)});
+    return trap_if(pFunc, lBoundsError, mThrowUnlinkable, {get_string(lErrorString)});
   }
 
   LLVMBasicBlockRef module::trap_elem_copy(LLVMValueRef lFunc, LLVMValueRef pOffset) {
@@ -1599,13 +1599,12 @@ namespace wembed {
           WEMBED_TRUNC(o_trunc_f32_ui64, LLVMBuildFPToUI, LLVMFloatType(), LLVMInt64Type(), float, LLVMInt32Type(), -1.0f, 18446744073709551616.0f);
           WEMBED_TRUNC(o_trunc_f64_ui64, LLVMBuildFPToUI, LLVMDoubleType(), LLVMInt64Type(), double, LLVMInt64Type(), -1.0, 18446744073709551616.0);
 
-  #define WEMBED_LOAD(OPCODE, TYPE, BYTES, OFFTYPE, OFFADDINTR, PARSEOP, CONVOP) case OPCODE: { \
+  #define WEMBED_LOAD(OPCODE, TYPE, BYTES, CONVOP) case OPCODE: { \
             if (mMemoryTypes.empty()) throw invalid_exception("load without memory block"); \
             LLVMTypeRef lPtrType = LLVMPointerType(TYPE, 0); \
             uint32_t lFlags = parse_uleb128<uint32_t>(); \
-            LLVMValueRef lOffset = LLVMConstInt(OFFTYPE, PARSEOP, false); \
-            LLVMValueRef lIndex = LLVMBuildZExt(mBuilder, pop_int(), OFFTYPE, "izext"); \
-            auto lTotalOffsetResult = call_mv_intrinsic<2>(OFFADDINTR, {lIndex, lOffset}); \
+            LLVMValueRef lOffset = LLVMConstInt(LLVMInt32Type(), static_cast<ull_t>(parse_uleb128<uint32_t>()), false); \
+            auto lTotalOffsetResult = call_mv_intrinsic<2>(mUAddWithOverflow_i32, {pop_int(), lOffset}); \
             static const char *lErrorString = "load addr overflow"; \
             trap_if(lFunc, lTotalOffsetResult[1], mThrowVMException, {get_string(lErrorString)}); \
             LLVMValueRef lTotalOffset = lTotalOffsetResult[0]; \
@@ -1619,55 +1618,30 @@ namespace wembed {
             push(CONVOP); \
           } break;
 
-          WEMBED_LOAD(o_load_i32, LLVMInt32Type(), 4, LLVMInt32Type(), mUAddWithOverflow_i32,
-                      static_cast<ull_t>(parse_uleb128<uint32_t>()), lLoad)
-          WEMBED_LOAD(o_load_i64, LLVMInt64Type(), 8, LLVMInt64Type(), mUAddWithOverflow_i64,
-                      static_cast<ull_t>(parse_uleb128<uint64_t>()), lLoad)
-          WEMBED_LOAD(o_load_f32, LLVMFloatType(), 4, LLVMInt32Type(), mUAddWithOverflow_i32,
-                      static_cast<ull_t>(parse_uleb128<uint32_t>()), lLoad)
-          WEMBED_LOAD(o_load_f64, LLVMDoubleType(), 8, LLVMInt64Type(), mUAddWithOverflow_i64,
-                      static_cast<ull_t>(parse_uleb128<uint64_t>()), lLoad)
+          WEMBED_LOAD(o_load_i32, LLVMInt32Type(), 4, lLoad)
+          WEMBED_LOAD(o_load_i64, LLVMInt64Type(), 8, lLoad)
+          WEMBED_LOAD(o_load_f32, LLVMFloatType(), 4, lLoad)
+          WEMBED_LOAD(o_load_f64, LLVMDoubleType(), 8, lLoad)
 
-          WEMBED_LOAD(o_load8_si32, LLVMInt8Type(), 1, LLVMInt32Type(), mUAddWithOverflow_i32,
-                      static_cast<ull_t>(parse_uleb128<uint32_t>()),
-                      LLVMBuildSExt(mBuilder, lLoad, LLVMInt32Type(), "sext"))
-          WEMBED_LOAD(o_load16_si32, LLVMInt16Type(), 2, LLVMInt32Type(), mUAddWithOverflow_i32,
-                      static_cast<ull_t>(parse_uleb128<uint32_t>()),
-                      LLVMBuildSExt(mBuilder, lLoad, LLVMInt32Type(), "sext"))
-          WEMBED_LOAD(o_load8_si64, LLVMInt8Type(), 1, LLVMInt64Type(), mUAddWithOverflow_i64,
-                      static_cast<ull_t>(parse_uleb128<uint64_t>()),
-                      LLVMBuildSExt(mBuilder, lLoad, LLVMInt64Type(), "sext"))
-          WEMBED_LOAD(o_load16_si64, LLVMInt16Type(), 2, LLVMInt64Type(), mUAddWithOverflow_i64,
-                      static_cast<ull_t>(parse_uleb128<uint64_t>()),
-                      LLVMBuildSExt(mBuilder, lLoad, LLVMInt64Type(), "sext"))
-          WEMBED_LOAD(o_load32_si64, LLVMInt32Type(), 4, LLVMInt64Type(), mUAddWithOverflow_i64,
-                      static_cast<ull_t>(parse_uleb128<uint64_t>()),
-                      LLVMBuildSExt(mBuilder, lLoad, LLVMInt64Type(), "sext"))
+          WEMBED_LOAD(o_load8_si32, LLVMInt8Type(), 1, LLVMBuildSExt(mBuilder, lLoad, LLVMInt32Type(), "sext"))
+          WEMBED_LOAD(o_load16_si32, LLVMInt16Type(), 2, LLVMBuildSExt(mBuilder, lLoad, LLVMInt32Type(), "sext"))
+          WEMBED_LOAD(o_load8_si64, LLVMInt8Type(), 1, LLVMBuildSExt(mBuilder, lLoad, LLVMInt64Type(), "sext"))
+          WEMBED_LOAD(o_load16_si64, LLVMInt16Type(), 2, LLVMBuildSExt(mBuilder, lLoad, LLVMInt64Type(), "sext"))
+          WEMBED_LOAD(o_load32_si64, LLVMInt32Type(), 4, LLVMBuildSExt(mBuilder, lLoad, LLVMInt64Type(), "sext"))
 
-          WEMBED_LOAD(o_load8_ui32, LLVMInt8Type(), 1, LLVMInt32Type(), mUAddWithOverflow_i32,
-                      static_cast<ull_t>(parse_uleb128<uint32_t>()),
-                      LLVMBuildZExt(mBuilder, lLoad, LLVMInt32Type(), "zext"))
-          WEMBED_LOAD(o_load16_ui32, LLVMInt16Type(), 2, LLVMInt32Type(), mUAddWithOverflow_i32,
-                      static_cast<ull_t>(parse_uleb128<uint32_t>()),
-                      LLVMBuildZExt(mBuilder, lLoad, LLVMInt32Type(), "zext"))
-          WEMBED_LOAD(o_load8_ui64, LLVMInt8Type(), 1, LLVMInt64Type(), mUAddWithOverflow_i64,
-                      static_cast<ull_t>(parse_uleb128<uint64_t>()),
-                      LLVMBuildZExt(mBuilder, lLoad, LLVMInt64Type(), "zext"))
-          WEMBED_LOAD(o_load16_ui64, LLVMInt16Type(), 2, LLVMInt64Type(), mUAddWithOverflow_i64,
-                      static_cast<ull_t>(parse_uleb128<uint64_t>()),
-                      LLVMBuildZExt(mBuilder, lLoad, LLVMInt64Type(), "zext"))
-          WEMBED_LOAD(o_load32_ui64, LLVMInt32Type(), 4, LLVMInt64Type(), mUAddWithOverflow_i64,
-                      static_cast<ull_t>(parse_uleb128<uint64_t>()),
-                      LLVMBuildZExt(mBuilder, lLoad, LLVMInt64Type(), "zext"))
+          WEMBED_LOAD(o_load8_ui32, LLVMInt8Type(), 1, LLVMBuildZExt(mBuilder, lLoad, LLVMInt32Type(), "zext"))
+          WEMBED_LOAD(o_load16_ui32, LLVMInt16Type(), 2, LLVMBuildZExt(mBuilder, lLoad, LLVMInt32Type(), "zext"))
+          WEMBED_LOAD(o_load8_ui64, LLVMInt8Type(), 1, LLVMBuildZExt(mBuilder, lLoad, LLVMInt64Type(), "zext"))
+          WEMBED_LOAD(o_load16_ui64, LLVMInt16Type(), 2, LLVMBuildZExt(mBuilder, lLoad, LLVMInt64Type(), "zext"))
+          WEMBED_LOAD(o_load32_ui64, LLVMInt32Type(), 4, LLVMBuildZExt(mBuilder, lLoad, LLVMInt64Type(), "zext"))
 
-  #define WEMBED_STORE(OPCODE, ITYPE, BYTES, OTYPE, OFFTYPE, OFFADDINTR, PARSEOP, CONVOP) case OPCODE: { \
+  #define WEMBED_STORE(OPCODE, ITYPE, BYTES, OTYPE, CONVOP) case OPCODE: { \
             if (mMemoryTypes.empty()) throw invalid_exception("store without memory block"); \
             LLVMTypeRef lPtrType = LLVMPointerType(OTYPE, 0); \
             uint32_t lFlags = parse_uleb128<uint32_t>(); \
-            LLVMValueRef lOffset = LLVMConstInt(OFFTYPE, PARSEOP, false); \
+            LLVMValueRef lOffset = LLVMConstInt(LLVMInt32Type(), static_cast<ull_t>(parse_uleb128<uint32_t>()), false); \
             LLVMValueRef lValue = pop(ITYPE); \
-            LLVMValueRef lIndex = LLVMBuildZExt(mBuilder, pop_int(), OFFTYPE, "izext"); \
-            auto lTotalOffsetResult = call_mv_intrinsic<2>(OFFADDINTR, {lIndex, lOffset}); \
+            auto lTotalOffsetResult = call_mv_intrinsic<2>(mUAddWithOverflow_i32, {pop_int(), lOffset}); \
             static const char *lErrorString = "store addr overflow"; \
             trap_if(lFunc, lTotalOffsetResult[1], mThrowVMException, {get_string(lErrorString)}); \
             LLVMValueRef lTotalOffset = lTotalOffsetResult[0]; \
@@ -1680,29 +1654,20 @@ namespace wembed {
             LLVMSetVolatile(lStore, true); \
           } break;
 
-          WEMBED_STORE(o_store_i32, LLVMInt32Type(), 4, LLVMInt32Type(), LLVMInt32Type(), mUAddWithOverflow_i32,
-                       static_cast<ull_t>(parse_uleb128<uint32_t>()), lValue)
-          WEMBED_STORE(o_store_i64, LLVMInt64Type(), 8, LLVMInt64Type(), LLVMInt64Type(), mUAddWithOverflow_i64,
-                       static_cast<ull_t>(parse_uleb128<uint64_t>()), lValue)
-          WEMBED_STORE(o_store_f32, LLVMFloatType(), 4, LLVMFloatType(), LLVMInt32Type(), mUAddWithOverflow_i32,
-                       static_cast<ull_t>(parse_uleb128<uint32_t>()), lValue)
-          WEMBED_STORE(o_store_f64, LLVMDoubleType(), 8, LLVMDoubleType(), LLVMInt64Type(), mUAddWithOverflow_i64,
-                       static_cast<ull_t>(parse_uleb128<int64_t>()), lValue)
+          WEMBED_STORE(o_store_i32, LLVMInt32Type(), 4, LLVMInt32Type(), lValue)
+          WEMBED_STORE(o_store_i64, LLVMInt64Type(), 8, LLVMInt64Type(), lValue)
+          WEMBED_STORE(o_store_f32, LLVMFloatType(), 4, LLVMFloatType(), lValue)
+          WEMBED_STORE(o_store_f64, LLVMDoubleType(), 8, LLVMDoubleType(), lValue)
 
-          WEMBED_STORE(o_store8_i32, LLVMInt32Type(), 1, LLVMInt8Type(), LLVMInt32Type(), mUAddWithOverflow_i32,
-                       static_cast<ull_t>(parse_uleb128<uint32_t>()),
+          WEMBED_STORE(o_store8_i32, LLVMInt32Type(), 1, LLVMInt8Type(),
                        LLVMBuildTrunc(mBuilder, lValue, LLVMInt8Type(), "trunc"))
-          WEMBED_STORE(o_store16_i32, LLVMInt32Type(), 2, LLVMInt16Type(), LLVMInt32Type(), mUAddWithOverflow_i32,
-                       static_cast<ull_t>(parse_uleb128<uint32_t>()),
+          WEMBED_STORE(o_store16_i32, LLVMInt32Type(), 2, LLVMInt16Type(),
                        LLVMBuildTrunc(mBuilder, lValue, LLVMInt16Type(), "trunc"))
-          WEMBED_STORE(o_store8_i64, LLVMInt64Type(), 1, LLVMInt8Type(), LLVMInt64Type(), mUAddWithOverflow_i64,
-                       static_cast<ull_t>(parse_uleb128<uint64_t>()),
+          WEMBED_STORE(o_store8_i64, LLVMInt64Type(), 1, LLVMInt8Type(),
                        LLVMBuildTrunc(mBuilder, lValue, LLVMInt8Type(), "trunc"))
-          WEMBED_STORE(o_store16_i64, LLVMInt64Type(), 2, LLVMInt16Type(), LLVMInt64Type(), mUAddWithOverflow_i64,
-                       static_cast<ull_t>(parse_uleb128<uint64_t>()),
+          WEMBED_STORE(o_store16_i64, LLVMInt64Type(), 2, LLVMInt16Type(),
                        LLVMBuildTrunc(mBuilder, lValue, LLVMInt16Type(), "trunc"))
-          WEMBED_STORE(o_store32_i64, LLVMInt64Type(), 4, LLVMInt32Type(), LLVMInt64Type(), mUAddWithOverflow_i64,
-                       static_cast<ull_t>(parse_uleb128<uint64_t>()),
+          WEMBED_STORE(o_store32_i64, LLVMInt64Type(), 4, LLVMInt32Type(),
                        LLVMBuildTrunc(mBuilder, lValue, LLVMInt32Type(), "trunc"))
 
   #define WEMBED_ICMP(OPCODE, OPCOMP) case OPCODE##i32: { \

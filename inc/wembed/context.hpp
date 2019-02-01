@@ -56,10 +56,10 @@ namespace wembed {
   class memory {
   public:
     memory(const memory_type &pType)
-      : mType(pType), mImpl(pType.initial() * sPageSize, (pType.maximum() + 1) * sPageSize) {
+      : mType(pType), mImpl(pType.initial() * sPageSize) {
     }
     memory(uint32_t pInitial, std::optional<uint32_t> pMaximum = {})
-      : mImpl(pInitial * sPageSize, (pMaximum.has_value() ? (pMaximum.value() + 1) : sMaxPages) * sPageSize) {
+      : mImpl(pInitial * sPageSize) {
       mType.mLimits.mInitial = pInitial;
       if (pMaximum.has_value()) {
         mType.mLimits.mFlags |= 0x1;
@@ -71,7 +71,7 @@ namespace wembed {
 
     void resize(size_t pNewSize) { mImpl.resize(pNewSize * sPageSize); }
     size_t size() { return mImpl.size() / sPageSize; }
-    size_t capacity() { return (mImpl.capacity() / sPageSize) - 1; }
+    size_t capacity() { return mType.maximum(); }
     resizable_limits limits() { return mType.mLimits; }
 
   protected:
@@ -114,7 +114,7 @@ namespace wembed {
   public:
     friend uint64_t orc_sym_resolver(const char *pName, void *pCtx);
 
-    context(module &pModule, resolvers_t pResolvers = {});
+    context(module &pModule, const resolvers_t &pResolvers = {});
     ~context();
 
     template<typename T = void>

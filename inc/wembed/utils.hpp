@@ -15,21 +15,20 @@ namespace wembed {
 
   using namespace std::literals::string_literals;
 
-  // Zeroed huge chunk of memory mapped to host virtual address space
-  // When resized, the pointers shall not be modified
+  // Zeroed 4GB memory segment
   class virtual_mapping {
   public:
-    virtual_mapping(size_t pInitialSize, size_t pMaximumSize);
+    virtual_mapping(size_t pInitialSize);
     virtual ~virtual_mapping();
 
     void resize(size_t pNewSize);
     uint8_t *data() { return mAddress; }
     size_t size() { return mCurSize; }
-    size_t capacity() { return mAllocatedSize; }
+    size_t capacity() { return 4L*1024*1024*1024; }
 
   protected:
     uint8_t *mAddress = nullptr;
-    size_t mCurSize = 0, mAllocatedSize = 0;
+    size_t mCurSize = 0;
   };
 
   struct externsym {
@@ -144,5 +143,9 @@ namespace wembed {
   }
 
   void llvm_init();
+
+  using hrclock = std::chrono::high_resolution_clock;
+  std::ostream &operator<<(std::ostream &pOS, const hrclock::duration &pDur);
+  void profile_step(const char *pName);
 
 }  // namespace wembed
