@@ -18,6 +18,7 @@
 namespace wembed {
 
   module::module(uint8_t *pInput, size_t pLen) {
+    profile_step("  module/ctr");
     if (pInput == nullptr || pLen < 4)
       throw malformed_exception("invalid input");
 
@@ -37,11 +38,13 @@ namespace wembed {
     mStartUser = LLVMAppendBasicBlock(mStartFunc, "callStart");
     LLVMPositionBuilderAtEnd(mBuilder, mStartInit);
     init_intrinsics();
+    profile_step("  module/init");
 
     switch(parse<uint32_t>()) { // version
       case 1: parse_sections(); break;
       default: throw malformed_exception("unexpected version");
     }
+    profile_step("  module/parsed");
 
 #ifdef WEMBED_VERBOSE
     std::cout << "Finalizing module..." << std::endl;
@@ -63,6 +66,7 @@ namespace wembed {
       throw invalid_exception(lMessage.str());
     }
     LLVMDisposeMessage(lError);
+    profile_step("  module/verified");
   }
 
   module::~module() {
@@ -756,6 +760,7 @@ namespace wembed {
       LLVMTypeRef lReturnType = lReturnTypesCount ? parse_llvm_vtype() : LLVMVoidType();
       mTypes[lType] = LLVMFunctionType(lReturnType, lParamTypes, uint(lParamTypeCount), false);
     }
+    profile_step("  module/types");
   }
 
   void module::parse_imports() {
@@ -831,6 +836,7 @@ namespace wembed {
       }
     }
     mImportFuncOffset = mFunctions.size();
+    profile_step("  module/imports");
   }
 
   void module::parse_functions() {
@@ -843,6 +849,7 @@ namespace wembed {
       LLVMValueRef lFuncRef = LLVMAddFunction(mModule, "wembed.func", mTypes[lTIndex]);
       mFunctions.emplace_back(lFuncRef, LLVMGetValueName(lFuncRef), hash_fn_type(mTypes[lTIndex]));
     }
+    profile_step("  module/functions");
   }
 
   void module::parse_section_table(uint32_t pSectionSize) {
@@ -856,6 +863,7 @@ namespace wembed {
       LLVMValueRef lTypes = LLVMAddGlobal(mModule, LLVMInt64Type(), "wembed.tableTypes");
       mTables.emplace_back(lType, lPointers, lTypes);
     }
+    profile_step("  module/tables");
   }
 
   void module::parse_section_memory(uint32_t pSectionSize) {
@@ -871,6 +879,7 @@ namespace wembed {
         throw invalid_exception("memory size too big, max 65536 pages");
       mMemoryTypes.emplace_back(lResult);
     }
+    profile_step("  module/memories");
   }
 
   void module::parse_globals() {
@@ -904,6 +913,7 @@ namespace wembed {
     LLVMBuildRetVoid(mBuilder);
     LLVMPositionBuilderAtEnd(mBuilder, mStartInit);
     LLVMBuildCall(mBuilder, lInit, nullptr, 0, "");
+    profile_step("  module/globals");
   }
 
   void module::parse_exports() {
@@ -954,6 +964,7 @@ namespace wembed {
           break;
       }
     }
+    profile_step("  module/exports");
   }
 
   void module::parse_section_start(uint32_t pSectionSize) {
@@ -968,6 +979,7 @@ namespace wembed {
       throw invalid_exception("start function require no input param");
 
     LLVMBuildCall(mBuilder, mFunctions[lIndex].mValue, nullptr, 0, "");
+    profile_step("  module/start");
   }
 
   void module::parse_section_element(uint32_t pSectionSize) {
@@ -1029,6 +1041,7 @@ namespace wembed {
     LLVMBuildRetVoid(mBuilder);
     LLVMPositionBuilderAtEnd(mBuilder, mStartInit);
     LLVMBuildCall(mBuilder, lInit, nullptr, 0, "");
+    profile_step("  module/elements");
   }
 
   void module::parse_section_data(uint32_t pSectionSize) {
@@ -1074,6 +1087,7 @@ namespace wembed {
     LLVMBuildRetVoid(mBuilder);
     LLVMPositionBuilderAtEnd(mBuilder, mStartInit);
     LLVMBuildCall(mBuilder, lInit, nullptr, 0, "");
+    profile_step("  module/data");
   }
 
   void module::skip_unreachable(uint8_t *pPastEnd) {
@@ -1946,6 +1960,7 @@ namespace wembed {
       std::cout << "Done: " << LLVMPrintValueToString(lFunc) << std::endl;
   #endif
     }
+    profile_step("  module/code");
   }
 
   void module::optimize(uint8_t pOptLevel) {

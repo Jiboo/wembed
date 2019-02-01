@@ -2,8 +2,10 @@
  * This program is used tp run wasm32 generated through wasmception
  */
 
+#include <chrono>
 #include <fstream>
 #include <filesystem>
+#include <iomanip>
 #include <iostream>
 #include <vector>
 
@@ -11,6 +13,7 @@
 #include <asm/unistd_32.h> // syscall names
 #include <sys/uio.h> // writev
 #include <sys/ioctl.h>
+#include <sys/mman.h> // madvise
 
 #include <wembed.hpp>
 
@@ -55,6 +58,17 @@ struct iovec32 {
   uint32_t mSize;
 };
 
+uint32_t syscall_brk(uint32_t pNewSize) {
+  uint32_t lHeapSize = (uint32_t)vm->size() * sPageSize;
+  if (pNewSize > lHeapSize) {
+    uint32_t lIncByte = pNewSize - lHeapSize;
+    uint32_t lIncPages = (uint32_t)ceil(lIncByte / sPageSize);
+    vm->resize(vm->size() + lIncPages);
+    lHeapSize = (uint32_t)vm->size() * sPageSize;
+  }
+  return lHeapSize;
+}
+
 i32 syscall_writev(i32 pFd, iovec32 *pVecOffset, uint32_t pVecSize) {
   //DumpHex(pVecOffset, sizeof(iovec32) * pVecSize);
   vector<iovec> lTranslatedVec(pVecSize);
@@ -69,16 +83,14 @@ i32 syscall_ioctl(i32 pFd, uint32_t pRequest, void* pArgp) {
   return ioctl(pFd, pRequest, pArgp);
 }
 
-i32 syscall_brk(i32 pNewSize) {
-  i32 lHeapSize = (i32)vm->size() * sPageSize;
-  if (pNewSize > lHeapSize) {
-    i32 lIncByte = pNewSize - lHeapSize;
-    i32 lIncPages = (int)ceil(lIncByte / sPageSize);
-    vm->resize(vm->size() + lIncPages);
-    lHeapSize = (i32)vm->size() * sPageSize;
-  }
-  return lHeapSize;
+i32 syscall_madvise(void* pArgp, i32 pSize, uint32_t pAdvice) {
+  return madvise(pArgp, pSize, pAdvice);
 }
+
+/*i32 syscall_mmap2(void *addr, i32 length, i32 prot,  i32 flags, i32 fd, i32 pgoffset) {
+  // FIXME Check params syscall_mmap2 0, 65536, 3, 34, -1, 0
+  return syscall_brk(vm->size() * sPageSize + length);
+}*/
 
 i32 env_syscall0(i32 a) {
   switch(a) {
@@ -106,6 +118,7 @@ i32 env_syscall3(i32 a, i32 b, i32 c, i32 d) {
   switch(a) {
     case __NR_ioctl: return syscall_ioctl(b, (uint32_t)c, (void*)(vm->data() + c));
     case __NR_writev: return syscall_writev(b, (iovec32*)(vm->data() + c), (uint32_t)d);
+    case __NR_madvise: return syscall_madvise((iovec32*)(vm->data() + b), c, d);
     default:
       cerr << "unimplemented syscall3 " << a << endl;
       return -1;
@@ -127,7 +140,7 @@ i32 env_syscall5(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f) {
 }
 i32 env_syscall6(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g) {
   switch(a) {
-    //case __NR_mmap2: return syscall_mmap2((void*)(vm->data() + b), c, d, e, f, g);
+    //case __NR_mmap2: return syscall_mmap2((void*)(/*vm->data() + */b), c, d, e, f, g);
     default:
       cerr << "unimplemented syscall6 " << a << endl;
       return -1;
@@ -141,13 +154,19 @@ void usage(const string &pProgName) {
 }
 
 int main(int argc, char **argv) {
+  profile_step("Start");
+
   llvm_init();
+
+  profile_step("LLVM Init");
 
   if (argc < 2) {
     cerr << "Invalid argument count, expecting at least 2, got " << argc << endl;
     usage(argv[0]);
     return EXIT_SUCCESS;
   }
+
+  profile_step("Args parsing");
 
   ifstream lModuleHandle(argv[1], ios::binary);
   if (!lModuleHandle.is_open()) {
@@ -157,6 +176,8 @@ int main(int argc, char **argv) {
   std::string lModuleBin((istreambuf_iterator<char>(lModuleHandle)),
                   istreambuf_iterator<char>());
   lModuleHandle.close();
+
+  profile_step("Module read");
 
   auto lEnvResolver = [](string_view pFieldName) -> resolve_result_t {
     const static unordered_map<string_view, resolve_result_t> sEnvMappings = {
@@ -182,9 +203,15 @@ int main(int argc, char **argv) {
 
   try {
     module lModule((uint8_t*)lModuleBin.data(), lModuleBin.size());
+    profile_step("Module parse");
+
     lModule.optimize();
+    //lModule.dump_ll(cout);
+    profile_step("Module optimize");
 
     context lContext(lModule, lResolvers);
+    profile_step("Context initialization");
+
     vm = lContext.mem();
 
     auto lEntry = lContext.get_export("main");
@@ -233,8 +260,15 @@ int main(int argc, char **argv) {
 
     //DumpHex(vm->data() + *lDataEnd, lDataHostOffset - lStart + 4 * lArgvOffsets.size());
 
+    profile_step("Argv construction");
+
     auto lEntryFn = lContext.get_fn<int(int, char**)>("main");
-    return lEntryFn((int)lArgvOffsets.size(), (char**)lDataVMOffset);
+    profile_step("Find main symbol");
+
+    int lResult = lEntryFn((int)lArgvOffsets.size(), (char**)lDataVMOffset);
+    profile_step("Main execution");
+
+    return lResult;
   }
   catch(const std::exception &e) {
     cerr << "Exception: " << e.what() << endl;

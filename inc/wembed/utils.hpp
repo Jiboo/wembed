@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <chrono>
 #include <stdexcept>
 #include <string>
 #include <string_view>

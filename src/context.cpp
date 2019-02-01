@@ -21,7 +21,9 @@ namespace wembed {
     return lRet;
   }
 
-  context::context(module &pModule, resolvers_t pResolver) : mModule(pModule) {
+  context::context(module &pModule, const resolvers_t &pResolver) : mModule(pModule) {
+    profile_step("  context/ctr");
+
     char *lTriple = LLVMGetDefaultTargetTriple();
     LLVMTargetRef lTarget;
     if (LLVMGetTargetFromTriple(lTriple, &lTarget, nullptr))
@@ -55,6 +57,8 @@ namespace wembed {
 
     mSymbols.emplace("memcpy", (void*)&memcpy);
 
+    profile_step("  context/prep");
+
     if (mModule.mImports.size() >= 1) {
       for (const auto &lImportModule : mModule.mImports) {
         auto lFields = lImportModule.second;
@@ -80,6 +84,7 @@ namespace wembed {
         }
       }
     }
+    profile_step("  context/imports");
 
     if (pModule.mMemoryTypes.size()) {
       auto &lMemory = pModule.mMemoryTypes[0];
@@ -111,6 +116,7 @@ namespace wembed {
 
       mSymbols.emplace("wembed.baseMemory", (void*)mem()->data());
     }
+    profile_step("  context/memories");
 
     const auto lTableCount = pModule.mTables.size();
     if (lTableCount > 1)
@@ -145,9 +151,13 @@ namespace wembed {
       mSymbols.emplace("wembed.tablePtrs", (void*)tab()->data_ptrs());
       mSymbols.emplace("wembed.tableTypes", (void*)tab()->data_types());
     }
+    profile_step("  context/tables");
 
     mEngine = LLVMOrcCreateInstance(lTMachine);
+    profile_step("  context/orc init");
+
     LLVMOrcAddEagerlyCompiledIR(mEngine, &mHandle, pModule.mModule, orc_sym_resolver, this);
+    profile_step("  context/jit");
 
     // Execute __wstart, init table/memory
     auto lStartPtr = get_pointer("wembed.start");
@@ -160,6 +170,7 @@ namespace wembed {
         throw vm_runtime_exception(pError.what());
       }
     }
+    profile_step("  context/start");
 
     // Replaces indices loaded in tables
     for (size_t i = 0; i < lTableCount; i++) {
@@ -182,6 +193,13 @@ namespace wembed {
         lTable->data_types()[lIndex] = lTypeHash;
       }
     }
+    profile_step("  context/table replace");
+
+#ifdef WEMBED_VERBOSE
+    std::ifstream lMemSegments("/proc/self/maps");
+    if (lMemSegments.is_open())
+      std::cout << lMemSegments.rdbuf();
+#endif
   }
 
   context::~context() {

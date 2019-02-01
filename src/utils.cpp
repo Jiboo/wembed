@@ -1,3 +1,6 @@
+#include <iostream>
+#include <iomanip>
+
 #include "wembed.hpp"
 
 uint64_t wembed::hash_type(LLVMTypeRef pType, bool pConst) {
@@ -21,4 +24,40 @@ uint64_t wembed::hash_fn_type(LLVMTypeRef pType) {
 void wembed::llvm_init() {
   LLVMInitializeNativeTarget();
   LLVMInitializeNativeAsmPrinter();
+}
+
+std::ostream &wembed::operator<<(std::ostream &pOS, const hrclock::duration &pDur) {
+  auto lNano = pDur.count();
+  if (lNano < 1000) {
+    return pOS << lNano << "ns";
+  }
+  if (lNano < 1'000'000) {
+    return pOS << lNano / 1000.0 << "µs";
+  }
+  if (lNano < 1'000'000'000) {
+    return pOS << lNano / 1'000'000.0 << "ms";
+  }
+  return pOS << lNano / 1'000'000'000.0 << "s";
+}
+
+void wembed::profile_step(const char *pName) {
+#ifdef WEMBED_PROFILE
+  static bool sInitialized = false;
+  static hrclock::time_point sFirst;
+  static hrclock::time_point sLast;
+
+  auto lNow = hrclock::now();
+  if (!sInitialized) {
+    sFirst = sLast = lNow;
+    sInitialized = true;
+  }
+
+  std::ios_base::fmtflags lIOFlags(std::cout.flags());
+  std::chrono::duration<double, std::milli> lElapsed = lNow - sFirst;
+  std::cout << "[" << std::fixed << std::setw(12) << std::setprecision(6) << lElapsed.count();
+  std::cout.flags(lIOFlags);
+  std::cout << "] " << pName << " (diff: " << (lNow - sLast) << ")" << std::endl;
+
+  sLast = lNow;
+#endif
 }
