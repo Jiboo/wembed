@@ -50,6 +50,18 @@ namespace wembed {
     std::cout << "Finalizing module..." << std::endl;
 #endif
 
+    for(auto &lNamespace : mImports)
+      for(auto &lImports : lNamespace.second)
+        lImports.second.retreiveNames();
+
+    for(auto &lExports : mExports)
+      lExports.second.retreiveNames();
+
+    for (auto &lFunc : mFunctions)
+      lFunc.retreiveName();
+
+    profile_step("  module/rename");
+
     // finish __wstart
     LLVMPositionBuilderAtEnd(mBuilder, mStartInit);
     LLVMBuildBr(mBuilder, mStartUser);
@@ -404,7 +416,7 @@ namespace wembed {
   void module::parse_custom_section(const std::string_view &pName, size_t pInternalSize) {
     if (pName == "name") {
       // "name" http://webassembly.org/docs/binary-encoding/#name-section
-      // parse_names(pInternalSize);
+      parse_names(pInternalSize);
       mCurrent += pInternalSize;
     }
     else if (pName == "dylink") {
@@ -434,10 +446,17 @@ namespace wembed {
           for (uint32_t lName = 0; lName < lCount; lName++) {
             uint32_t lIndex = parse_uleb128<uint32_t>();
             uint32_t lNameSize = parse_uleb128<uint32_t>();
-            std::string lNameStr(parse_str(lNameSize));
+            auto lNameStr(parse_str(lNameSize));
             if (lIndex >= mFunctions.size())
               throw invalid_exception("function index out of bounds");
-            LLVMSetValueName2(mFunctions[lIndex].mValue, lNameStr.data(), lNameStr.size());
+            std::stringstream lNewName;
+            lNewName << "wasm.names.func." << lNameStr;
+            std::string lNewNameStr = lNewName.str();
+#ifdef WEMBED_VERBOSE
+            std::cout << "Renaming " << mFunctions[lIndex].mValue << " aka "
+                      << LLVMGetValueName(mFunctions[lIndex].mValue) << " to " << lNewNameStr << std::endl;
+#endif
+            LLVMSetValueName2(mFunctions[lIndex].mValue, lNewNameStr.data(), lNewNameStr.size());
           }
         } break;
       }
@@ -788,7 +807,7 @@ namespace wembed {
           LLVMValueRef lFunction = LLVMAddFunction(mModule, "wembed.func", lType);
           LLVMSetLinkage(lFunction, LLVMLinkage::LLVMExternalLinkage);
           const uint64_t lTypeHash = hash_fn_type(lType);
-          mFunctions.emplace_back(lFunction, LLVMGetValueName(lFunction), lTypeHash);
+          mFunctions.emplace_back(lFunction, lTypeHash);
           mImports[std::string(lModule)].emplace(std::string(lField), symbol_t{ek_function, hash_fn_type(lType), lFunction});
   #ifdef WEMBED_VERBOSE
           std::cout << "Import func " << mFunctions.size() << ": " << LLVMPrintTypeToString(lType) << ", hash:" << hash_fn_type(lType) << std::endl;
@@ -847,7 +866,7 @@ namespace wembed {
       if (lTIndex >= mTypes.size())
         throw invalid_exception("type index out of range");
       LLVMValueRef lFuncRef = LLVMAddFunction(mModule, "wembed.func", mTypes[lTIndex]);
-      mFunctions.emplace_back(lFuncRef, LLVMGetValueName(lFuncRef), hash_fn_type(mTypes[lTIndex]));
+      mFunctions.emplace_back(lFuncRef, hash_fn_type(mTypes[lTIndex]));
     }
     profile_step("  module/functions");
   }
@@ -2001,7 +2020,7 @@ namespace wembed {
     LLVMRunPassManager(lPass, mModule);
     LLVMDisposePassManager(lPass);
 
-#if defined(WEMBED_VERBOSE) && 1
+#if defined(WEMBED_VERBOSE) && 0
     dump_ll(std::cout);
 #endif
   }

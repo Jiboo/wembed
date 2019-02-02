@@ -13,11 +13,20 @@ namespace wembed {
     auto lRef = (context*)pCtx;
 
     auto lPredefined = lRef->mSymbols.find(pName);
-    if (lPredefined != lRef->mSymbols.end())
-      return (uint64_t)lPredefined->second;
+    if (lPredefined != lRef->mSymbols.end()) {
+#ifdef WEMBED_VERBOSE
+      std::cout << "Resolved builtin " << pName << " to " << std::hex << lPredefined->second << std::dec << std::endl;
+#endif
+      return (uint64_t) lPredefined->second;
+    }
 
     uint64_t lRet;
     LLVMOrcGetSymbolAddress(lRef->mEngine, &lRet, pName);
+
+#ifdef WEMBED_VERBOSE
+    std::cout << "Resolved " << pName << " to " << std::hex << lRet << std::dec << std::endl;
+#endif
+
     return lRet;
   }
 
@@ -159,6 +168,12 @@ namespace wembed {
     LLVMOrcAddEagerlyCompiledIR(mEngine, &mHandle, pModule.mModule, orc_sym_resolver, this);
     profile_step("  context/jit");
 
+#if defined(WEMBED_VERBOSE) && 0
+    std::ifstream lMemSegments("/proc/self/maps");
+    if (lMemSegments.is_open())
+      std::cout << lMemSegments.rdbuf();
+#endif
+
     // Execute __wstart, init table/memory
     auto lStartPtr = get_pointer("wembed.start");
     if (lStartPtr) {
@@ -194,12 +209,6 @@ namespace wembed {
       }
     }
     profile_step("  context/table replace");
-
-#ifdef WEMBED_VERBOSE
-    std::ifstream lMemSegments("/proc/self/maps");
-    if (lMemSegments.is_open())
-      std::cout << lMemSegments.rdbuf();
-#endif
   }
 
   context::~context() {

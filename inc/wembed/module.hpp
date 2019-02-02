@@ -114,8 +114,14 @@ namespace wembed {
       std::string mName;
       uint64_t mType;
 
-      FuncDef(LLVMValueRef pValue, const std::string &pName, uint64_t pTypeHash)
-        : mValue(pValue), mName(pName), mType(pTypeHash) {}
+      FuncDef(LLVMValueRef pValue, uint64_t pTypeHash)
+        : mValue(pValue), mType(pTypeHash) {}
+
+      void retreiveName() {
+        size_t lSize;
+        const char *lName = LLVMGetValueName2(mValue, &lSize);
+        mName = std::string(lName, lSize);
+      }
     };
     std::vector<FuncDef> mFunctions;
 
@@ -127,12 +133,16 @@ namespace wembed {
       symbol_t() {}
       symbol_t(external_kind pKind, uint64_t pTypeHash, LLVMValueRef pValue) : mKind(pKind), mTypeHash(pTypeHash) {
         mValues.emplace_back(pValue);
-        mValueNames.emplace_back(LLVMGetValueName(pValue));
       }
       symbol_t(external_kind pKind, uint64_t pTypeHash, std::initializer_list<LLVMValueRef> pValues)
         : mKind(pKind), mTypeHash(pTypeHash), mValues(pValues) {
-        for (const auto &lValue : mValues)
-          mValueNames.emplace_back(LLVMGetValueName(lValue));
+      }
+      void retreiveNames() {
+        for (const auto &lValue : mValues) {
+          size_t lSize;
+          const char *lName = LLVMGetValueName2(lValue, &lSize);
+          mValueNames.emplace_back(std::string(lName, lSize));
+        }
       }
     };
     std::unordered_map<std::string, symbol_t> mExports;
