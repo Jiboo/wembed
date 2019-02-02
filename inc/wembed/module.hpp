@@ -41,6 +41,7 @@ namespace wembed {
     LLVMValueRef symbol1(const std::string_view &pName);
 
   protected:
+    uint8_t mOptLevel = 0;
     uint8_t *mCurrent, *mEnd;
     size_t mImportFuncOffset = 0;
     size_t mUnreachableDepth = 0;

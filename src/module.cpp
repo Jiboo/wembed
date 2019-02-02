@@ -1982,40 +1982,123 @@ namespace wembed {
     profile_step("  module/code");
   }
 
+  void addInitialAliasAnalysisPasses(LLVMPassManagerRef pPass) {
+    LLVMAddTypeBasedAliasAnalysisPass(pPass);
+    LLVMAddScopedNoAliasAAPass(pPass);
+  }
+
+  void addInstructionCombiningPass(LLVMPassManagerRef pPass) {
+    LLVMAddInstructionCombiningPass(pPass);
+  }
+
+  void addFunctionSimplificationPasses(uint8_t pOptLevel, LLVMPassManagerRef pPass) {
+    LLVMAddScalarReplAggregatesPassSSA(pPass);
+    //createSpeculativeExecutionIfHasBranchDivergencePass
+    LLVMAddJumpThreadingPass(pPass);
+    LLVMAddCorrelatedValuePropagationPass(pPass);
+    LLVMAddCFGSimplificationPass(pPass);
+    if (pOptLevel > 2) LLVMAddAggressiveInstCombinerPass(pPass);
+    addInstructionCombiningPass(pPass);
+    //createPGOMemOPSizeOptLegacyPass
+    LLVMAddTailCallEliminationPass(pPass);
+    LLVMAddCFGSimplificationPass(pPass);
+    LLVMAddReassociatePass(pPass);
+    LLVMAddLoopRotatePass(pPass);
+    LLVMAddLICMPass(pPass);
+    LLVMAddLoopUnswitchPass(pPass);
+    LLVMAddCFGSimplificationPass(pPass);
+    addInstructionCombiningPass(pPass);
+    LLVMAddIndVarSimplifyPass(pPass);
+    LLVMAddLoopIdiomPass(pPass);
+    LLVMAddLoopDeletionPass(pPass);
+    //createSimpleLoopUnrollPass
+    if (pOptLevel > 1) {
+      LLVMAddMergedLoadStoreMotionPass(pPass);
+      LLVMAddNewGVNPass(pPass);
+    }
+    LLVMAddMemCpyOptPass(pPass);
+    LLVMAddSCCPPass(pPass);
+    LLVMAddBitTrackingDCEPass(pPass);
+    addInstructionCombiningPass(pPass);
+    LLVMAddJumpThreadingPass(pPass);
+    LLVMAddCorrelatedValuePropagationPass(pPass);
+    LLVMAddDeadStoreEliminationPass(pPass);
+    LLVMAddLICMPass(pPass);
+    LLVMAddLoopRerollPass(pPass);
+    LLVMAddAggressiveDCEPass(pPass);
+    LLVMAddCFGSimplificationPass(pPass);
+    addInstructionCombiningPass(pPass);
+  }
+
+  void addLTOOptimizationPasses(uint8_t pOptLevel, LLVMPassManagerRef pPass) {
+    LLVMAddGlobalDCEPass(pPass);
+    addInitialAliasAnalysisPasses(pPass);
+    //createForceFunctionAttrsLegacyPass
+    //createInferFunctionAttrsLegacyPass
+    if (pOptLevel > 1) {
+      //createCallSiteSplittingPass
+      //createPGOIndirectCallPromotionLegacyPass
+      LLVMAddIPSCCPPass(pPass);
+      LLVMAddCalledValuePropagationPass(pPass);
+    }
+    //LLVMAddFunctionAttrsPass(pPass); Makes call.wast fail
+    //createReversePostOrderFunctionAttrsPass
+    //createGlobalSplitPass
+    //createWholeProgramDevirtPass
+    if (pOptLevel == 1)
+      return;
+    LLVMAddGlobalOptimizerPass(pPass);
+    LLVMAddPromoteMemoryToRegisterPass(pPass);
+    LLVMAddConstantMergePass(pPass);
+    LLVMAddDeadArgEliminationPass(pPass);
+    if (pOptLevel > 2) LLVMAddAggressiveInstCombinerPass(pPass);
+    addInstructionCombiningPass(pPass);
+    LLVMAddFunctionInliningPass(pPass);
+    LLVMAddPruneEHPass(pPass);
+    LLVMAddGlobalOptimizerPass(pPass);
+    LLVMAddGlobalDCEPass(pPass);
+    LLVMAddArgumentPromotionPass(pPass);
+    addInstructionCombiningPass(pPass);
+    LLVMAddJumpThreadingPass(pPass);
+    LLVMAddScalarReplAggregatesPass(pPass);
+    //LLVMAddFunctionAttrsPass(pPass); Makes call.wast fail
+    //createGlobalsAAWrapperPass
+    LLVMAddLICMPass(pPass);
+    LLVMAddMergedLoadStoreMotionPass(pPass);
+    LLVMAddNewGVNPass(pPass);
+    LLVMAddMemCpyOptPass(pPass);
+    LLVMAddDeadStoreEliminationPass(pPass);
+    LLVMAddIndVarSimplifyPass(pPass);
+    LLVMAddLoopDeletionPass(pPass);
+    //createLoopInterchangePass
+    //createSimpleLoopUnrollPass
+    LLVMAddLoopVectorizePass(pPass);
+    LLVMAddLoopUnrollPass(pPass);
+    addInstructionCombiningPass(pPass);
+    LLVMAddCFGSimplificationPass(pPass);
+    LLVMAddSCCPPass(pPass);
+    addInstructionCombiningPass(pPass);
+    LLVMAddBitTrackingDCEPass(pPass);
+    LLVMAddAlignmentFromAssumptionsPass(pPass);
+    addInstructionCombiningPass(pPass);
+    LLVMAddJumpThreadingPass(pPass);
+  }
+
+  void addLateLTOOptimizationPasses(uint8_t pOptLevel, LLVMPassManagerRef pPass) {
+    LLVMAddCFGSimplificationPass(pPass);
+    //createEliminateAvailableExternallyPass
+    LLVMAddGlobalDCEPass(pPass);
+  }
+
   void module::optimize(uint8_t pOptLevel) {
+    if (pOptLevel == 0)
+      return;
+
+    mOptLevel = pOptLevel;
     LLVMPassManagerRef lPass = LLVMCreatePassManager();
 
-    if (pOptLevel > 0) {
-      LLVMAddDeadStoreEliminationPass(lPass);
-      //LLVMAddFunctionAttrsPass(lPass); // Makes call.wast fail
-      LLVMAddGlobalDCEPass(lPass);
-      //LLVMAddGlobalOptimizerPass(lPass);
-      LLVMAddIndVarSimplifyPass(lPass);
-      LLVMAddInstructionCombiningPass(lPass);
-      LLVMAddIPSCCPPass(lPass);
-      //LLVMAddJumpThreadingPass(lPass);
-      LLVMAddLoopDeletionPass(lPass);
-      LLVMAddLoopRotatePass(lPass);
-      LLVMAddLoopUnrollPass(lPass);
-      LLVMAddLoopUnswitchPass(lPass);
-      LLVMAddPromoteMemoryToRegisterPass(lPass);
-      LLVMAddMemCpyOptPass(lPass);
-      LLVMAddPruneEHPass(lPass);
-      LLVMAddReassociatePass(lPass);
-      LLVMAddScalarReplAggregatesPass(lPass);
-      LLVMAddCFGSimplificationPass(lPass);
-      //LLVMAddStripSymbolsPass(lPass);
-      //LLVMAddStripDeadPrototypesPass(lPass);
-      //LLVMAddTailCallEliminationPass(lPass); // Makes call.wast fail
-    }
-    if (pOptLevel > 1) {
-      LLVMAddConstantMergePass(lPass);
-      LLVMAddGVNPass(lPass);
-    }
-    if (pOptLevel > 2) {
-      //LLVMAddArgumentPromotionPass(lPass);
-      LLVMAddAggressiveInstCombinerPass(lPass);
-    }
+    addLTOOptimizationPasses(pOptLevel, lPass);
+    addLateLTOOptimizationPasses(pOptLevel, lPass);
 
     LLVMRunPassManager(lPass, mModule);
     LLVMDisposePassManager(lPass);

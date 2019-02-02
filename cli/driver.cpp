@@ -148,8 +148,16 @@ i32 env_syscall6(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g) {
 }
 
 void usage(const string &pProgName) {
-  cout << "usage: " << pProgName << " <wasm path> [<args>]\n"
+  cout << "usage: " << pProgName << " <flags> [-- <args>]\n"
+          "  \n"
           "  runs 'main' from a wasm32 module, compiled with wasmception\n"
+          "  \n"
+          "  available flags:\n"
+          "    -i <wasm>  module input path (required)\n"
+          "    -O<level>  optimisation level ([0-4] default: 0)\n"
+          "    -d         emit optimized llvm IR before executing\n"
+          "  \n"
+          "  result 1 in case of error, or the return value of the wasm's main function."
        << endl;
 }
 
@@ -163,14 +171,75 @@ int main(int argc, char **argv) {
   if (argc < 2) {
     cerr << "Invalid argument count, expecting at least 2, got " << argc << endl;
     usage(argv[0]);
-    return EXIT_SUCCESS;
+    return EXIT_FAILURE;
+  }
+
+  path lWasmPath;
+  uint8_t lOptLevel = 4;
+  bool lDump = false;
+  vector<string_view> lArgs;
+
+  for (int i = 1; i < argc; i++) {
+    if (argv[i] == std::string("--")) {
+      if (argc == i + 1) {
+        cerr << "-- should be followed by at least one argument" << endl;
+        usage(argv[0]);
+        return EXIT_FAILURE;
+      }
+      for (int j = i + 1; j < argc; j++)
+        lArgs.emplace_back(argv[j]);
+      break;
+    }
+    if (argv[i][0] == '-') {
+      switch(argv[i][1]) {
+        case 'O': {
+          char lRaw = argv[i][2];
+          if (lRaw < '0' || lRaw > '4') {
+            cerr << "-O accepts values in the [0-4] range" << endl;
+            usage(argv[0]);
+            return EXIT_FAILURE;
+          }
+          lOptLevel = (uint8_t) (argv[i][2] - '0');
+        } break;
+        case 'i':
+          if (argc == i + 1) {
+            cerr << "-i should be followed by a path" << endl;
+            usage(argv[0]);
+            return EXIT_FAILURE;
+          }
+          lWasmPath = argv[i+1];
+          i++;
+          break;
+        case 'd':
+          lDump = true;
+          break;
+        default:
+          cerr << "Can't parse argument: " << argv[i] << endl;
+          usage(argv[0]);
+          return EXIT_FAILURE;
+      }
+    }
+    else {
+      cerr << "Can't parse argument: " << argv[i] << endl;
+      usage(argv[0]);
+      return EXIT_FAILURE;
+    }
+  }
+
+  if (lWasmPath.empty()) {
+    cerr << "wasm path is required" << endl;
+    usage(argv[0]);
+    return EXIT_FAILURE;
   }
 
   profile_step("Args parsing");
 
-  ifstream lModuleHandle(argv[1], ios::binary);
+  cout << "Wasm path: " << lWasmPath;
+  cout << "Opt level: " << lOptLevel;
+
+  ifstream lModuleHandle(lWasmPath, ios::binary);
   if (!lModuleHandle.is_open()) {
-    std::cerr << "can't open module: " << argv[1] << endl;
+    std::cerr << "can't open module: " << lWasmPath.string() << endl;
     return EXIT_FAILURE;
   }
   std::string lModuleBin((istreambuf_iterator<char>(lModuleHandle)),
@@ -205,9 +274,13 @@ int main(int argc, char **argv) {
     module lModule((uint8_t*)lModuleBin.data(), lModuleBin.size());
     profile_step("Module parse");
 
-    lModule.optimize();
-    //lModule.dump_ll(cout);
+    lModule.optimize(lOptLevel);
     profile_step("Module optimize");
+
+    if (lDump) {
+      lModule.dump_ll(cout);
+      profile_step("Module dump");
+    }
 
     context lContext(lModule, lResolvers);
     profile_step("Context initialization");
@@ -225,15 +298,15 @@ int main(int argc, char **argv) {
     }
 
     auto lDataEnd = lContext.get_global<i32>("__data_end");
-    auto lHeapBase = lContext.get_global<i32>("__heap_base");
+    //auto lHeapBase = lContext.get_global<i32>("__heap_base");
     vector<i32> lArgvOffsets;
 
     i32 lDataVMOffset = *lDataEnd;
     uint8_t *lDataHostOffset = vm->data() + lDataVMOffset;
-    uint8_t *lStart = lDataHostOffset;
+    //uint8_t *lStart = lDataHostOffset;
 
     // Add module absolute path as argv[0]
-    string lModuleAbsPath = absolute(argv[1]).string();
+    string lModuleAbsPath = absolute(lWasmPath).string();
     lArgvOffsets.emplace_back(lDataVMOffset);
     memcpy(lDataHostOffset, lModuleAbsPath.data(), lModuleAbsPath.size());
     lDataVMOffset += lModuleAbsPath.size() + 1;
@@ -242,13 +315,11 @@ int main(int argc, char **argv) {
     lDataHostOffset++;
 
     // Add input args as argv[1+i]
-    int lIArgsCount = argc - 2;
-    for (int i = 0; i < lIArgsCount; i++) {
+    for (const auto &lArg : lArgs) {
       lArgvOffsets.emplace_back(lDataVMOffset);
-      size_t lArgSize = strlen(argv[2 + i]);
-      memcpy(lDataHostOffset, argv[2 + i], lArgSize);
-      lDataVMOffset += lArgSize + 1;
-      lDataHostOffset += lArgSize;
+      memcpy(lDataHostOffset, lArg.data(), lArg.size());
+      lDataVMOffset += lArg.size() + 1;
+      lDataHostOffset += lArg.size();
       *lDataHostOffset = '\0';
       lDataHostOffset++;
     }

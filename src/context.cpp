@@ -40,11 +40,21 @@ namespace wembed {
     if (!LLVMTargetHasJIT(lTarget))
       throw std::runtime_error("can't jit on this host");
 
-    LLVMTargetMachineRef lTMachine =
-        LLVMCreateTargetMachine(lTarget, lTriple, "", "",
-                                LLVMCodeGenLevelDefault,
-                                LLVMRelocDefault,
-                                LLVMCodeModelJITDefault);
+    LLVMCodeGenOptLevel lOptLevel;
+    if (pModule.mOptLevel > 3)
+      lOptLevel = LLVMCodeGenLevelAggressive;
+    else {
+      switch (pModule.mOptLevel) {
+        default:
+        case 0: lOptLevel = LLVMCodeGenLevelNone; break;
+        case 1: lOptLevel = LLVMCodeGenLevelLess; break;
+        case 2: lOptLevel = LLVMCodeGenLevelDefault; break;
+        case 3: lOptLevel = LLVMCodeGenLevelAggressive; break;
+      }
+    }
+
+    LLVMTargetMachineRef lTMachine = LLVMCreateTargetMachine(lTarget, lTriple, "", "", lOptLevel, LLVMRelocStatic,
+        LLVMCodeModelJITDefault);
     assert(lTMachine != nullptr);
     LLVMDisposeMessage(lTriple);
 
@@ -166,6 +176,7 @@ namespace wembed {
     profile_step("  context/orc init");
 
     LLVMOrcAddEagerlyCompiledIR(mEngine, &mHandle, pModule.mModule, orc_sym_resolver, this);
+    //LLVMOrcAddLazilyCompiledIR(mEngine, &mHandle, pModule.mModule, orc_sym_resolver, this);
     profile_step("  context/jit");
 
 #if defined(WEMBED_VERBOSE) && 0
