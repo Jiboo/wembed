@@ -4,7 +4,7 @@ dist: xenial
 addons:
   apt:
     packages:
-      - boost
+      - libboost-dev
       - cmake
       - make
       - g++-5
