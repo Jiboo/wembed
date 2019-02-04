@@ -149,4 +149,6 @@ namespace wembed {
   std::ostream &operator<<(std::ostream &pOS, const hrclock::duration &pDur);
   void profile_step(const char *pName);
 
+  void dump_hex(const void* data, size_t size);
+
 }  // namespace wembed

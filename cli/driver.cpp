@@ -21,36 +21,6 @@ using namespace std;
 using namespace std::filesystem;
 using namespace wembed;
 
-// https://gist.github.com/ccbrown/9722406
-void DumpHex(const void* data, size_t size) {
-  char ascii[17];
-  size_t i, j;
-  ascii[16] = '\0';
-  for (i = 0; i < size; ++i) {
-    printf("%02X ", ((unsigned char*)data)[i]);
-    if (((unsigned char*)data)[i] >= ' ' && ((unsigned char*)data)[i] <= '~') {
-      ascii[i % 16] = ((unsigned char*)data)[i];
-    } else {
-      ascii[i % 16] = '.';
-    }
-    if ((i+1) % 8 == 0 || i+1 == size) {
-      printf(" ");
-      if ((i+1) % 16 == 0) {
-        printf("|  %s \n", ascii);
-      } else if (i+1 == size) {
-        ascii[(i+1) % 16] = '\0';
-        if ((i+1) % 16 <= 8) {
-          printf(" ");
-        }
-        for (j = (i+1) % 16; j < 16; ++j) {
-          printf("   ");
-        }
-        printf("|  %s \n", ascii);
-      }
-    }
-  }
-}
-
 memory *vm;
 
 struct iovec32 {
@@ -70,7 +40,7 @@ uint32_t syscall_brk(uint32_t pNewSize) {
 }
 
 i32 syscall_writev(i32 pFd, iovec32 *pVecOffset, uint32_t pVecSize) {
-  //DumpHex(pVecOffset, sizeof(iovec32) * pVecSize);
+  //dump_hex(pVecOffset, sizeof(iovec32) * pVecSize);
   vector<iovec> lTranslatedVec(pVecSize);
   for (int i = 0; i < pVecSize; i++) {
     lTranslatedVec[i].iov_base = vm->data() + pVecOffset[i].mOffset;
@@ -234,9 +204,6 @@ int main(int argc, char **argv) {
 
   profile_step("Args parsing");
 
-  cout << "Wasm path: " << lWasmPath;
-  cout << "Opt level: " << lOptLevel;
-
   ifstream lModuleHandle(lWasmPath, ios::binary);
   if (!lModuleHandle.is_open()) {
     std::cerr << "can't open module: " << lWasmPath.string() << endl;
@@ -329,7 +296,7 @@ int main(int argc, char **argv) {
       *lArgvPtrs++ = lOffset;
     }
 
-    //DumpHex(vm->data() + *lDataEnd, lDataHostOffset - lStart + 4 * lArgvOffsets.size());
+    //dump_hex(vm->data() + *lDataEnd, lDataHostOffset - lStart + 4 * lArgvOffsets.size());
 
     profile_step("Argv construction");
 

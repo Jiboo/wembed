@@ -23,6 +23,8 @@ const unordered_set<string> sBlacklist = {
   // WONT FIX: Text parser related
   "comments",
   "inline-module",
+  // WONT FIX: No use to validate skipped code..
+  "unreached-invalid",
 };
 
 random_device rdevice;
@@ -188,9 +190,14 @@ public:
   }
 
   void parse_tests() {
-    mOutput << "TEST(testsuite," << mTestName << ") {\n"
-            << "  std::unordered_map<std::string_view, context*> declared, registered;\n"
-            << "  auto lSpectestResolver = [](std::string_view pFieldName) -> resolve_result_t {\n"
+    mOutput << "#include <gtest/gtest.h>\n"
+               "#include \"wembed.hpp\"\n"
+               "#include \"test.hpp\"\n\n"
+               "using namespace wembed;\n"
+               "using namespace std::literals::string_literals;\n\n"
+               "TEST(testsuite," << mTestName << ") {\n"
+               "  std::unordered_map<std::string_view, context*> declared, registered;\n"
+               "  auto lSpectestResolver = [](std::string_view pFieldName) -> resolve_result_t {\n"
                "    const static std::unordered_map<std::string_view, resolve_result_t> sSpectestMappings = {\n"
                "      {\"global_i32\",    expose_cglob(&spectest_global_i32)},\n"
                "      {\"global_f32\",    expose_cglob(&spectest_global_f32)},\n"
@@ -732,10 +739,6 @@ int main(int argc,char** argv) {
     cerr << "i/o error: can't open " << argv[2] << std::endl;
     return EXIT_FAILURE;
   }
-  lOutput << "#include <gtest/gtest.h>\n";
-  lOutput << "#include \"wembed.hpp\"\n";
-  lOutput << "#include \"test.hpp\"\n\n";
-  lOutput << "using namespace wembed;\n";
-  lOutput << "using namespace std::literals::string_literals;\n\n";
+
   handle(lInputPath, lOutput);
 }

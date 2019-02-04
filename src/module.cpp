@@ -425,7 +425,7 @@ namespace wembed {
     }
     else {
 #ifdef WEMBED_VERBOSE
-      std::cout << "Ignoring custom section " << pName << std::endl;
+      std::cout << "Ignoring custom section " << pName << " of size " << pInternalSize << std::endl;
 #endif
       mCurrent += pInternalSize;
     }
@@ -1127,9 +1127,6 @@ namespace wembed {
       LLVMValueRef lFunc = mFunctions[lFIndex].mValue;
       LLVMTypeRef lFuncType = LLVMGetElementType(LLVMTypeOf(lFunc));
       LLVMTypeRef lReturnType = LLVMGetReturnType(lFuncType);
-  #ifdef WEMBED_VERBOSE
-      std::cout << "Parsing code for func " << lFIndex << ": " << LLVMGetValueName(lFunc) << ", type " << LLVMPrintTypeToString(lFuncType) << std::endl;
-  #endif
 
       std::vector<LLVMValueRef> lParams(LLVMCountParams(lFunc));
       LLVMGetParams(lFunc, lParams.data());
@@ -1155,6 +1152,13 @@ namespace wembed {
 
       uint32_t lBodySize = parse_uleb128<uint32_t>();
       uint8_t *lBefore = mCurrent;
+
+#ifdef WEMBED_VERBOSE
+      std::cout << "At PC 0x" << std::hex << (mCurrent - lCodeSectionStart) << std::dec
+                << " parsing code for func " << lFIndex << ": " << LLVMGetValueName(lFunc)
+                << ", type " << LLVMPrintTypeToString(lFuncType) << std::endl;
+#endif
+
       uint32_t lGroupCount = parse_uleb128<uint32_t>();
       for (size_t lLocalBlock = 0; lLocalBlock < lGroupCount; lLocalBlock++) {
         uint32_t lLocalsCount = parse_uleb128<uint32_t>();
@@ -1172,7 +1176,7 @@ namespace wembed {
       uint8_t *lEndPos = mCurrent + lCodeSize;
       while (mCurrent < lEndPos && !mCFEntries.empty()) {
   #if defined(WEMBED_VERBOSE) && 0
-        std::cout << "At instruction 0x" << std::hex << (uint32_t)*mCurrent << std::dec
+        std::cout << "At PC 0x" << std::hex << (mCurrent - lCodeSectionStart) << ", instruction 0x" << (uint32_t)*mCurrent << std::dec
                   << ", reachable: " << mCFEntries.back().mReachable
                   << ", depth: " << mUnreachableDepth << std::endl;
   #endif

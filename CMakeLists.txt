@@ -18,6 +18,7 @@ llvm_map_components_to_libnames(LLVM_LIBS
 find_package(Boost)
 include_directories(${Boost_INCLUDE_DIRS})
 
+include_directories(dep)
 add_subdirectory(dep/try_signal)
 include_directories(dep/try_signal)
 
@@ -30,6 +31,9 @@ target_link_libraries(wembed ${LLVM_LIBS})
 
 add_executable(demo demo.cpp)
 target_link_libraries(demo wembed try_signal ${LLVM_LIBS})
+
+#add_executable(debug_proto debug_proto.cpp)
+#target_link_libraries(debug_proto ${LLVM_LIBS})
 
 add_executable(tstgen tst/test_gen.cpp)
 target_link_libraries(tstgen wembed stdc++fs)
@@ -62,8 +66,9 @@ file(GLOB_RECURSE GTESTS_EXTRA_SRC "tst/gtests/**.cpp")
 #set(GTESTS_EXTRA_SRC "")
 
 include_directories(tst/testsuite)
-add_executable(testsuite ${TESTSUITE_SRC} ${TESTSUITE_EXTRA_INC} ${TESTSUITE_EXTRA_SRC} ${GTESTS_EXTRA_SRC})
-target_link_libraries(testsuite gtest wembed try_signal ${LLVM_LIBS} stdc++fs)
+add_executable(gtests ${TESTSUITE_SRC} ${TESTSUITE_EXTRA_INC} ${TESTSUITE_EXTRA_SRC} ${GTESTS_EXTRA_SRC})
+target_link_libraries(gtests gtest wembed try_signal ${LLVM_LIBS} stdc++fs)
+add_test(NAME gtests_test COMMAND gtests)
 
 add_executable(wembed-driver cli/driver.cpp)
 target_link_libraries(wembed-driver wembed try_signal ${LLVM_LIBS} stdc++fs)
@@ -78,14 +83,17 @@ if (NOT "$ENV{WASMCEPTION}" STREQUAL "")
     string(REGEX REPLACE "${WASMCEPTION_PATH}/(.*).c" "\\1" TESTCASE "${TESTCASE_C}")
     set(TESTCASE_WASM "${WASMCEPTION_OUTPUT}/${TESTCASE}.wasm")
     add_custom_command(OUTPUT "${TESTCASE_WASM}"
-        COMMAND $ENV{WASMCEPTION}/dist/bin/clang --sysroot=$ENV{WASMCEPTION}/sysroot/ "${TESTCASE_C}" -Oz -o "${TESTCASE_WASM}" -Wl,--export=main
+        COMMAND $ENV{WASMCEPTION}/dist/bin/clang --sysroot=$ENV{WASMCEPTION}/sysroot/ "${TESTCASE_C}" -O0 -g -o "${TESTCASE_WASM}" -Wl,--export=main
         DEPENDS ${TESTCASE_C}
         )
     set(TESTCASE_TARGET "wasmception_${TESTCASE}")
     set(GEN_TESTCASE_TARGET "gen_${TESTCASE_TARGET}")
-    add_executable(${TESTCASE_TARGET} ${TESTCASE_C})
+    #add_executable(${TESTCASE_TARGET} ${TESTCASE_C})
     add_custom_target(${GEN_TESTCASE_TARGET} DEPENDS ${TESTCASE_WASM})
-    add_dependencies(${TESTCASE_TARGET} ${GEN_TESTCASE_TARGET})
+    #add_dependencies(${TESTCASE_TARGET} ${GEN_TESTCASE_TARGET})
+    add_dependencies(wembed-driver ${GEN_TESTCASE_TARGET})
+    set(TST_TESTCASE_NAME "tst_${TESTCASE_TARGET}")
+    add_test(NAME ${TST_TESTCASE_NAME} COMMAND wembed-driver -i ${TESTCASE_WASM} -O0 -- arg0 arg1 arg2 arg3 arg4 arg5 arg6)
     message(STATUS "Adding wasmception file ${TESTCASE_C} as ${TESTCASE_WASM}")
     list(APPEND WASMCEPTION_MODULES ${TESTCASE_WASM})
   endforeach()

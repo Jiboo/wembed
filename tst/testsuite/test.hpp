@@ -20,8 +20,6 @@ extern wembed::memory spectest_mem;
 extern wembed::table spectest_tab;
 void spectest_reset();
 
-void dump(const void* data, size_t size);
-
 template<typename T>
 wembed::fp_bits<T> fp(const char *p) {
   using bits = typename wembed::fp_bits<T>::bits;

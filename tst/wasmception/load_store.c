@@ -10,12 +10,12 @@ int main(int argc, char** argv) {
     lIArray[i] = rand();
   }
 
-  float lAccumulator = 0;
+  int lAccumulator = 0;
   for (int i = 0; i < lCount; i++) {
     lAccumulator += lIArray[i] + rand();
   }
 
-  printf("%f", lAccumulator);
+  printf("%i", lAccumulator);
 
   return EXIT_SUCCESS;
 }

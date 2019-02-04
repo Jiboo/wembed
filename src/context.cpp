@@ -1,3 +1,5 @@
+#include <llvm-c/ExecutionEngine.h>
+
 #include "try_signal.hpp"
 
 #include "wembed.hpp"
@@ -173,10 +175,12 @@ namespace wembed {
     profile_step("  context/tables");
 
     mEngine = LLVMOrcCreateInstance(lTMachine);
+#ifdef WEMBED_GDB_DEBUG
+    LLVMOrcRegisterJITEventListener(mEngine, LLVMCreateGDBRegistrationListener());
+#endif
     profile_step("  context/orc init");
 
     LLVMOrcAddEagerlyCompiledIR(mEngine, &mHandle, pModule.mModule, orc_sym_resolver, this);
-    //LLVMOrcAddLazilyCompiledIR(mEngine, &mHandle, pModule.mModule, orc_sym_resolver, this);
     profile_step("  context/jit");
 
 #if defined(WEMBED_VERBOSE) && 0
