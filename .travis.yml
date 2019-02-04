@@ -4,11 +4,16 @@ compiler: clang
 
 addons:
   apt:
+    sources:
+      - llvm-toolchain-xenial-7
+      - ubuntu-toolchain-r-test
     packages:
       - cmake
       - make
       - clang-7
-      - libstdc++-7-dev
+      - libllvm7
+      - libc++-7-dev
+      - libc++abi-7-dev
       - libboost-dev
 
 before_script:
