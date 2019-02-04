@@ -25,7 +25,7 @@ before_script:
   - git submodule update --init --recursive
   - mkdir build
   - cd build
-  - cmake ..
+  - cmake -DCMAKE_CXX_FLAGS="-stdlib=libc++" ..
   - make
   - sudo make install
   - cd ../..
@@ -34,6 +34,6 @@ before_script:
   # Generate build script for wembed
   - mkdir build
   - cd build
-  - cmake ..
+  - cmake -DCMAKE_CXX_FLAGS="-stdlib=libc++" ..
 
 script: make && make test
