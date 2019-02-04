@@ -13,27 +13,26 @@ before_script:
   # Download, build, install required dependencies (not included as submodules)
   - git submodule update --init --recursive
   - cd dep
-    # llvm/llvm-project
-    - git clone https://github.com/llvm/llvm-project.git
-    - cd llvm-project
-      - mkdir build
-      - cd build
-        - cmake -DLLVM_ENABLE_PROJECTS='clang;libcxx;libcxxabi;compiler-rt;libunwind' -DLLVM_TARGETS_TO_BUILD=X86 -DCMAKE_BUILD_TYPE=MinSizeRel ../llvm
-        - make -j 4
-        - sudo make install
-        - cd ..
-      - cd ..
-    # WebAssembly/wabt
-    - git clone https://github.com/WebAssembly/wabt.git
-    - cd wabt
-      - mkdir build
-      - cd build
-        - cmake -DCMAKE_C_COMPILER=/usr/local/bin/clang -DCMAKE_CXX_COMPILER=/usr/local/bin/clang++ ..
-        - make
-        - sudo make install
-        - cd ..
-      - cd ..
-    - cd ..
+  # llvm/llvm-project
+  - git clone https://github.com/llvm/llvm-project.git
+  - cd llvm-project
+  - mkdir build
+  - cd build
+  - cmake -DLLVM_ENABLE_PROJECTS='clang;libcxx;libcxxabi;compiler-rt;libunwind' -DLLVM_TARGETS_TO_BUILD=X86 -DCMAKE_BUILD_TYPE=MinSizeRel ../llvm
+  - make -j 4
+  - sudo make install
+  - cd ../..
+  # WebAssembly/wabt
+  - git clone https://github.com/WebAssembly/wabt.git
+  - cd wabt
+  - mkdir build
+  - cd build
+  - cmake -DCMAKE_C_COMPILER=/usr/local/bin/clang -DCMAKE_CXX_COMPILER=/usr/local/bin/clang++ ..
+  - make
+  - sudo make install
+  - cd ../..
+  # Done with dependencies
+  - cd ..
   # Generate build script for wembed
   - mkdir build
   - cd build
