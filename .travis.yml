@@ -21,8 +21,8 @@ before_script:
   - cd dep
   # WebAssembly/wabt
   - git clone https://github.com/WebAssembly/wabt.git
-  - git submodule update --init --recursive
   - cd wabt
+  - git submodule update --init --recursive
   - mkdir build
   - cd build
   - cmake ..
