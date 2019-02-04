@@ -1,27 +1,19 @@
 language: cpp
 dist: xenial
+compiler: clang
 
 addons:
   apt:
     packages:
-      - libboost-dev
       - cmake
       - make
-      - g++-5
+      - clang-7
+      - libstdc++-7-dev
+      - libboost-dev
 
 before_script:
   # Download, build, install required dependencies (not included as submodules)
-  - git submodule update --init --recursive
   - cd dep
-  # llvm/llvm-project
-  - git clone https://github.com/llvm/llvm-project.git
-  - cd llvm-project
-  - mkdir build
-  - cd build
-  - cmake -DLLVM_ENABLE_PROJECTS='clang;libcxx;libcxxabi;compiler-rt;libunwind' -DLLVM_TARGETS_TO_BUILD=X86 -DCMAKE_BUILD_TYPE=MinSizeRel ../llvm
-  - make -j 4
-  - sudo make install
-  - cd ../..
   # WebAssembly/wabt
   - git clone https://github.com/WebAssembly/wabt.git
   - cd wabt
