@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.com/Jiboo/wembed.svg?branch=master)](https://travis-ci.com/Jiboo/wembed)
+
 WASM embedding library using LLVM's Orc JIT.
 
 Usage

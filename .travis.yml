@@ -10,12 +10,22 @@ addons:
     packages:
       - cmake
       - make
-      - g++-8
+      - libstdc++-8-dev
       - clang-8
       - llvm-8-dev
       - libboost-dev
+      - libgtest-dev
 
 before_script:
+  - export CC=clang-8
+  - export CXX=clang++-8
+  # libgtest-dev require compilation
+  - mkdir gtest-build
+  - cd gtest-build
+  - cmake /usr/src/gtest/
+  - make
+  - sudo cp *.a /usr/local/lib
+  - cd ..
   # Download, build, install required dependencies (not included as submodules)
   - cd dep
   # WebAssembly/wabt
@@ -33,6 +43,6 @@ before_script:
   # Generate build script for wembed
   - mkdir build
   - cd build
-  - cmake -DCMAKE_C_COMPILER=clang-8 -DCMAKE_CXX_COMPILER=clang++-8 ..
+  - cmake ..
 
-script: make && make test
+script: make && make test ARGS="-V"
