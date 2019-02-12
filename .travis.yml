@@ -14,6 +14,7 @@ addons:
       - libstdc++-8-dev
       - clang-9
       - llvm-9-dev
+      - llvm-9-tools
       - libboost-dev
       - libgtest-dev
 

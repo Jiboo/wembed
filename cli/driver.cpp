@@ -53,7 +53,7 @@ i32 syscall_ioctl(i32 pFd, uint32_t pRequest, void* pArgp) {
   return ioctl(pFd, pRequest, pArgp);
 }
 
-i32 syscall_madvise(void* pArgp, i32 pSize, uint32_t pAdvice) {
+i32 syscall_madvise(void* pArgp, uint32_t pSize, uint32_t pAdvice) {
   return madvise(pArgp, pSize, pAdvice);
 }
 
@@ -88,7 +88,7 @@ i32 env_syscall3(i32 a, i32 b, i32 c, i32 d) {
   switch(a) {
     case __NR_ioctl: return syscall_ioctl(b, (uint32_t)c, (void*)(vm->data() + c));
     case __NR_writev: return syscall_writev(b, (iovec32*)(vm->data() + c), (uint32_t)d);
-    case __NR_madvise: return syscall_madvise((iovec32*)(vm->data() + b), c, d);
+    case __NR_madvise: return syscall_madvise((iovec32*)(vm->data() + b), (uint32_t)c, (uint32_t)d);
     default:
       cerr << "unimplemented syscall3 " << a << endl;
       return -1;
