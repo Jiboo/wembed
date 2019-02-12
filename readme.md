@@ -29,12 +29,13 @@ Out of scope
 - Any post-MVP feature below phase 4
 - wasm64
 
-Building dependencies
+Dependencies
 ---------------------
 
 - LLVM libraries (8+)
 - boost (endian and functional)
-- wabt (used to generate wasm binaries from testsuite text)
 
-Optional:
+Optional (required for tests):
+- google-test (unittests and running testsuite)
+- wabt (used to generate wasm binaries from testsuite text)
 - wasmception (used to generate wasm32 from some C test cases)

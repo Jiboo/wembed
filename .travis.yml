@@ -5,20 +5,21 @@ compiler: clang
 addons:
   apt:
     sources:
-      - llvm-toolchain-xenial-8
+      - sourceline: 'deb http://apt.llvm.org/trusty/ llvm-toolchain-trusty main'
+        key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
       - ubuntu-toolchain-r-test
     packages:
       - cmake
       - make
       - libstdc++-8-dev
-      - clang-8
-      - llvm-8-dev
+      - clang-9
+      - llvm-9-dev
       - libboost-dev
       - libgtest-dev
 
 before_script:
-  - export CC=clang-8
-  - export CXX=clang++-8
+  - export CC=clang-9
+  - export CXX=clang++-9
   # libgtest-dev require compilation
   - mkdir gtest-build
   - cd gtest-build
