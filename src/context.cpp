@@ -67,14 +67,23 @@ namespace wembed {
     mSymbols.emplace("wembed.throw.vm_exception", (void*)&wembed::intrinsics::throw_vm_exception);
     mSymbols.emplace("wembed.ctxRef", (void*)this);
 
-    mSymbols.emplace("floorf", (void*)&floorf);
-    mSymbols.emplace("floor", (void*)&floor);
-    mSymbols.emplace("truncf", (void*)&truncf);
-    mSymbols.emplace("trunc", (void*)&trunc);
-    mSymbols.emplace("nearbyintf", (void*)&nearbyintf);
-    mSymbols.emplace("nearbyint", (void*)&nearbyint);
-    mSymbols.emplace("ceilf", (void*)&ceilf);
-    mSymbols.emplace("ceil", (void*)&ceil);
+    float(*sCeil32)(float) = &ceilf;
+    double(*sCeil64)(double) = &ceil;
+    float(*sFloor32)(float) = &floorf;
+    double(*sFloor64)(double) = &floor;
+    float(*sTrunc32)(float) = &truncf;
+    double(*sTrunc64)(double) = &trunc;
+    float(*sNearByInt32)(float) = &nearbyintf;
+    double(*sNearByInt64)(double) = &nearbyint;
+
+    mSymbols.emplace("floorf", (void*)sFloor32);
+    mSymbols.emplace("floor", (void*)sFloor64);
+    mSymbols.emplace("truncf", (void*)sTrunc32);
+    mSymbols.emplace("trunc", (void*)sTrunc64);
+    mSymbols.emplace("nearbyintf", (void*)sNearByInt32);
+    mSymbols.emplace("nearbyint", (void*)sNearByInt64);
+    mSymbols.emplace("ceilf", (void*)sCeil32);
+    mSymbols.emplace("ceil", (void*)sCeil64);
 
     mSymbols.emplace("memcpy", (void*)&memcpy);
 
