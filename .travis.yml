@@ -5,15 +5,15 @@ compiler: clang
 addons:
   apt:
     sources:
-      - llvm-toolchain-xenial-7
+      - llvm-toolchain-xenial-8
       - ubuntu-toolchain-r-test
     packages:
       - cmake
       - make
-      - clang-7
-      - llvm-7-dev
-      - libc++-7-dev
-      - libc++abi-7-dev
+      - clang-8
+      - llvm-8-dev
+      - libc++-8-dev
+      - libc++abi-8-dev
       - libboost-dev
 
 before_script:
