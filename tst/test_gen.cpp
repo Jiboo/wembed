@@ -740,5 +740,6 @@ int main(int argc,char** argv) {
     return EXIT_FAILURE;
   }
 
+  wembed::llvm_init();
   handle(lInputPath, lOutput);
 }

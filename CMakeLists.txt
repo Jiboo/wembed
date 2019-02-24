@@ -35,7 +35,7 @@ add_executable(wembed-driver cli/driver.cpp)
 target_link_libraries(wembed-driver wembed try_signal ${LLVM_LIBS} stdc++fs)
 
 add_executable(demo demo.cpp)
-target_link_libraries(demo wembed try_signal ${LLVM_LIBS})
+target_link_libraries(demo wembed try_signal ${LLVM_LIBS} stdc++fs)
 
 if (GTEST_FOUND)
   message(STATUS "Found GTest ${GTEST_LIBRARIES}")

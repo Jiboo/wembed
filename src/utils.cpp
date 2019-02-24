@@ -63,7 +63,7 @@ void wembed::profile_step(const char *pName) {
 }
 
 // https://gist.github.com/ccbrown/9722406
-void dump_hex(const void* data, size_t size) {
+void wembed::dump_hex(const void* data, size_t size) {
   char ascii[17];
   size_t i, j;
   ascii[16] = '\0';

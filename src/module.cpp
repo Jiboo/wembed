@@ -1,23 +1,26 @@
+#include <filesystem>
 #include <sstream>
+#include <stack>
 
 #include <llvm-c/Analysis.h>
+#include <llvm-c/DebugInfo.h>
 #include <llvm-c/Transforms/AggressiveInstCombine.h>
 #include <llvm-c/Transforms/InstCombine.h>
 #include <llvm-c/Transforms/IPO.h>
 #include <llvm-c/Transforms/Scalar.h>
 #include <llvm-c/Transforms/Utils.h>
 #include <llvm-c/Transforms/Vectorize.h>
-#include <wembed/module.hpp>
 
 #include "wembed.hpp"
 
 #ifdef WEMBED_VERBOSE
 #include <iostream>
+#include <iomanip>
 #endif
 
 namespace wembed {
 
-  module::module(uint8_t *pInput, size_t pLen) {
+  module::module(uint8_t *pInput, size_t pLen, bool pDebugSupport) : mDebugSupport(pDebugSupport) {
     profile_step("  module/ctr");
     if (pInput == nullptr || pLen < 4)
       throw malformed_exception("invalid input");
@@ -38,6 +41,19 @@ namespace wembed {
     mStartUser = LLVMAppendBasicBlock(mStartFunc, "callStart");
     LLVMPositionBuilderAtEnd(mBuilder, mStartInit);
     init_intrinsics();
+
+    char *lTriple = LLVMGetDefaultTargetTriple();
+    LLVMTargetRef lTarget;
+    if (LLVMGetTargetFromTriple(lTriple, &lTarget, nullptr))
+      throw std::runtime_error("can't get triple for host");
+    LLVMTargetMachineRef lTMachine = LLVMCreateTargetMachine(lTarget, lTriple, "", "", LLVMCodeGenLevelNone, LLVMRelocStatic, LLVMCodeModelJITDefault);
+    LLVMTargetDataRef lDataLayoutRef = LLVMCreateTargetDataLayout(lTMachine);
+    LLVMSetModuleDataLayout(mModule, lDataLayoutRef);
+    LLVMDisposeTargetData(lDataLayoutRef);
+    LLVMSetTarget(mModule, lTriple);
+    LLVMDisposeMessage(lTriple);
+    LLVMDisposeTargetMachine(lTMachine);
+
     profile_step("  module/init");
 
     switch(parse<uint32_t>()) { // version
@@ -61,6 +77,11 @@ namespace wembed {
       lFunc.retreiveName();
 
     profile_step("  module/rename");
+
+    if (pDebugSupport)
+      parse_debug_infos();
+
+    profile_step("  module/debug");
 
     // finish __wstart
     LLVMPositionBuilderAtEnd(mBuilder, mStartInit);
@@ -133,9 +154,10 @@ namespace wembed {
     return lVal;
   }
 
-  void module::push(LLVMValueRef lVal) {
-    assert(lVal);
-    mEvalStack.emplace_back(lVal);
+  LLVMValueRef module::push(LLVMValueRef pVal) {
+    assert(pVal);
+    mEvalStack.emplace_back(pVal);
+    return pVal;
   }
 
   LLVMValueRef module::pop() {
@@ -394,6 +416,7 @@ namespace wembed {
           size_t lNameSizeBytes = mCurrent - lBefore;
           std::string_view lName = parse_str(lNameSize);
           size_t lInternalSize = lPayloadSize - lNameSizeBytes - lName.size();
+          mCustomSections[lName] = {mCurrent, lInternalSize};
           parse_custom_section(lName, lInternalSize);
         } break;
         case 1: parse_types(); break;
@@ -424,10 +447,11 @@ namespace wembed {
       mCurrent += pInternalSize;
     }
     else {
-#ifdef WEMBED_VERBOSE
-      std::cout << "Ignoring custom section " << pName << " of size " << pInternalSize << std::endl;
-#endif
       mCurrent += pInternalSize;
+#ifdef WEMBED_VERBOSE
+      if (!mDebugSupport || (mDebugSupport && pName.substr(0, strlen(".debug_")) != ".debug_"))
+        std::cout << "Ignoring custom section " << pName << " of size " << pInternalSize << std::endl;
+#endif
     }
   }
 
@@ -461,6 +485,791 @@ namespace wembed {
         } break;
       }
     }
+  }
+
+  module::Section module::get_custom_section(const std::string_view &pName) {
+    auto it = mCustomSections.find(pName);
+    if (it == mCustomSections.end())
+      return {nullptr, 0};
+    return it->second;
+  }
+
+  std::string_view module::get_debug_string(size_t pOffset) {
+    return std::string_view((char*)mDebugStrSection.mStart + pOffset);
+  }
+
+  LLVMMetadataRef module::get_debug_rel_file(LLVMDIBuilderRef pDIBuilder, const std::string_view &pFile, const std::string_view &pPath) {
+    auto lAbsPath = std::filesystem::path(pPath) / pFile;
+    auto lDir = lAbsPath.parent_path().string();
+    auto lFilename = lAbsPath.filename().string();
+    LLVMMetadataRef lRef = LLVMDIBuilderCreateFile(pDIBuilder, lFilename.data(), lFilename.size(),
+                                                   lDir.data(), lDir.size());
+    return lRef;
+  }
+
+  LLVMMetadataRef module::get_debug_abs_file(LLVMDIBuilderRef pDIBuilder, const std::string_view &pAbsPath) {
+    // FIXME This is bugged if pAbsPath is a URI
+    auto lAbsPath = std::filesystem::path(pAbsPath);
+    auto lDir = lAbsPath.parent_path().string();
+    auto lFilename = lAbsPath.filename().string();
+    LLVMMetadataRef lRef = LLVMDIBuilderCreateFile(pDIBuilder, lFilename.data(), lFilename.size(),
+                                                   lDir.data(), lDir.size());
+    return lRef;
+  }
+
+  void module::parse_debug_infos() {
+    using namespace llvm::dwarf;
+    // As debug infos are not in dependency order (for example debug_info needs debug_abbrev)
+    // We defer parsing here, after parsing the module
+
+    mDbgKind = LLVMGetMDKindID("dbg", 3);
+    mDebugStrSection = get_custom_section(".debug_str");
+    parse_debug_abbrev_entries();
+    parse_debug_lines();
+
+    LLVMValueRef lDIVersionValue = LLVMConstInt(LLVMInt32Type(), LLVMDebugMetadataVersion(), false);
+    LLVMMetadataRef lDIVersionMD = LLVMValueAsMetadata(lDIVersionValue);
+    LLVMAddModuleFlag(mModule, LLVMModuleFlagBehaviorWarning,
+        "Debug Info Version", strlen("Debug Info Version"), lDIVersionMD);
+
+    LLVMValueRef lDwarfVersionValue = LLVMConstInt(LLVMInt32Type(), 4, false);
+    LLVMMetadataRef lDwarfVersionMD = LLVMValueAsMetadata(lDwarfVersionValue);
+    LLVMAddModuleFlag(mModule, LLVMModuleFlagBehaviorWarning,
+                      "Dwarf Version", strlen("Dwarf Version"), lDwarfVersionMD);
+
+    Section lDebugInfo = get_custom_section(".debug_info");
+    uint8_t *lDebugInfoStart = lDebugInfo.mStart;
+    uint8_t *lDebugInfoEnd = lDebugInfoStart + lDebugInfo.mSize;
+    uint8_t *lPointer = lDebugInfoStart;
+    while (lPointer < lDebugInfoEnd) {
+      uint8_t *lSectionStart = lPointer;
+      ptrdiff_t lSectionOffset = lSectionStart - lDebugInfoStart;
+      uint32_t lSectionSize = parse<uint32_t>(lPointer);
+      uint8_t *lSectionEnd = lPointer + lSectionSize;
+      uint16_t lDwarfVersion = parse<uint16_t>(lPointer);
+      uint32_t lAbbrevOffset = parse<uint32_t>(lPointer);
+      AbbrevDecls &lAbbrevDecls = mParsedAbbrevs[lAbbrevOffset];
+      uint8_t lAddrSize = *lPointer++;
+
+      /*std::cout << (void*)(lSectionOffset) << ": Compile Unit: length = "
+                << lSectionSize << " version = " << lDwarfVersion << " abbr_offset = " << lAbbrevOffset
+                << " addr_size = " << (unsigned)lAddrSize << std::endl;*/
+
+      // Expect 32bit debug info, and DWARF4
+      if (lAddrSize != 4 || lDwarfVersion != 4)
+        return;
+
+      std::stack<DIE*> lHierarchy;
+
+      while (lPointer < lSectionEnd) {
+        uint8_t *lDieStart = lPointer;
+        size_t lAbbrevCode = parse_uleb128<size_t>(lPointer);
+        AbbrevDecl &lDecl = lAbbrevDecls[lAbbrevCode];
+        DIE lCurrent;
+        lCurrent.mTag = lDecl.mTag;
+        lCurrent.mOffset = lDieStart - lDebugInfoStart;
+
+        /*std::cout << (void*)(lDieStart - lDebugInfoStart) << ": " << TagString(lDecl.mTag).data() << " "
+                  << ChildrenString((unsigned)lDecl.mHasChild).data() << std::endl;*/
+
+        for (const auto &lAttr : lDecl.mAttributes) {
+          /*std::cout << "\t" << AttributeString(lAttr.mAttribute).data() << "\t"
+                    << FormEncodingString(lAttr.mForm).data() << "\t";*/
+          switch (lAttr.mForm) {
+            case DW_FORM_addr: lCurrent.mAttributes[lAttr.mAttribute] = parse<uint32_t>(lPointer); break;
+            case DW_FORM_block1: {
+              uint8_t lSize = parse<uint8_t>(lPointer);
+              std::string_view lData((char*)lPointer, lSize);
+              lPointer += lSize;
+              lCurrent.mAttributes[lAttr.mAttribute] = lData;
+            } break;
+            case DW_FORM_block2: {
+              uint16_t lSize = parse<uint16_t>(lPointer);
+              std::string_view lData((char*)lPointer, lSize);
+              lPointer += lSize;
+              lCurrent.mAttributes[lAttr.mAttribute] = lData;
+            } break;
+            case DW_FORM_block4: {
+              uint32_t lSize = parse<uint32_t>(lPointer);
+              std::string_view lData((char*)lPointer, lSize);
+              lPointer += lSize;
+              lCurrent.mAttributes[lAttr.mAttribute] = lData;
+            } break;
+            case DW_FORM_block: {
+              uint64_t lSize = parse_uleb128<uint64_t>(lPointer);
+              std::string_view lData((char*)lPointer, lSize);
+              lPointer += lSize;
+              lCurrent.mAttributes[lAttr.mAttribute] = lData;
+            } break;
+            case DW_FORM_data1: lCurrent.mAttributes[lAttr.mAttribute] = parse<uint8_t>(lPointer); break;
+            case DW_FORM_data2: lCurrent.mAttributes[lAttr.mAttribute] = parse<uint16_t>(lPointer); break;
+            case DW_FORM_data4: lCurrent.mAttributes[lAttr.mAttribute] = parse<uint32_t>(lPointer); break;
+            case DW_FORM_data8: lCurrent.mAttributes[lAttr.mAttribute] = parse<uint64_t>(lPointer); break;
+            case DW_FORM_sdata: lCurrent.mAttributes[lAttr.mAttribute] = parse_sleb128<int64_t>(lPointer); break;
+            case DW_FORM_udata: lCurrent.mAttributes[lAttr.mAttribute] = parse_uleb128<uint64_t>(lPointer); break;
+            case DW_FORM_exprloc: {
+              // FIXME Can't find in doc what's the type of the first byte in expressions
+              uint64_t lSize = parse_uleb128<uint64_t>(lPointer);
+              std::string_view lExpr((char*)lPointer, lSize);
+              lPointer += lSize;
+              lCurrent.mAttributes[lAttr.mAttribute] = lExpr;
+            } break;
+            case DW_FORM_flag: lCurrent.mAttributes[lAttr.mAttribute] = parse<uint8_t>(lPointer); break;
+            case DW_FORM_flag_present: lCurrent.mAttributes[lAttr.mAttribute] = 1; break;
+            case DW_FORM_sec_offset: lCurrent.mAttributes[lAttr.mAttribute] = parse<uint32_t>(lPointer); break;
+            case DW_FORM_ref1: lCurrent.mAttributes[lAttr.mAttribute] = lSectionOffset + parse<uint8_t>(lPointer); break;
+            case DW_FORM_ref2: lCurrent.mAttributes[lAttr.mAttribute] = lSectionOffset + parse<uint16_t>(lPointer); break;
+            case DW_FORM_ref4: lCurrent.mAttributes[lAttr.mAttribute] = lSectionOffset + parse<uint32_t>(lPointer); break;
+            case DW_FORM_ref8: lCurrent.mAttributes[lAttr.mAttribute] = lSectionOffset + parse<uint64_t>(lPointer); break;
+            case DW_FORM_ref_udata: lCurrent.mAttributes[lAttr.mAttribute] = lSectionOffset + parse_uleb128<uint64_t>(lPointer); break;
+            case DW_FORM_ref_addr: lCurrent.mAttributes[lAttr.mAttribute] = parse<uint32_t>(lPointer); break;
+            case DW_FORM_string: {
+              std::string_view lString((char*)lPointer);
+              lPointer += lString.size() + 1;
+              lCurrent.mAttributes[lAttr.mAttribute] = lString;
+            } break;
+            case DW_FORM_strp: {
+              auto lString = get_debug_string(parse<uint32_t>(lPointer));
+              lCurrent.mAttributes[lAttr.mAttribute] = lString;
+            } break;
+            default:
+              throw std::runtime_error(std::string("unknown form type ") + FormEncodingString(lAttr.mForm).data());
+          }
+          /*if (std::holds_alternative<std::string_view>(lCurrent.mAttributes[lAttr.mAttribute]))
+            std::cout << std::get<std::string_view>(lCurrent.mAttributes[lAttr.mAttribute]);
+          else
+            std::cout << std::hex << std::get<uint64_t>(lCurrent.mAttributes[lAttr.mAttribute]) << std::dec;
+          std::cout << std::endl;*/
+        }
+
+        DIE *lCurentPtr;
+        if (lDecl.mTag == DW_TAG_null) {
+          lHierarchy.pop();
+        }
+        else {
+          if (!lHierarchy.empty()) {
+            lCurrent.mParent = lHierarchy.top();
+            lCurentPtr = &lHierarchy.top()->mChildren.emplace_back(lCurrent);
+          }
+          else {
+            lCurrent.mParent = nullptr;
+            lCurentPtr = &mParsedDI.emplace_back(lCurrent);
+          }
+          mDIOffsetCache[lCurrent.mOffset] = lCurentPtr;
+          if (lDecl.mHasChild)
+            lHierarchy.push(lCurentPtr);
+        }
+      }
+    }
+
+    for (auto &lDIE : mParsedDI) {
+      LLVMDIBuilderRef lDIBuilder = LLVMCreateDIBuilder(mModule);
+      apply_die_metadata(lDIBuilder, lDIE);
+      LLVMDIBuilderFinalize(lDIBuilder);
+      LLVMDisposeDIBuilder(lDIBuilder);
+    }
+
+  }
+
+  void module::parse_debug_abbrev_entries() {
+    using namespace llvm::dwarf;
+    Section lSection = get_custom_section(".debug_abbrev");
+    uint8_t *lPointer = lSection.mStart;
+    uint8_t *lEnd = lPointer + lSection.mSize;
+    while (lPointer < lEnd) {
+      ptrdiff_t lOffset = lPointer - lSection.mStart;
+      //std::cout << "Abbrev table for offset: 0x" << std::hex << lOffset << std::dec << std::endl;
+      AbbrevDecls lDecls;
+      while (true) {
+        AbbrevDecl lDecl;
+        size_t lCode = parse_uleb128<size_t>(lPointer);
+        if (lCode == 0)
+          break;
+        lDecl.mTag = (Tag)parse_uleb128<uint16_t>(lPointer);
+        lDecl.mHasChild = *lPointer++ == DW_CHILDREN_yes;
+        //std::cout << "[" << lCode << "] " << TagString(lDecl.mTag).data() << " " << ChildrenString((unsigned)lDecl.mHasChild).data() << std::endl;
+        while (true) {
+          AbbrevAttr lAttr;
+          lAttr.mAttribute = (Attribute)parse_uleb128<uint16_t>(lPointer);
+          lAttr.mForm = (Form)parse_uleb128<uint16_t>(lPointer);
+          if (lAttr.mAttribute == 0 && lAttr.mForm == 0)
+            break;
+          //std::cout << "\t" << AttributeString(lAttr.mAttribute).data() << "\t" << FormEncodingString(lAttr.mForm).data() << std::endl;
+          lDecl.mAttributes.emplace_back(lAttr);
+        }
+        lDecls[lCode] = lDecl;
+      }
+      mParsedAbbrevs[lOffset] = lDecls;
+    }
+  }
+
+  void module::LineContext::append_row(const LineState &pState) {
+    /*std::cout << std::setw(10) << reinterpret_cast<void*>(pState.mAddress)
+              << "\t" << std::setw(6) << pState.mLine
+              << "\t" << std::setw(6) << pState.mColumn
+              << "\t" << std::setw(6) << pState.mFile
+              << "\t" << std::setw(3) << pState.mISA
+              << "\t" << std::setw(13) << pState.mDiscriminator << "\t";
+    if (pState.mIsStmt) std::cout << "is ";
+    if (pState.mBasicBlock) std::cout << "bb ";
+    if (pState.mEndSequence) std::cout << "es ";
+    if (pState.mEpilogueBeg) std::cout << "eb ";
+    if (pState.mPrologueEnd) std::cout << "pe ";
+    std::cout << std::endl;*/
+
+    LineItem lItem;
+    lItem.mAddress = pState.mAddress;
+    lItem.mFile = pState.mFile - 1;
+    lItem.mLine = pState.mLine;
+    lItem.mColumn = pState.mColumn;
+
+    mCurrentBuffer.emplace_back(lItem);
+
+    if (pState.mEndSequence) {
+      LineSequence lSequence;
+      lSequence.mStartAddress = mCurrentBuffer.front().mAddress;
+      lSequence.mEndAddress = mCurrentBuffer.back().mAddress;
+      lSequence.mLines = std::move(mCurrentBuffer);
+      mSequences.push_back(lSequence);
+    }
+  }
+
+  module::LineSequence &module::LineContext::find_sequence(uint32_t pStart, uint32_t pEnd) {
+    for (auto &lSequence : mSequences) {
+      if (lSequence.mStartAddress == pStart && lSequence.mEndAddress == pEnd)
+        return lSequence;
+    }
+    throw std::runtime_error("can't find inst sequence");
+  }
+
+  LLVMValueRef module::find_func_by_range(uint32_t pStart, uint32_t pEnd) {
+    for (auto &lFuncRange : mFuncRanges) {
+      if (lFuncRange.mStartAddress == pStart && lFuncRange.mEndAddress == pEnd)
+        return lFuncRange.mFunc;
+    }
+    return nullptr;
+  }
+
+  void module::parse_debug_lines() {
+    using namespace llvm::dwarf;
+    Section lSection = get_custom_section(".debug_line");
+    uint8_t *lPointer = lSection.mStart;
+    uint8_t *lEnd = lPointer + lSection.mSize;
+
+    while (lPointer < lEnd) {
+      LineContext lContext;
+      LineState lState;
+      uint32_t lSectionStart = lPointer - lSection.mStart;
+      //std::cout << "debug_line " << (void*)(lSectionStart) << std::endl;
+      uint32_t lSectionSize = parse<uint32_t>(lPointer);
+      uint8_t *lSectionEnd = lPointer + lSectionSize;
+      /*uint16_t lDwarfVersion =*/ parse<uint16_t>(lPointer);
+      /*uint32_t lHeaderSize =*/ parse<uint32_t>(lPointer);
+      uint8_t lMinInstrLength = *lPointer++;
+      uint8_t lMaxInstrLength = *lPointer++;
+      uint8_t lDefaultIsStmt = *lPointer++;
+      lState.reset(lDefaultIsStmt);
+      int8_t lLineBase = *lPointer++;
+      int8_t lLineRange = *lPointer++;
+      uint8_t lOpcodeBase = *lPointer++;
+      std::string_view lOpcodeLengths((char*)lPointer, lOpcodeBase - 1);
+      lPointer += lOpcodeLengths.size();
+      while (true) {
+        std::string_view lIncludeDir((char*)lPointer);
+        lPointer += lIncludeDir.size() + 1;
+        if (lIncludeDir.empty())
+          break;
+        lContext.mDirectories.emplace_back(lIncludeDir);
+      }
+      while (true) {
+        LineFileEntry lFile;
+        std::string_view lFileName((char*)lPointer);
+        lPointer += lFileName.size() + 1;
+        if (lFileName.empty())
+          break;
+        lFile.mFilename = lFileName;
+        lFile.mDirectory = parse_uleb128<uint64_t>(lPointer);
+        lFile.mLastModification = parse_uleb128<uint64_t>(lPointer);
+        lFile.mByteSize = parse_uleb128<uint64_t>(lPointer);
+        lContext.mFiles.emplace_back(lFile);
+      }
+      while (lPointer < lSectionEnd) {
+        LineNumberOps lOpcode = (LineNumberOps)*lPointer++;
+        if (lOpcode < lOpcodeBase) {
+          //std::cout << LNStandardString(lOpcode).data() << std::endl;
+          switch (lOpcode) {
+            case DW_LNS_copy: {
+              lContext.append_row(lState);
+              lState.mDiscriminator = 0;
+              lState.mBasicBlock = false;
+              lState.mPrologueEnd = false;
+              lState.mEpilogueBeg = false;
+            } break;
+            case DW_LNS_const_add_pc: {
+              uint8_t lAdjustedOp = (uint8_t)255 - lOpcodeBase;
+              uint32_t lAdvanceOp = lAdjustedOp / lLineRange;
+              lState.mAddress += lMinInstrLength * ((lState.mOpIndex + lAdvanceOp) / lMaxInstrLength);
+              lState.mOpIndex = (lState.mOpIndex + lAdvanceOp) % lMaxInstrLength;
+            } break;
+            case DW_LNS_fixed_advance_pc: {
+              lState.mAddress += parse_uleb128<uint16_t>(lPointer);
+              lState.mOpIndex = 0;
+            } break;
+            case DW_LNS_advance_pc: lState.mAddress += parse_uleb128<uint32_t>(lPointer) * lMinInstrLength; break;
+            case DW_LNS_advance_line: lState.mLine += parse_sleb128<int32_t>(lPointer); break;
+            case DW_LNS_set_file: lState.mFile = parse_uleb128<uint32_t>(lPointer); break;
+            case DW_LNS_set_column: lState.mColumn = parse_uleb128<uint32_t>(lPointer); break;
+            case DW_LNS_negate_stmt: lState.mIsStmt = !lState.mIsStmt; break;
+            case DW_LNS_set_basic_block: lState.mBasicBlock = true; break;
+            case DW_LNS_set_prologue_end: lState.mPrologueEnd = true; break;
+            case DW_LNS_set_epilogue_begin: lState.mEpilogueBeg = true; break;
+            case DW_LNS_set_isa: lState.mISA = parse_uleb128<uint32_t>(lPointer); break;
+
+            case DW_LNS_extended_op: {
+              uint64_t lExtendedOpcodeSize = parse_uleb128<uint64_t>(lPointer);
+              LineNumberExtendedOps lExtendedOpcode = (LineNumberExtendedOps)*lPointer++;
+              //std::cout << LNExtendedString(lExtendedOpcode).data() << std::endl;
+              switch (lExtendedOpcode) {
+                case DW_LNE_end_sequence: {
+                  lState.mEndSequence = true;
+                  lContext.append_row(lState);
+                  lState.reset(lDefaultIsStmt);
+                } break;
+                case DW_LNE_set_address: {
+                  lState.mAddress = parse<uint32_t>(lPointer);
+                  lState.mOpIndex = 0;
+                } break;
+                case DW_LNE_define_file: {
+                  LineFileEntry lFile;
+                  std::string_view lFileName((char*)lPointer);
+                  lPointer += lFileName.size() + 1;
+                  lFile.mFilename = lFileName;
+                  lFile.mDirectory = parse_uleb128<uint64_t>(lPointer);
+                  lFile.mLastModification = parse_uleb128<uint64_t>(lPointer);
+                  lFile.mByteSize = parse_uleb128<uint64_t>(lPointer);
+                  lContext.mFiles.emplace_back(lFile);
+                } break;
+                case DW_LNE_set_discriminator: {
+                  lState.mDiscriminator = parse_uleb128<uint32_t>(lPointer);
+                } break;
+                default:
+                  lPointer += lExtendedOpcodeSize;
+                  break;
+              }
+            } break;
+          }
+        }
+        else {
+          uint8_t lAdjustedOp = lOpcode - lOpcodeBase;
+          //std::cout << "Special Opcode: " << (unsigned)lAdjustedOp << std::endl;
+          uint32_t lAdvanceOp = lAdjustedOp / lLineRange;
+          lState.mAddress += lMinInstrLength * ((lState.mOpIndex + lAdvanceOp) / lMaxInstrLength);
+          lState.mOpIndex = (lState.mOpIndex + lAdvanceOp) % lMaxInstrLength;
+          lState.mLine += lLineBase + (lAdjustedOp % lLineRange);
+          lContext.append_row(lState);
+          lState.mBasicBlock = false;
+          lState.mPrologueEnd = false;
+          lState.mEpilogueBeg = false;
+          lState.mDiscriminator = 0;
+        }
+      }
+      mParsedLines[lSectionStart] = lContext;
+    }
+  }
+
+  void module::LineState::reset(bool pDefaultIsStmt) {
+    mAddress = 0;
+    mOpIndex = 0;
+    mFile = 1;
+    mLine = 1;
+    mColumn = 0;
+    mIsStmt = pDefaultIsStmt;
+    mBasicBlock = false;
+    mEndSequence = false;
+    mPrologueEnd = false;
+    mEpilogueBeg = false;
+    mISA = 0;
+    mDiscriminator = 0;
+  }
+
+  std::vector<module::DIE*> module::DIE::children(llvm::dwarf::Tag pTag) {
+    std::vector<module::DIE*> lResult;
+    for (auto &lChild : mChildren) {
+      if (lChild.mTag == pTag)
+        lResult.push_back(&lChild);
+    }
+    return lResult;
+  }
+
+  module::DIE* module::DIE::parent(llvm::dwarf::Tag pTag) {
+    DIE *lCurrent = this;
+    while (lCurrent != nullptr) {
+      if (lCurrent->mTag == pTag)
+        break;
+      lCurrent = lCurrent->mParent;
+    }
+    return lCurrent;
+  }
+
+  LLVMMetadataRef module::get_debug_file(LLVMDIBuilderRef pDIBuilder, DIE *pContext, uint64_t pIndex) {
+    using namespace llvm::dwarf;
+    if (pIndex == 0)
+      return nullptr;
+    auto lCU = pContext->parent(DW_TAG_compile_unit);
+    uint64_t lLinesOffset = lCU->attr<uint64_t>(DW_AT_stmt_list, -1);
+    assert(lLinesOffset != -1);
+    auto lContext = mParsedLines.find(lLinesOffset);
+    assert(lContext != mParsedLines.end());
+    const auto &lFile = lContext->second.mFiles[pIndex - 1];
+    return get_debug_rel_file(pDIBuilder, lFile.mFilename, lContext->second.mDirectories[lFile.mDirectory - 1]);
+  }
+
+  void module::apply_die_metadata_on_child(LLVMDIBuilderRef pDIBuilder, DIE &pDIE) {
+    for (DIE &pChild : pDIE.mChildren) {
+      auto lAlreadyEvaluating = mEvaluatingDIE.find(&pChild);
+      if (lAlreadyEvaluating == mEvaluatingDIE.end())
+        apply_die_metadata(pDIBuilder, pChild);
+    }
+  }
+
+  void module::apply_die_metadata(LLVMDIBuilderRef pDIBuilder, DIE &pDIE) {
+    using namespace llvm::dwarf;
+    if (pDIE.mMetadata != nullptr)
+      return;
+
+    mEvaluatingDIE.emplace(&pDIE);
+
+    auto lType = pDIE.attr<uint64_t>(DW_AT_type);
+    if (lType) {
+      auto lTypeDie = mDIOffsetCache.find(lType);
+      assert(lTypeDie != mDIOffsetCache.end());
+      apply_die_metadata(pDIBuilder, *lTypeDie->second);
+    }
+
+    switch (pDIE.mTag) {
+      case DW_TAG_base_type: {
+        auto lByteSize = pDIE.attr<uint64_t>(DW_AT_byte_size);
+        auto lName = pDIE.attr<std::string_view>(DW_AT_name);
+        auto lEncoding = pDIE.attr<uint64_t>(DW_AT_encoding);
+
+        pDIE.mMetadata = LLVMDIBuilderCreateBasicType(pDIBuilder, lName.data(), lName.size(),
+            lByteSize * 8, (LLVMDWARFTypeEncoding)lEncoding, LLVMDIFlagZero);
+      } break;
+      case DW_TAG_pointer_type: {
+        LLVMMetadataRef lPointee = nullptr;
+        std::string lName;
+        if (lType) {
+          auto lTypeDie = mDIOffsetCache.find(lType);
+          if (lTypeDie == mDIOffsetCache.end()) break;
+          lPointee = lTypeDie->second->mMetadata;
+        }
+        if (lPointee != nullptr) {
+          size_t lPointeeNameLength;
+          const char *lPointeeName = LLVMDITypeGetName(lPointee, &lPointeeNameLength);
+          lName = std::string(lPointeeName, lPointeeNameLength);
+          lName += '*';
+        }
+        else {
+          lName = "void*";
+        }
+
+        pDIE.mMetadata = LLVMDIBuilderCreatePointerType(pDIBuilder, lPointee, 32, 32, 0, lName.data(), lName.size());
+      } break;
+      case DW_TAG_typedef: {
+        auto lName = pDIE.attr<std::string_view>(DW_AT_name);
+        auto lTypeDie = mDIOffsetCache.find(lType);
+        if (lTypeDie == mDIOffsetCache.end()) break;
+        auto lFile = get_debug_file(pDIBuilder, &pDIE, pDIE.attr<uint64_t>(DW_AT_decl_file));
+        auto lLine = pDIE.attr<uint64_t>(DW_AT_decl_line);
+        pDIE.mMetadata = LLVMDIBuilderCreateTypedef(pDIBuilder, lTypeDie->second->mMetadata,
+            lName.data(), lName.size(), lFile, lLine, pDIE.mParent->mMetadata);
+      } break;
+      case DW_TAG_subroutine_type: {
+        std::vector<LLVMMetadataRef> lParamTypes;
+        auto lTypeDie = mDIOffsetCache.find(lType);
+        if (lTypeDie == mDIOffsetCache.end())
+          lParamTypes.push_back(nullptr);
+        else
+          lParamTypes.push_back(lTypeDie->second->mMetadata);
+
+        auto lParamTypeOffsets = pDIE.children_attr<uint64_t>(DW_TAG_formal_parameter, DW_AT_type);
+        for (uint64_t lParamTypeOffset : lParamTypeOffsets) {
+          auto lParamTypeDIE = mDIOffsetCache.find(lParamTypeOffset);
+          assert(lParamTypeDIE != mDIOffsetCache.end());
+          apply_die_metadata(pDIBuilder, *lParamTypeDIE->second);
+          lParamTypes.emplace_back(lParamTypeDIE->second->mMetadata);
+        }
+        auto lCU = pDIE.parent(DW_TAG_compile_unit);
+        auto lName = lCU->attr<std::string_view>(DW_AT_name);
+        auto lFile = get_debug_abs_file(pDIBuilder, lName);
+        pDIE.mMetadata = LLVMDIBuilderCreateSubroutineType(pDIBuilder, lFile, lParamTypes.data(), lParamTypes.size(),
+                                                       LLVMDIFlagZero);
+      } break;
+      case DW_TAG_restrict_type:
+      case DW_TAG_const_type:
+      case DW_TAG_volatile_type: {
+        auto lTypeDie = mDIOffsetCache.find(lType);
+        if (lTypeDie == mDIOffsetCache.end()) break;
+        auto lUnderlyingType = lTypeDie->second->mMetadata;
+
+        pDIE.mMetadata = LLVMDIBuilderCreateQualifiedType(pDIBuilder, pDIE.mTag, lUnderlyingType);
+      } break;
+
+      case DW_TAG_enumerator: {
+        auto lName = pDIE.attr<std::string_view>(DW_AT_name);
+        auto lValue = pDIE.attr<uint64_t >(DW_AT_const_value);
+        auto lParentType = pDIE.mParent->attr<uint64_t>(DW_AT_type);
+        auto lParentTypeDie = mDIOffsetCache.find(lParentType);
+        if (lParentTypeDie == mDIOffsetCache.end()) break;
+        auto lParentTypeEncoding = lParentTypeDie->second->attr<uint64_t>(DW_AT_encoding);
+        bool lUnsigned;
+        switch (lParentTypeEncoding) {
+          case DW_ATE_signed:
+          case DW_ATE_signed_char:
+          case DW_ATE_signed_fixed:
+            lUnsigned = false;
+            break;
+          default:
+            lUnsigned = true;
+        }
+
+        pDIE.mMetadata = LLVMDIBuilderCreateEnumerator(pDIBuilder, lName.data(), lName.size(), lValue, lUnsigned);
+      } break;
+      case DW_TAG_enumeration_type: {
+        auto lByteSize = pDIE.attr<uint64_t>(DW_AT_byte_size);
+        auto lName = pDIE.attr<std::string_view>(DW_AT_name);
+        auto lFile = get_debug_file(pDIBuilder, &pDIE, pDIE.attr<uint64_t>(DW_AT_decl_file));
+        auto lLine = pDIE.attr<uint64_t>(DW_AT_decl_line);
+        auto lTypeDie = mDIOffsetCache.find(lType);
+        if (lTypeDie == mDIOffsetCache.end()) break;
+        auto lUnderlyingType = lTypeDie->second->mMetadata;
+
+        apply_die_metadata_on_child(pDIBuilder, pDIE);
+        auto lEnumerators = pDIE.children(DW_TAG_enumerator);
+        std::vector<LLVMMetadataRef> lEnumeratorRefs;
+        for (auto &lEnumerator : lEnumerators)
+          lEnumeratorRefs.emplace_back(lEnumerator->mMetadata);
+
+        pDIE.mMetadata = LLVMDIBuilderCreateEnumerationType(pDIBuilder, pDIE.mParent->mMetadata,
+            lName.data(), lName.size(), lFile, lLine,
+            lByteSize * 8, 32, lEnumeratorRefs.data(),
+            lEnumeratorRefs.size(), lUnderlyingType);
+      } break;
+
+      case DW_TAG_subrange_type: {
+        pDIE.mMetadata = LLVMDIBuilderGetOrCreateSubrange(pDIBuilder,
+            pDIE.attr<uint64_t>(DW_AT_lower_bound),
+            pDIE.attr<uint64_t>(DW_AT_count));
+      } break;
+      case DW_TAG_array_type: {
+        apply_die_metadata_on_child(pDIBuilder, pDIE);
+        auto lSubranges = pDIE.children(DW_TAG_subrange_type);
+        std::vector<LLVMMetadataRef> lSubrangeRefs;
+        uint64_t lTotalSize = 0;
+        for (auto &lSubrange : lSubranges) {
+          lTotalSize += lSubrange->attr<uint64_t>(DW_AT_count);
+          lSubrangeRefs.emplace_back(lSubrange->mMetadata);
+        }
+        auto lTypeDie = mDIOffsetCache.find(lType);
+        if (lTypeDie == mDIOffsetCache.end()) break;
+
+        pDIE.mMetadata = LLVMDIBuilderCreateArrayType(pDIBuilder, lTotalSize,
+            32, lTypeDie->second->mMetadata,
+            lSubrangeRefs.data(), lSubrangeRefs.size());
+      } break;
+
+      case DW_TAG_member: {
+        auto lName = pDIE.attr<std::string_view>(DW_AT_name);
+        auto lFile = get_debug_file(pDIBuilder, &pDIE, pDIE.attr<uint64_t>(DW_AT_decl_file));
+        auto lLine = pDIE.attr<uint64_t>(DW_AT_decl_line);
+        auto lOffsetByte = pDIE.attr<uint64_t>(DW_AT_data_member_location);
+        auto lTypeDie = mDIOffsetCache.find(lType);
+        if (lTypeDie == mDIOffsetCache.end()) break;
+        auto lTypeByteSize = lTypeDie->second->attr<uint64_t>(DW_AT_byte_size, 4);
+        auto lBitSize = pDIE.attr<uint64_t>(DW_AT_bit_size, lTypeByteSize * 8);
+        auto lBitOffset = pDIE.attr<uint64_t>(DW_AT_bit_offset);
+
+        pDIE.mMetadata = LLVMDIBuilderCreateMemberType(
+            pDIBuilder, pDIE.mParent->mMetadata, lName.data(),
+            lName.size(), lFile, lLine,
+            lBitSize, 32, lOffsetByte * 8 + lBitOffset,
+            LLVMDIFlagZero, lTypeDie->second->mMetadata);
+      } break;
+      case DW_TAG_structure_type: {
+        auto lName = pDIE.attr<std::string_view>(DW_AT_name);
+        auto lFile = get_debug_file(pDIBuilder, &pDIE, pDIE.attr<uint64_t>(DW_AT_decl_file));
+        auto lLine = pDIE.attr<uint64_t>(DW_AT_decl_line);
+        auto lByteSize = pDIE.attr<uint64_t>(DW_AT_byte_size);
+        apply_die_metadata_on_child(pDIBuilder, pDIE);
+        auto lMembers = pDIE.children(DW_TAG_member);
+        std::vector<LLVMMetadataRef> lMemberRefs;
+        for (auto &lMember : lMembers)
+          lMemberRefs.emplace_back(lMember->mMetadata);
+
+        pDIE.mMetadata = LLVMDIBuilderCreateStructType(
+            pDIBuilder, pDIE.mParent->mMetadata, lName.data(),
+            lName.size(), lFile, lLine,
+            lByteSize * 8, 32, LLVMDIFlagZero,
+            nullptr, lMemberRefs.data(),
+            lMemberRefs.size(), 0, nullptr,
+            lName.data(), lName.size());
+      } break;
+      case DW_TAG_union_type: {
+        auto lName = pDIE.attr<std::string_view>(DW_AT_name);
+        auto lFile = get_debug_file(pDIBuilder, &pDIE, pDIE.attr<uint64_t>(DW_AT_decl_file));
+        auto lLine = pDIE.attr<uint64_t>(DW_AT_decl_line);
+        auto lByteSize = pDIE.attr<uint64_t>(DW_AT_byte_size);
+        apply_die_metadata_on_child(pDIBuilder, pDIE);
+        std::vector<LLVMMetadataRef> lChilds;
+        for (auto &lMember : pDIE.mChildren)
+          lChilds.emplace_back(lMember.mMetadata);
+
+        pDIE.mMetadata = LLVMDIBuilderCreateUnionType(
+            pDIBuilder, pDIE.mParent->mMetadata, lName.data(),
+            lName.size(), lFile, lLine,
+            lByteSize * 8, 32, LLVMDIFlagZero,
+            lChilds.data(), lChilds.size(), 0,
+            nullptr, 0);
+      } break;
+
+      case DW_TAG_unspecified_parameters: {
+        // noop
+      } break;
+      case DW_TAG_lexical_block: {
+        // TODO
+      } break;
+      case DW_TAG_variable: {
+        // TODO
+      } break;
+
+      case DW_TAG_formal_parameter: {
+        auto lName = pDIE.attr<std::string_view>(DW_AT_name);
+        auto lFile = get_debug_file(pDIBuilder, &pDIE, pDIE.attr<uint64_t>(DW_AT_decl_file));
+        auto lLine = pDIE.attr<uint64_t>(DW_AT_decl_line);
+        auto lParentParams = pDIE.mParent->children(DW_TAG_formal_parameter);
+        assert(lParentParams.size() > 0);
+        size_t lIndex = 0;
+        for (; lIndex < lParentParams.size(); lIndex++) {
+          if (lParentParams[lIndex] == &pDIE)
+            break;
+        }
+        auto lTypeDie = mDIOffsetCache.find(lType);
+        if(lTypeDie != mDIOffsetCache.end())
+          break;
+
+        if (!lName.empty()) {
+          pDIE.mMetadata = LLVMDIBuilderCreateParameterVariable(
+              pDIBuilder, pDIE.mParent->mMetadata, lName.data(), lName.size(), lIndex + 1,
+              lFile, lLine, lTypeDie->second->mMetadata, true, LLVMDIFlagZero);
+        }
+      } break;
+
+      case DW_TAG_subprogram: {
+        // FIXME Support inlined function
+        if (pDIE.attr<uint64_t>(DW_AT_abstract_origin))
+          break;
+        auto lName = pDIE.attr<std::string_view>(DW_AT_name);
+        auto lFile = get_debug_file(pDIBuilder, &pDIE, pDIE.attr<uint64_t>(DW_AT_decl_file));
+        auto lLine = pDIE.attr<uint64_t>(DW_AT_decl_line);
+        auto lExternal = pDIE.attr<uint64_t>(DW_AT_external);
+        std::vector<LLVMMetadataRef> lParamTypes;
+        auto lTypeDie = mDIOffsetCache.find(lType);
+        if (lTypeDie == mDIOffsetCache.end())
+          lParamTypes.push_back(nullptr);
+        else
+          lParamTypes.push_back(lTypeDie->second->mMetadata);
+        auto lParamTypeOffsets = pDIE.children_attr<uint64_t>(DW_TAG_formal_parameter, DW_AT_type);
+        for (uint64_t lParamTypeOffset : lParamTypeOffsets) {
+          auto lParamTypeDIE = mDIOffsetCache.find(lParamTypeOffset);
+          assert(lParamTypeDIE != mDIOffsetCache.end());
+          apply_die_metadata(pDIBuilder, *lParamTypeDIE->second);
+          lParamTypes.emplace_back(lParamTypeDIE->second->mMetadata);
+        }
+        auto lSubprogramTypes = LLVMDIBuilderCreateSubroutineType(pDIBuilder, lFile, lParamTypes.data(),
+            lParamTypes.size(), LLVMDIFlagZero);
+
+        int lFlags = LLVMDIFlagZero;
+        if (pDIE.attr<uint64_t>(DW_AT_prototyped))
+          lFlags = LLVMDIFlagPrototyped;
+
+        pDIE.mMetadata = LLVMDIBuilderCreateFunction(pDIBuilder, pDIE.mParent->mMetadata, lName.data(), lName.size(),
+            nullptr, 0, lFile, lLine, lSubprogramTypes, !lExternal, true, 0, LLVMDIFlags(lFlags), 0);
+
+        auto lLowPC = pDIE.attr<uint64_t>(DW_AT_low_pc, -1);
+        auto lHighPC = lLowPC + pDIE.attr<uint64_t>(DW_AT_high_pc, -1);
+        auto lFunc = find_func_by_range(lLowPC, lHighPC);
+        if (lFunc) {
+          LLVMGlobalSetMetadata(lFunc, mDbgKind, pDIE.mMetadata);
+
+          /*std::cout << "At subprogram " << lName << "(aka " << (lFunc ? LLVMGetValueName(lFunc) : "null") << ") for range "
+                    << (void*)lLowPC << ", " << (void*)lHighPC << std::endl;*/
+
+          auto lCUDie = pDIE.parent(DW_TAG_compile_unit);
+          auto lStatements = lCUDie->attr<uint64_t>(DW_AT_stmt_list, -1);
+          if (lStatements != -1 && lLowPC != -1) {
+            auto &lLines = mParsedLines[lStatements].find_sequence(lLowPC, lHighPC);
+            for (auto &lLineItem : lLines.mLines) {
+              auto lInstr = mInstructions.find(lLineItem.mAddress);
+              if (lInstr == mInstructions.end())
+                continue;
+              lLineItem.mLoc = LLVMDIBuilderCreateDebugLocation(LLVMGetGlobalContext(), lLineItem.mLine, lLineItem.mColumn, pDIE.mMetadata, nullptr);
+              auto lLocAsValue = LLVMMetadataAsValue(LLVMGetGlobalContext(), lLineItem.mLoc);
+              //std::cout << "Attaching " << (void*)lLineItem.mAddress << " " << lLineItem.mLine << ":" << lLineItem.mColumn << " to: " << lInstr->second << " " << LLVMPrintValueToString(lInstr->second) << std::endl;
+              LLVMSetMetadata(lInstr->second, mDbgKind, lLocAsValue);
+            }
+
+            // Avoids "inlinable function call in a function with debug info must have a !dbg location"
+            // errors by copying a close debug location to call instructions missing one
+            LLVMValueRef lLastLoc = nullptr;
+            std::vector<LLVMValueRef> lTodo;
+            if (lFunc != nullptr) {
+              LLVMBasicBlockRef lBlock = LLVMGetFirstBasicBlock(lFunc);
+              if (lBlock != nullptr) {
+                while (lBlock != nullptr) {
+                  LLVMValueRef lInstr = LLVMGetFirstInstruction(lBlock);
+                  while (lInstr != nullptr) {
+                    LLVMValueRef lLoc = LLVMGetMetadata(lInstr, mDbgKind);
+                    if (lLoc != nullptr) {
+                      lLastLoc = lLoc;
+                      for (auto &lItem : lTodo)
+                        LLVMSetMetadata(lItem, mDbgKind, lLoc);
+                      lTodo.clear();
+                    }
+                    if (LLVMGetInstructionOpcode(lInstr) == LLVMCall && lLoc == nullptr) {
+                      if (lLastLoc != nullptr)
+                        LLVMSetMetadata(lInstr, mDbgKind, lLastLoc);
+                      else
+                        lTodo.push_back(lInstr);
+                    }
+                    lInstr = LLVMGetNextInstruction(lInstr);
+                  }
+                  lBlock = LLVMGetNextBasicBlock(lBlock);
+                }
+              }
+            }
+          }
+        }
+      } break;
+
+      case DW_TAG_compile_unit: {
+        auto lProducer = pDIE.attr<std::string_view>(DW_AT_producer);
+        auto lLang = pDIE.attr<uint64_t>(DW_AT_language);
+        auto lName = pDIE.attr<std::string_view>(DW_AT_name);
+        auto lFile = get_debug_abs_file(pDIBuilder, lName);
+        pDIE.mMetadata = LLVMDIBuilderCreateCompileUnit(pDIBuilder, LLVMDWARFSourceLanguage(lLang - 1),
+            lFile, lProducer.data(), lProducer.size(),
+            0, nullptr, 0, 0, nullptr, 0, LLVMDWARFEmissionFull, 0, 0, 0);
+      } break;
+
+      default:
+#ifdef WEMBED_VERBOSE
+        std::cerr << "unsupported DI node " << TagString(pDIE.mTag).data() << std::endl;
+#endif
+        break;
+    }
+
+    mEvaluatingDIE.erase(&pDIE);
+    apply_die_metadata_on_child(pDIBuilder, pDIE);
   }
 
   uint8_t module::bit_count(LLVMTypeRef pType) {
@@ -1119,6 +1928,7 @@ namespace wembed {
   }
 
   void module::parse_section_code(uint32_t pSectionSize) {
+    uint8_t *lCodeSectionStart = mCurrent;
     uint32_t lCount = parse_uleb128<uint32_t>();
     for (size_t lCode = 0; lCode < lCount; lCode++) {
       size_t lFIndex = mImportFuncOffset + lCode;
@@ -1153,8 +1963,13 @@ namespace wembed {
       uint32_t lBodySize = parse_uleb128<uint32_t>();
       uint8_t *lBefore = mCurrent;
 
+      uint32_t lFuncOffsetStart = mCurrent - lCodeSectionStart;
+      /*if (mDebugSupport) {
+        mInstructions[lFuncOffsetStart] = LLVMBasicBlockAsValue(lFuncEntry);
+      }*/
+
 #ifdef WEMBED_VERBOSE
-      std::cout << "At PC 0x" << std::hex << (mCurrent - lCodeSectionStart) << std::dec
+      std::cout << "At PC 0x" << std::hex << lFuncOffsetStart << std::dec
                 << " parsing code for func " << lFIndex << ": " << LLVMGetValueName(lFunc)
                 << ", type " << LLVMPrintTypeToString(lFuncType) << std::endl;
 #endif
@@ -1180,6 +1995,8 @@ namespace wembed {
                   << ", reachable: " << mCFEntries.back().mReachable
                   << ", depth: " << mUnreachableDepth << std::endl;
   #endif
+        size_t lPC = mCurrent - lCodeSectionStart;
+        LLVMValueRef lLastValue = nullptr;
         uint8_t lInstr = *mCurrent++;
         if (!mCFEntries.back().mReachable) {
           switch (lInstr) {
@@ -1388,7 +2205,7 @@ namespace wembed {
           case o_unreachable: {
             const char *lErrorString = "unreachable reached";
             trap_if(lFunc, get_const(true), mThrowVMException, {get_string(lErrorString)});
-            LLVMBuildUnreachable(mBuilder);
+            lLastValue = LLVMBuildUnreachable(mBuilder);
             skip_unreachable(lEndPos);
           } break;
 
@@ -1400,7 +2217,7 @@ namespace wembed {
               auto lWhere = LLVMGetInsertBlock(mBuilder);
               LLVMAddIncoming(lTarget.mPhi, &lResult, &lWhere, 1);
             }
-            LLVMBuildBr(mBuilder, lTarget.mBlock);
+            lLastValue = LLVMBuildBr(mBuilder, lTarget.mBlock);
             skip_unreachable(lEndPos);
           } break;
 
@@ -1414,7 +2231,7 @@ namespace wembed {
               LLVMAddIncoming(lTarget.mPhi, &lResult, &lWhere, 1);
             }
             LLVMBasicBlockRef lElse = LLVMAppendBasicBlock(lFunc, "afterBrIf");
-            LLVMBuildCondBr(mBuilder, i32_to_bool(lCond), lTarget.mBlock, lElse);
+            lLastValue = LLVMBuildCondBr(mBuilder, i32_to_bool(lCond), lTarget.mBlock, lElse);
 
             LLVMPositionBuilderAtEnd(mBuilder, lElse);
           } break;
@@ -1436,12 +2253,12 @@ namespace wembed {
               LLVMAddIncoming(lDefaultTarget.mPhi, &lResult, &lWhere, 1);
             }
 
-            LLVMValueRef lSwitch = LLVMBuildSwitch(mBuilder, lIndex, lDefaultTarget.mBlock, lTargets.size());
+            LLVMValueRef lLastValue = LLVMBuildSwitch(mBuilder, lIndex, lDefaultTarget.mBlock, lTargets.size());
             for (size_t i = 0; i < lTargets.size(); i++) {
               const BlockEntry &lTarget = branch_depth(lTargets[i]);
               if (lTarget.mSignature != lDefaultTarget.mSignature)
                 throw invalid_exception("br_table type mismatch");
-              LLVMAddCase(lSwitch, get_const((uint32_t)i), lTarget.mBlock);
+              LLVMAddCase(lLastValue, get_const((uint32_t)i), lTarget.mBlock);
               if (lResult != nullptr) {
                 auto lWhere = LLVMGetInsertBlock(mBuilder);
                 LLVMAddIncoming(lTarget.mPhi, &lResult, &lWhere, 1);
@@ -1457,7 +2274,7 @@ namespace wembed {
               auto lWhere = LLVMGetInsertBlock(mBuilder);
               LLVMAddIncoming(mCFEntries[0].mPhi, &lValue, &lWhere, 1);
             }
-            LLVMBuildBr(mBuilder, mCFEntries[0].mEnd);
+            lLastValue = LLVMBuildBr(mBuilder, mCFEntries[0].mEnd);
             skip_unreachable(lEndPos);
           } break;
 
@@ -1480,10 +2297,10 @@ namespace wembed {
                 throw invalid_exception("arg type mismatch");
             }
             bool lCalleeReturnValue = LLVMGetReturnType(lCalleeType) != LLVMVoidType();
-            auto lResult = LLVMBuildCall(mBuilder, lCallee, lCalleeParams.data(), lCalleeParams.size(),
+            lLastValue = LLVMBuildCall(mBuilder, lCallee, lCalleeParams.data(), lCalleeParams.size(),
                                          lCalleeReturnValue ? "call" : "");
             if(lCalleeReturnValue) {
-              push(lResult);
+              push(lLastValue);
             }
           } break;
           case o_call_indirect: {
@@ -1526,10 +2343,10 @@ namespace wembed {
             LLVMValueRef lPointer = LLVMBuildInBoundsGEP(mBuilder, lTablePtr, &lCalleeIndice, 1, "gep");
             LLVMValueRef lRawFuncPtr = LLVMBuildLoad(mBuilder, lPointer, "loadPtr");
             LLVMValueRef lFuncPtr = LLVMBuildPointerCast(mBuilder, lRawFuncPtr, lCalleePtr, "cast");
-            auto lResult = LLVMBuildCall(mBuilder, lFuncPtr, lCalleeParams.data(), lCalleeParams.size(),
+            lLastValue = LLVMBuildCall(mBuilder, lFuncPtr, lCalleeParams.data(), lCalleeParams.size(),
                                          lCalleeReturnValue ? "call" : "");
             if(lCalleeReturnValue) {
-              push(lResult);
+              push(lLastValue);
             }
           } break;
 
@@ -1537,24 +2354,24 @@ namespace wembed {
             LLVMValueRef lCondition = pop(LLVMInt32Type());
             LLVMValueRef lFalse = pop();
             LLVMValueRef lTrue = pop(LLVMTypeOf(lFalse));
-            push(LLVMBuildSelect(mBuilder, i32_to_bool(lCondition), lTrue, lFalse, "select"));
+            lLastValue = push(LLVMBuildSelect(mBuilder, i32_to_bool(lCondition), lTrue, lFalse, "select"));
           } break;
           case o_eqz_i32: {
             LLVMValueRef lZero32 = LLVMConstInt(LLVMInt32Type(), 0, true);
             LLVMValueRef lCond = LLVMBuildICmp(mBuilder, LLVMIntEQ, pop(LLVMInt32Type()), lZero32, "eq");
-            push(bool_to_i32(lCond));
+            lLastValue = push(bool_to_i32(lCond));
           } break;
           case o_eqz_i64: {
             LLVMValueRef lZero64 = LLVMConstInt(LLVMInt64Type(), 0, true);
             LLVMValueRef lCond = LLVMBuildICmp(mBuilder, LLVMIntEQ, pop(LLVMInt64Type()), lZero64, "eq");
-            push(bool_to_i32(lCond));
+            lLastValue = push(bool_to_i32(lCond));
           } break;
 
           case o_get_local: {
             uint32_t lLocalIndex = parse_uleb128<uint32_t>();
             if (lLocalIndex >= lLocals.size())
               throw invalid_exception("local index out of bounds");
-            push(LLVMBuildLoad(mBuilder, lLocals[lLocalIndex], "getLocal"));
+            lLastValue = push(LLVMBuildLoad(mBuilder, lLocals[lLocalIndex], "getLocal"));
           } break;
           case o_set_local: {
             uint32_t lLocalIndex = parse_uleb128<uint32_t>();
@@ -1562,7 +2379,7 @@ namespace wembed {
               throw invalid_exception("local index out of bounds");
             auto lValueType = LLVMGetElementType(lLocalTypes[lLocalIndex]);
             auto lValue = LLVMBuildIntToPtr(mBuilder, pop(lValueType), lValueType, "setLocal");
-            LLVMBuildStore(mBuilder, lValue, lLocals[lLocalIndex]);
+            lLastValue = LLVMBuildStore(mBuilder, lValue, lLocals[lLocalIndex]);
           } break;
           case o_tee_local: {
             uint32_t lLocalIndex = parse_uleb128<uint32_t>();
@@ -1570,14 +2387,14 @@ namespace wembed {
               throw invalid_exception("local index out of bounds");
             auto lValueType = LLVMGetElementType(lLocalTypes[lLocalIndex]);
             auto lValue = LLVMBuildIntToPtr(mBuilder, top(lValueType), lValueType, "teeLocal");
-            LLVMBuildStore(mBuilder, lValue, lLocals[lLocalIndex]);
+            lLastValue = LLVMBuildStore(mBuilder, lValue, lLocals[lLocalIndex]);
           } break;
 
           case o_get_global: {
             uint32_t lGlobalIndex = parse_uleb128<uint32_t>();
             if (lGlobalIndex >= mGlobals.size())
               throw invalid_exception("global index out of bounds");
-            push(LLVMBuildLoad(mBuilder, mGlobals[lGlobalIndex], "getGlobal"));
+            lLastValue = push(LLVMBuildLoad(mBuilder, mGlobals[lGlobalIndex], "getGlobal"));
           } break;
           case o_set_global: {
             uint32_t lGlobalIndex = parse_uleb128<uint32_t>();
@@ -1585,20 +2402,22 @@ namespace wembed {
               throw invalid_exception("global index out of bounds");
             auto lValueType = LLVMGetElementType(LLVMTypeOf(mGlobals[lGlobalIndex]));
             auto lValue = LLVMBuildIntToPtr(mBuilder, pop(lValueType), lValueType, "setGlobal");
-            LLVMBuildStore(mBuilder, lValue, mGlobals[lGlobalIndex]);
+            lLastValue = LLVMBuildStore(mBuilder, lValue, mGlobals[lGlobalIndex]);
           } break;
 
           case o_memory_grow: {
             if (mMemoryTypes.empty()) throw invalid_exception("grow_memory without memory block");
             /*uint8_t lReserved =*/ parse_uleb128<uint8_t>();
             LLVMValueRef lArgs[] = { mContextRef, pop_int() };
-            push(LLVMBuildCall(mBuilder, mMemoryGrow, lArgs, 2, "growMem"));
+            lLastValue = push(LLVMBuildCall(mBuilder, mMemoryGrow, lArgs, 2, "growMem"));
           } break;
           case o_memory_size: {
             if (mMemoryTypes.empty()) throw invalid_exception("current_memory without memory block");
             /*uint8_t lReserved =*/ parse_uleb128<uint8_t>();
-            push(LLVMBuildCall(mBuilder, mMemorySize, &mContextRef, 1, "curMem"));
+            lLastValue = push(LLVMBuildCall(mBuilder, mMemorySize, &mContextRef, 1, "curMem"));
           } break;
+
+          // NOTE JB: Don't affect lLastValue for const, LLVM doens't support attaching source location to them
 
   #define WEMBED_CONST(OPCODE, PARSEOP) case OPCODE: { \
             push(PARSEOP); \
@@ -1607,8 +2426,8 @@ namespace wembed {
           WEMBED_CONST(o_const_i32, LLVMConstInt(LLVMInt32Type(), static_cast<ull_t>(parse_sleb128<int32_t>()), true))
           WEMBED_CONST(o_const_i64, LLVMConstInt(LLVMInt64Type(), static_cast<ull_t>(parse_sleb128<int64_t>()), true))
           case o_const_f32: {
-              fp_bits<float> components(parse<float>());
-              push(LLVMConstBitCast(LLVMConstInt(LLVMInt32Type(), static_cast<ull_t>(components.mRaw), false),
+            fp_bits<float> components(parse<float>());
+            push(LLVMConstBitCast(LLVMConstInt(LLVMInt32Type(), static_cast<ull_t>(components.mRaw), false),
                                     LLVMFloatType()));
           } break;
           WEMBED_CONST(o_const_f64, LLVMConstReal(LLVMDoubleType(), parse<double>()))
@@ -1624,7 +2443,7 @@ namespace wembed {
             LLVMValueRef lInvalid = LLVMBuildOr(mBuilder, lBoundsTest, lExponentTest, "validTruncate"); \
             const char *lErrorString = "invalid truncate"; \
             trap_if(lFunc, lInvalid, mThrowVMException, {get_string(lErrorString)}); \
-            push(OPCONV(mBuilder, lValue, OTYPE, #OPCODE)); \
+            lLastValue = push(OPCONV(mBuilder, lValue, OTYPE, #OPCODE)); \
           } break;
 
           WEMBED_TRUNC(o_trunc_f32_si32, LLVMBuildFPToSI, LLVMFloatType(), LLVMInt32Type(), float, LLVMInt32Type(), -2147483904.0f, 2147483648.0f);
@@ -1652,7 +2471,7 @@ namespace wembed {
             if (lAlign > BYTES) throw invalid_exception("unnatural alignment"); \
             LLVMSetAlignment(lLoad, lAlign); \
             LLVMSetVolatile(lLoad, true); \
-            push(CONVOP); \
+            lLastValue = push(CONVOP); \
           } break;
 
           WEMBED_LOAD(o_load_i32, LLVMInt32Type(), 4, lLoad)
@@ -1689,7 +2508,8 @@ namespace wembed {
             if (lAlign > BYTES) throw invalid_exception("unnatural alignment"); \
             LLVMSetAlignment(lStore, lAlign); \
             LLVMSetVolatile(lStore, true); \
-          } break;
+            lLastValue = lStore; \
+        } break;
 
           WEMBED_STORE(o_store_i32, LLVMInt32Type(), 4, LLVMInt32Type(), lValue)
           WEMBED_STORE(o_store_i64, LLVMInt64Type(), 8, LLVMInt64Type(), lValue)
@@ -1710,12 +2530,12 @@ namespace wembed {
   #define WEMBED_ICMP(OPCODE, OPCOMP) case OPCODE##i32: { \
             LLVMValueRef rhs = pop(); \
             LLVMValueRef lhs = pop(LLVMTypeOf(rhs)); \
-            push(bool_to_i32(LLVMBuildICmp(mBuilder, OPCOMP, lhs, rhs, #OPCOMP))); \
+            lLastValue = push(bool_to_i32(LLVMBuildICmp(mBuilder, OPCOMP, lhs, rhs, #OPCOMP))); \
           } break; \
           case OPCODE##i64: { \
             LLVMValueRef rhs = pop(); \
             LLVMValueRef lhs = pop(LLVMTypeOf(rhs)); \
-            push(bool_to_i32(LLVMBuildICmp(mBuilder, OPCOMP, lhs, rhs, #OPCOMP))); \
+            lLastValue = push(bool_to_i32(LLVMBuildICmp(mBuilder, OPCOMP, lhs, rhs, #OPCOMP))); \
           } break;
 
           WEMBED_ICMP(o_eq_, LLVMIntEQ)
@@ -1732,12 +2552,12 @@ namespace wembed {
   #define WEMBED_FCMP(OPCODE, OPCOMP) case OPCODE##f32: { \
             LLVMValueRef rhs = pop(); \
             LLVMValueRef lhs = pop(LLVMTypeOf(rhs)); \
-            push(bool_to_i32(LLVMBuildFCmp(mBuilder, OPCOMP, lhs, rhs, #OPCOMP))); \
+            lLastValue = push(bool_to_i32(LLVMBuildFCmp(mBuilder, OPCOMP, lhs, rhs, #OPCOMP))); \
           } break; \
           case OPCODE##f64: { \
             LLVMValueRef rhs = pop(); \
             LLVMValueRef lhs = pop(LLVMTypeOf(rhs)); \
-            push(bool_to_i32(LLVMBuildFCmp(mBuilder, OPCOMP, lhs, rhs, #OPCOMP))); \
+            lLastValue = push(bool_to_i32(LLVMBuildFCmp(mBuilder, OPCOMP, lhs, rhs, #OPCOMP))); \
           } break;
 
           WEMBED_FCMP(o_eq_, LLVMRealOEQ)
@@ -1750,7 +2570,7 @@ namespace wembed {
   #define WEMBED_BINARY(OPCODE, INSTR) case OPCODE: { \
             LLVMValueRef rhs = pop(); \
             LLVMValueRef lhs = pop(LLVMTypeOf(rhs)); \
-            push(INSTR); \
+            lLastValue = push(INSTR); \
           } break;
   #define WEMBED_BINARY_MULTI(OPCODE, INSTR) WEMBED_BINARY(OPCODE##32, INSTR) WEMBED_BINARY(OPCODE##64, INSTR)
 
@@ -1791,7 +2611,7 @@ namespace wembed {
           WEMBED_BINARY(o_shr_ui64, LLVMBuildLShr(mBuilder, lhs, emit_shift_mask(LLVMInt64Type(), rhs), "shru"))
 
   #define WEMBED_INTRINSIC(OPCODE, INTRINSIC, ...) case OPCODE: { \
-            push(call_intrinsic(INTRINSIC, {__VA_ARGS__})); \
+            lLastValue = push(call_intrinsic(INTRINSIC, {__VA_ARGS__})); \
         } break;
 
           WEMBED_INTRINSIC(o_ctz_i32, mCttz_i32, pop(LLVMInt32Type()), get_const(false))
@@ -1806,28 +2626,28 @@ namespace wembed {
           WEMBED_INTRINSIC(o_abs_f64, mAbs_f64, pop(LLVMDoubleType()))
 
           case o_ceil_f32: {
-            push(emit_quiet_nan_or_intrinsic(pop(LLVMFloatType()), mCeil_f32, mCeil_f64));
+            lLastValue = push(emit_quiet_nan_or_intrinsic(pop(LLVMFloatType()), mCeil_f32, mCeil_f64));
           } break;
           case o_ceil_f64: {
-            push(emit_quiet_nan_or_intrinsic(pop(LLVMDoubleType()), mCeil_f32, mCeil_f64));
+            lLastValue = push(emit_quiet_nan_or_intrinsic(pop(LLVMDoubleType()), mCeil_f32, mCeil_f64));
           } break;
           case o_floor_f32: {
-            push(emit_quiet_nan_or_intrinsic(pop(LLVMFloatType()), mFloor_f32, mFloor_f64));
+            lLastValue = push(emit_quiet_nan_or_intrinsic(pop(LLVMFloatType()), mFloor_f32, mFloor_f64));
           } break;
           case o_floor_f64: {
-            push(emit_quiet_nan_or_intrinsic(pop(LLVMDoubleType()), mFloor_f32, mFloor_f64));
+            lLastValue = push(emit_quiet_nan_or_intrinsic(pop(LLVMDoubleType()), mFloor_f32, mFloor_f64));
           } break;
           case o_trunc_f32: {
-            push(emit_quiet_nan_or_intrinsic(pop(LLVMFloatType()), mTrunc_f32, mTrunc_f64));
+            lLastValue = push(emit_quiet_nan_or_intrinsic(pop(LLVMFloatType()), mTrunc_f32, mTrunc_f64));
           } break;
           case o_trunc_f64: {
-            push(emit_quiet_nan_or_intrinsic(pop(LLVMDoubleType()), mTrunc_f32, mTrunc_f64));
+            lLastValue = push(emit_quiet_nan_or_intrinsic(pop(LLVMDoubleType()), mTrunc_f32, mTrunc_f64));
           } break;
           case o_nearest_f32: {
-            push(emit_quiet_nan_or_intrinsic(pop(LLVMFloatType()), mNearest_f32, mNearest_f64));
+            lLastValue = push(emit_quiet_nan_or_intrinsic(pop(LLVMFloatType()), mNearest_f32, mNearest_f64));
           } break;
           case o_nearest_f64: {
-            push(emit_quiet_nan_or_intrinsic(pop(LLVMDoubleType()), mNearest_f32, mNearest_f64));
+            lLastValue = push(emit_quiet_nan_or_intrinsic(pop(LLVMDoubleType()), mNearest_f32, mNearest_f64));
           } break;
 
   #define WEMBED_INTRINSIC_BINARY(OPCODE, INTRINSIC, ...) WEMBED_BINARY(OPCODE, call_intrinsic(INTRINSIC, {lhs, rhs, __VA_ARGS__}));
@@ -1837,35 +2657,35 @@ namespace wembed {
           case o_min_f32: {
             LLVMValueRef rhs = pop(LLVMFloatType());
             LLVMValueRef lhs = pop(LLVMFloatType());
-            push(emit_min(lhs, rhs));
+            lLastValue = push(emit_min(lhs, rhs));
           } break;
           case o_min_f64: {
             LLVMValueRef rhs = pop(LLVMDoubleType());
             LLVMValueRef lhs = pop(LLVMDoubleType());
-            push(emit_min(lhs, rhs));
+            lLastValue = push(emit_min(lhs, rhs));
           } break;
           case o_max_f32: {
             LLVMValueRef rhs = pop(LLVMFloatType());
             LLVMValueRef lhs = pop(LLVMFloatType());
-            push(emit_max(lhs, rhs));
+            lLastValue = push(emit_max(lhs, rhs));
           } break;
           case o_max_f64: {
             LLVMValueRef rhs = pop(LLVMDoubleType());
             LLVMValueRef lhs = pop(LLVMDoubleType());
-            push(emit_max(lhs, rhs));
+            lLastValue = push(emit_max(lhs, rhs));
           } break;
 
           WEMBED_INTRINSIC_BINARY_MULTI(o_copysign_f, mCopysign_f)
 
           case o_neg_f32: {
-            push(LLVMBuildFNeg(mBuilder, pop(LLVMFloatType()), "neg"));
+            lLastValue = push(LLVMBuildFNeg(mBuilder, pop(LLVMFloatType()), "neg"));
           } break;
           case o_neg_f64: {
-            push(LLVMBuildFNeg(mBuilder, pop(LLVMDoubleType()), "neg"));
+            lLastValue = push(LLVMBuildFNeg(mBuilder, pop(LLVMDoubleType()), "neg"));
           } break;
 
   #define WEMBED_CAST(OPCODE, INSTR, ITYPE, OTYPE) case OPCODE: { \
-            push(INSTR(mBuilder, pop(ITYPE), OTYPE, #INSTR)); \
+            lLastValue = push(INSTR(mBuilder, pop(ITYPE), OTYPE, #INSTR)); \
           } break;
 
           WEMBED_CAST(o_wrap_i64, LLVMBuildTrunc, LLVMInt64Type(), LLVMInt32Type())
@@ -1874,7 +2694,7 @@ namespace wembed {
 
 
 #define WEMBED_SIGN_EXT(OPCODE, INSTR, ITYPE, OTYPE) case OPCODE: { \
-            push(INSTR(mBuilder, LLVMBuildTrunc(mBuilder, pop(), ITYPE, #INSTR"-signext"), OTYPE, #INSTR)); \
+            lLastValue = push(INSTR(mBuilder, LLVMBuildTrunc(mBuilder, pop(), ITYPE, #INSTR"-signext"), OTYPE, #INSTR)); \
           } break;
 
           WEMBED_SIGN_EXT(o_extend_i32_s8, LLVMBuildSExt, LLVMInt8Type(), LLVMInt32Type())
@@ -1884,10 +2704,10 @@ namespace wembed {
           WEMBED_SIGN_EXT(o_extend_i64_s32, LLVMBuildSExt, LLVMInt32Type(), LLVMInt64Type())
 
           case o_demote_f64: {
-            push(clear_nan(LLVMBuildFPTrunc(mBuilder, pop(LLVMDoubleType()), LLVMFloatType(), "demote")));
+            lLastValue = push(clear_nan(LLVMBuildFPTrunc(mBuilder, pop(LLVMDoubleType()), LLVMFloatType(), "demote")));
           } break;
           case o_promote_f32: {
-            push(clear_nan(LLVMBuildFPExt(mBuilder, pop(LLVMFloatType()), LLVMDoubleType(), "promote")));
+            lLastValue = push(clear_nan(LLVMBuildFPExt(mBuilder, pop(LLVMFloatType()), LLVMDoubleType(), "promote")));
           } break;
 
           WEMBED_CAST(o_convert_f32_si32, LLVMBuildSIToFP, LLVMInt32Type(), LLVMFloatType())
@@ -1921,7 +2741,7 @@ namespace wembed {
                 LLVMValueRef lValueOrMin = LLVMBuildSelect(mBuilder, lMinBoundsTest, get_const(std::numeric_limits<OCTYPE>::min()), lConverted, "valueOrMin"); \
                 LLVMValueRef lValueOrMax = LLVMBuildSelect(mBuilder, lMaxBoundsTest, get_const(std::numeric_limits<OCTYPE>::max()), lValueOrMin, "valueOrMax"); \
                 LLVMValueRef lValueOrZero = LLVMBuildSelect(mBuilder, lNan, get_zero(OTYPE), lValueOrMax, "valueOrZero"); \
-                push(lValueOrZero); \
+                lLastValue = push(lValueOrZero); \
               } break;
 
               WEMBED_SAT_TRUNC(o_trunc_sat_f32_si32, LLVMBuildFPToSI, LLVMFloatType(), LLVMInt32Type(), float, int32_t, LLVMInt32Type(), -2147483904.0f, 2147483648.0f);
@@ -1970,14 +2790,33 @@ namespace wembed {
           std::cout << std::endl;
         }
   #endif
+        if (lLastValue != nullptr && mDebugSupport) {
+          mInstructions[lPC] = lLastValue;
+        }
       }
       assert(mCurrent == lEndPos);
       assert(LLVMGetInsertBlock(mBuilder) == lFuncEnd);
 
+#if defined(WEMBED_VERBOSE) && 0
+      std::cout << "At PC 0x" << std::hex << (mCurrent - lCodeSectionStart) << std::dec
+                << " done parsing code for func " << lFIndex << ": " << LLVMGetValueName(lFunc) << std::endl;
+#endif
+
+      LLVMValueRef lReturn;
       if (lReturnType != LLVMVoidType())
-        LLVMBuildRet(mBuilder, pop(lReturnType));
+        lReturn = LLVMBuildRet(mBuilder, pop(lReturnType));
       else
-        LLVMBuildRetVoid(mBuilder);
+        lReturn = LLVMBuildRetVoid(mBuilder);
+
+      if (mDebugSupport) {
+        uint32_t lFuncOffsetEnd = mCurrent - lCodeSectionStart;
+        mInstructions[lFuncOffsetEnd] = lReturn;
+        FuncRange lFuncRange;
+        lFuncRange.mStartAddress = lFuncOffsetStart;
+        lFuncRange.mEndAddress = lFuncOffsetEnd;
+        lFuncRange.mFunc = lFunc;
+        mFuncRanges.emplace_back(lFuncRange);
+      }
 
   #if defined(WEMBED_VERBOSE) && 0
       std::cout << "Done: " << LLVMPrintValueToString(lFunc) << std::endl;

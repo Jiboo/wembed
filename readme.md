@@ -1,6 +1,22 @@
-[![Build Status](https://travis-ci.com/Jiboo/wembed.svg?branch=master)](https://travis-ci.com/Jiboo/wembed)
+[![Build Status](https://travis-ci.com/Jiboo/wembed.svg?branch=dwarf)](https://travis-ci.com/Jiboo/wembed)
 
 WASM embedding library using LLVM's Orc JIT.
+
+Branch info
+-----------
+
+This branch has experimental DWARF (yurydelendik/webassembly-dwarf) to LLVM IR
+debug metadata, partially working on some simple C input (source+lines only).
+
+It depends on some LLVM patches before merging into master:
+  - https://reviews.llvm.org/D58323
+  - https://reviews.llvm.org/D58334
+
+TODO:
+  - DW_TAG_lexical_block
+  - DW_TAG_variable
+  - DW_TAG_inlined_subroutine
+  - Macro sections
 
 Usage
 -----
@@ -30,9 +46,9 @@ Out of scope
 - wasm64
 
 Dependencies
----------------------
+------------
 
-- LLVM libraries (8+)
+- LLVM libraries (nightly)
 - boost (endian and functional)
 
 Optional (required for tests):

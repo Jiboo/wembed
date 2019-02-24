@@ -3,11 +3,15 @@
 #include <ostream>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
+#include <variant>
 #include <vector>
 
 #include <boost/endian/conversion.hpp>
 
 #include <llvm-c/Core.h>
+
+#include <llvm/BinaryFormat/Dwarf.h>
 
 #include "lang.hpp"
 #include "utils.hpp"
@@ -29,7 +33,7 @@ namespace wembed {
   class module {
     friend class context;
   public:
-    module(uint8_t *pInput, size_t pLen);
+    module(uint8_t *pInput, size_t pLen, bool pDebugSupport = false);
     virtual ~module();
 
     void optimize(uint8_t pOptLevel = 4);
@@ -41,10 +45,18 @@ namespace wembed {
     LLVMValueRef symbol1(const std::string_view &pName);
 
   protected:
+    bool mDebugSupport;
     uint8_t mOptLevel = 0;
     uint8_t *mCurrent, *mEnd;
     size_t mImportFuncOffset = 0;
     size_t mUnreachableDepth = 0;
+
+    struct Section {
+      uint8_t *mStart;
+      size_t mSize;
+    };
+    std::unordered_map<std::string_view, Section> mCustomSections;
+    Section get_custom_section(const std::string_view &pName);
 
     LLVMBuilderRef mBuilder;
     std::vector<memory_type> mMemoryTypes;
@@ -155,37 +167,45 @@ namespace wembed {
     const BlockEntry &branch_depth(size_t pDepth);
     LLVMValueRef top();
     LLVMValueRef top(LLVMTypeRef pDesired);
-    void push(LLVMValueRef lVal);
+    LLVMValueRef push(LLVMValueRef lVal);
     LLVMValueRef pop();
     LLVMValueRef pop_int();
     LLVMValueRef pop(LLVMTypeRef pDesired);
 
-    template<typename T> T parse() {
-      T lResult = *reinterpret_cast<T*>(mCurrent);
-      mCurrent += sizeof(T);
+    template<typename T> T parse(uint8_t *&pPointer) {
+      T lResult = *reinterpret_cast<T*>(pPointer);
+      pPointer += sizeof(T);
       return boost::endian::little_to_native(lResult);
+    }
+
+    template<typename T> T parse() {
+      return parse<T>(mCurrent);
     }
 
     std::string_view parse_str(size_t pSize);
 
-    template<typename T> T parse_uleb128() {
+    template<typename T> T parse_uleb128(uint8_t *&pPointer) {
       T lResult = 0;
       size_t lShift = 0;
       uint8_t lByte;
       do {
-        lByte = *mCurrent++;
+        lByte = *pPointer++;
         lResult |= T(lByte & (uint8_t) 0x7f) << lShift;
         lShift += 7;
       } while (lByte & 0x80);
       return boost::endian::little_to_native(lResult);
     }
 
-    template<typename T> T parse_sleb128() {
+    template<typename T> T parse_uleb128() {
+      return parse_uleb128<T>(mCurrent);
+    }
+
+    template<typename T> T parse_sleb128(uint8_t *&pPointer) {
       T lResult = 0;
       size_t lShift = 0;
       uint8_t lByte;
       do {
-        lByte = *mCurrent++;
+        lByte = *pPointer++;
         lResult |= T(lByte & (uint8_t) 0x7f) << lShift;
         lShift += 7;
       } while (lByte & 0x80);
@@ -193,6 +213,10 @@ namespace wembed {
       if ((lShift < lSize) && (lByte & 0x40))
         lResult |= - (1 << lShift);
       return boost::endian::little_to_native(lResult);
+    }
+
+    template<typename T> T parse_sleb128() {
+      return parse_sleb128<T>(mCurrent);
     }
 
     elem_type parse_elem_type();
@@ -203,6 +227,127 @@ namespace wembed {
     void parse_sections();
     void parse_custom_section(const std::string_view &pName, size_t pInternalSize);
     void parse_names(size_t pInternalSize);
+
+    struct LineFileEntry {
+      std::string_view mFilename;
+      uint64_t mDirectory;
+      uint64_t mLastModification;
+      uint64_t mByteSize;
+    };
+    struct LineState {
+      uint32_t mAddress;
+      uint32_t mOpIndex;
+      uint32_t mFile;
+      uint32_t mLine;
+      uint32_t mColumn;
+      uint32_t mISA;
+      uint32_t mDiscriminator;
+      bool mIsStmt;
+      bool mBasicBlock;
+      bool mEndSequence;
+      bool mPrologueEnd;
+      bool mEpilogueBeg;
+      void reset(bool pDefaultIsStmt);
+    };
+    struct LineItem {
+      LLVMMetadataRef mLoc = nullptr;
+      uint32_t mAddress;
+      uint32_t mFile;
+      uint32_t mLine;
+      uint32_t mColumn;
+    };
+    struct LineSequence {
+      uint32_t mStartAddress;
+      uint32_t mEndAddress;
+      std::vector<LineItem> mLines;
+    };
+    struct LineContext {
+      std::vector<std::string_view> mDirectories;
+      std::vector<LineFileEntry> mFiles;
+      std::vector<LineSequence> mSequences;
+      std::vector<LineItem> mCurrentBuffer;
+      void append_row(const LineState &pState);
+      LineSequence &find_sequence(uint32_t pStart, uint32_t pEnd);
+    };
+    std::unordered_map<size_t, LineContext> mParsedLines;
+
+    struct AbbrevAttr {
+      llvm::dwarf::Attribute mAttribute;
+      llvm::dwarf::Form mForm;
+    };
+    using AbbrevAttrs = std::vector<AbbrevAttr>;
+    struct AbbrevDecl {
+      llvm::dwarf::Tag mTag;
+      bool mHasChild;
+      AbbrevAttrs mAttributes;
+    };
+    using AbbrevDecls = std::unordered_map<size_t, AbbrevDecl>;
+    std::unordered_map<size_t, AbbrevDecls> mParsedAbbrevs;
+
+    using AttrValue = std::variant<uint64_t, std::string_view>;
+    using AttrValues = std::unordered_map<llvm::dwarf::Attribute, AttrValue>;
+    struct DIE {
+      size_t mOffset;
+      LLVMMetadataRef mMetadata = nullptr;
+      llvm::dwarf::Tag mTag;
+      AttrValues mAttributes;
+      std::list<DIE> mChildren;
+      DIE* mParent;
+
+      template<typename T>
+      T attr(llvm::dwarf::Attribute pAttr, T pDefault = {}) {
+        auto lFound = mAttributes.find(pAttr);
+        if (lFound == mAttributes.end())
+          return pDefault;
+        return std::get<T>(lFound->second);
+      }
+
+      // List all children with the requested tag
+      std::vector<DIE*> children(llvm::dwarf::Tag pTag);
+
+      template<typename T>
+      std::vector<T> children_attr(llvm::dwarf::Tag pTag, llvm::dwarf::Attribute pAttr, T pDefault = {}) {
+        std::vector<T> lResult;
+        for (auto &lChild : mChildren) {
+          if (lChild.mTag == pTag) {
+            lResult.push_back(lChild.attr<T>(pAttr));
+          }
+        }
+        return lResult;
+      }
+
+      // Climbs up the parent hierarchy until finding the requested tag
+      DIE* parent(llvm::dwarf::Tag pTag);
+    };
+    std::list<DIE> mParsedDI;
+    std::unordered_map<size_t, DIE*> mDIOffsetCache;
+
+    Section mDebugStrSection;
+    std::unordered_set<DIE*> mEvaluatingDIE;
+    unsigned mDbgKind;
+
+    /* When debug support is enabled, we need to keep a mapping between wasm instructions offsets and LLVMValues so
+     * that we may attach debug metadata later.
+     */
+    std::unordered_map<size_t, LLVMValueRef> mInstructions;
+
+    struct FuncRange {
+      uint32_t mStartAddress, mEndAddress;
+      LLVMValueRef mFunc;
+    };
+    std::vector<FuncRange> mFuncRanges;
+
+    void parse_debug_infos();
+    void parse_debug_abbrev_entries();
+    void parse_debug_lines();
+    std::string_view get_debug_string(size_t pOffset);
+    LLVMMetadataRef get_debug_rel_file(LLVMDIBuilderRef pDIBuilder, const std::string_view &pFile, const std::string_view &pPath);
+    LLVMMetadataRef get_debug_abs_file(LLVMDIBuilderRef pDIBuilder, const std::string_view &pAbsPath);
+    // Find the requested file for a DW_AT_decl_file
+    LLVMMetadataRef get_debug_file(LLVMDIBuilderRef pDIBuilder, DIE *pContext, uint64_t pIndex);
+    void apply_die_metadata(LLVMDIBuilderRef pDIBuilder, DIE &pDIE);
+    void apply_die_metadata_on_child(LLVMDIBuilderRef pDIBuilder, DIE &pDIE);
+    LLVMValueRef find_func_by_range(uint32_t pStart, uint32_t pEnd);
 
     LLVMValueRef get_const(bool value) { return LLVMConstInt(LLVMInt1Type(), ull_t(value), false); }
     LLVMValueRef get_const(int32_t value) { return LLVMConstInt(LLVMInt32Type(), ull_t(value), true); }

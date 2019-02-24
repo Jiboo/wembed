@@ -55,8 +55,7 @@ namespace wembed {
       }
     }
 
-    LLVMTargetMachineRef lTMachine = LLVMCreateTargetMachine(lTarget, lTriple, "", "", lOptLevel, LLVMRelocStatic,
-        LLVMCodeModelJITDefault);
+    LLVMTargetMachineRef lTMachine = LLVMCreateTargetMachine(lTarget, lTriple, "", "", lOptLevel, LLVMRelocStatic, LLVMCodeModelJITDefault);
     assert(lTMachine != nullptr);
     LLVMDisposeMessage(lTriple);
 
@@ -190,6 +189,7 @@ namespace wembed {
     profile_step("  context/orc init");
 
     LLVMOrcAddEagerlyCompiledIR(mEngine, &mHandle, pModule.mModule, orc_sym_resolver, this);
+    LLVMDisposeTargetMachine(lTMachine); // NOTE JB: LLVMOrcCreateInstance documentation says that TargetMachine shouldn't be freed
     profile_step("  context/jit");
 
 #if defined(WEMBED_VERBOSE) && 0

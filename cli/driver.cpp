@@ -125,6 +125,7 @@ void usage(const string &pProgName) {
           "  available flags:\n"
           "    -i <wasm>  module input path (required)\n"
           "    -O<level>  optimisation level ([0-4] default: 0)\n"
+          "    -g         enable debug support\n"
           "    -d         emit optimized llvm IR before executing\n"
           "  \n"
           "  result 1 in case of error, or the return value of the wasm's main function."
@@ -147,6 +148,7 @@ int main(int argc, char **argv) {
   path lWasmPath;
   uint8_t lOptLevel = 4;
   bool lDump = false;
+  bool lDebug = false;
   vector<string_view> lArgs;
 
   for (int i = 1; i < argc; i++) {
@@ -182,6 +184,9 @@ int main(int argc, char **argv) {
           break;
         case 'd':
           lDump = true;
+          break;
+        case 'g':
+          lDebug = true;
           break;
         default:
           cerr << "Can't parse argument: " << argv[i] << endl;
@@ -238,7 +243,7 @@ int main(int argc, char **argv) {
   };
 
   try {
-    module lModule((uint8_t*)lModuleBin.data(), lModuleBin.size());
+    module lModule((uint8_t*)lModuleBin.data(), lModuleBin.size(), lDebug);
     profile_step("Module parse");
 
     lModule.optimize(lOptLevel);
@@ -303,7 +308,7 @@ int main(int argc, char **argv) {
     auto lEntryFn = lContext.get_fn<int(int, char**)>("main");
     profile_step("Find main symbol");
 
-    int lResult = lEntryFn((int)lArgvOffsets.size(), (char**)lDataVMOffset);
+    int lResult = lEntryFn((int)lArgvOffsets.size(), reinterpret_cast<char**>(lDataVMOffset));
     profile_step("Main execution");
 
     return lResult;
