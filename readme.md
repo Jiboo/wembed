@@ -12,6 +12,9 @@ It depends on some LLVM patches before merging into master:
   - https://reviews.llvm.org/D58323
   - https://reviews.llvm.org/D58334
 
+Also you should remove the value of DEBUG_PREFIX_MAP in wasmception/Makefile so
+that file path don't start with `wasmception://` and GDB may find them.
+``
 TODO:
   - DW_TAG_lexical_block
   - DW_TAG_variable
