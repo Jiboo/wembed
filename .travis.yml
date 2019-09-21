@@ -1,11 +1,11 @@
 language: cpp
-dist: xenial
+dist: bionic
 compiler: clang
 
 addons:
   apt:
     sources:
-      - sourceline: 'deb http://apt.llvm.org/trusty/ llvm-toolchain-trusty main'
+      - sourceline: 'deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic main'
         key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
       - ubuntu-toolchain-r-test
     packages:
