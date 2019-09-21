@@ -205,34 +205,21 @@ namespace wembed {
       try {
         sig::try_signal(lFnPtr);
       }
+      catch(const unlinkable_exception &pError) {
+        // invalid module init, rethrow
+        throw pError;
+      }
+      catch(const vm_runtime_exception &pError) {
+        // invalid module, although, carry on with tables init
+        replace_tables_indices();
+        throw pError;
+      }
       catch(const std::system_error &pError) {
         throw vm_runtime_exception(pError.what());
       }
     }
     profile_step("  context/start");
-
-    // Replaces indices loaded in tables
-    for (size_t i = 0; i < lTableCount; i++) {
-      table *lTable = tab();
-      table_type &lType = pModule.mTables[i].mType;
-      for (size_t lIndex = 0; lIndex < lType.mLimits.mInitial; lIndex++) {
-        void *lIndice = lTable->data_ptrs()[lIndex];
-        if ((size_t)lIndice == 0 || (size_t)lIndice > pModule.mFunctions.size())
-          continue;
-        const auto &lFuncDef = pModule.mFunctions[(size_t)lIndice - 1];
-        void *lAddress = get_pointer(lFuncDef.mName.c_str());
-        if (!lAddress)
-          throw unlinkable_exception("func in table was opt out");
-        auto lTypeHash = lFuncDef.mType;
-  #ifdef WEMBED_VERBOSE
-        std::cout << "remap table element for " << i << ", " << lIndex << " aka "
-                  << lFuncDef.mName << ": " << lAddress << ", type: " << lTypeHash << std::endl;
-  #endif
-        lTable->data_ptrs()[lIndex] = lAddress;
-        lTable->data_types()[lIndex] = lTypeHash;
-      }
-    }
-    profile_step("  context/table replace");
+    replace_tables_indices();
   }
 
   context::~context() {
@@ -241,6 +228,31 @@ namespace wembed {
         LLVMOrcRemoveModule(mEngine, mHandle);
       LLVMOrcDisposeInstance(mEngine);
     }
+  }
+
+  void context::replace_tables_indices() {
+    const auto lTableCount = mModule.mTables.size();
+    for (size_t i = 0; i < lTableCount; i++) {
+      table *lTable = tab();
+      table_type &lType = mModule.mTables[i].mType;
+      for (size_t lIndex = 0; lIndex < lType.mLimits.mInitial; lIndex++) {
+        void *lIndice = lTable->data_ptrs()[lIndex];
+        if ((size_t)lIndice == 0 || (size_t)lIndice > mModule.mFunctions.size())
+          continue;
+        const auto &lFuncDef = mModule.mFunctions[(size_t)lIndice - 1];
+        void *lAddress = get_pointer(lFuncDef.mName.c_str());
+        if (!lAddress)
+          throw unlinkable_exception("func in table was opt out");
+        auto lTypeHash = lFuncDef.mType;
+#ifdef WEMBED_VERBOSE
+        std::cout << "remap table element for " << i << ", " << lIndex << " aka "
+                  << lFuncDef.mName << ": " << lAddress << ", type: " << lTypeHash << std::endl;
+#endif
+        lTable->data_ptrs()[lIndex] = lAddress;
+        lTable->data_types()[lIndex] = lTypeHash;
+      }
+    }
+    profile_step("  context/table replace");
   }
 
   memory *context::mem() {

@@ -209,6 +209,8 @@ namespace wembed {
 
     std::unordered_map<std::string, void*> mSymbols;
 
+    void replace_tables_indices();
+
   public:
     memory *mem();
     table *tab();

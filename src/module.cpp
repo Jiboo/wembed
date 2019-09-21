@@ -2402,7 +2402,10 @@ namespace wembed {
               throw invalid_exception("global index out of bounds");
             auto lValueType = LLVMGetElementType(LLVMTypeOf(mGlobals[lGlobalIndex]));
             auto lValue = LLVMBuildIntToPtr(mBuilder, pop(lValueType), lValueType, "setGlobal");
-            lLastValue = LLVMBuildStore(mBuilder, lValue, mGlobals[lGlobalIndex]);
+            auto lGlobal = mGlobals[lGlobalIndex];
+            if (LLVMIsGlobalConstant(lGlobal))
+              throw invalid_exception("global is immutable");
+            lLastValue = LLVMBuildStore(mBuilder, lValue, lGlobal);
           } break;
 
           case o_memory_grow: {

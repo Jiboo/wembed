@@ -1,10 +1,14 @@
 cmake_minimum_required(VERSION 3.8.2)
 project(wembed)
 
+#add_definitions(-DWEMBED_VERBOSE)
+#add_definitions(-DWEMBED_PROFILE)
+#add_definitions(-DWEMBED_GDB_DEBUG)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 
-find_package(LLVM 9.0 REQUIRED CONFIG)
+find_package(LLVM 10.0 REQUIRED CONFIG)
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 include_directories(${LLVM_INCLUDE_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
@@ -75,6 +79,9 @@ if (GTEST_FOUND)
   add_executable(gtests ${TESTSUITE_SRC} ${TESTSUITE_EXTRA_INC} ${TESTSUITE_EXTRA_SRC} ${GTESTS_EXTRA_SRC})
   target_link_libraries(gtests ${GTEST_LIBRARIES} wembed try_signal ${LLVM_LIBS} stdc++fs)
   add_test(NAME gtests_test COMMAND gtests)
+
+  add_executable(debug_case ${TESTSUITE_EXTRA_INC} ${TESTSUITE_EXTRA_SRC} tst/debug_case.cpp)
+  target_link_libraries(debug_case ${GTEST_LIBRARIES} wembed try_signal ${LLVM_LIBS} stdc++fs)
 endif()
 
 if (NOT "$ENV{WASMCEPTION}" STREQUAL "")

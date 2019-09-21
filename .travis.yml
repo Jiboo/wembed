@@ -12,15 +12,15 @@ addons:
       - cmake
       - make
       - libstdc++-8-dev
-      - clang-9
-      - llvm-9-dev
-      - llvm-9-tools
+      - clang-10
+      - llvm-10-dev
+      - llvm-10-tools
       - libboost-dev
       - libgtest-dev
 
 before_script:
-  - export CC=clang-9
-  - export CXX=clang++-9
+  - export CC=clang-10
+  - export CXX=clang++-10
   # libgtest-dev require compilation
   - mkdir gtest-build
   - cd gtest-build

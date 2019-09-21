@@ -711,6 +711,8 @@ void handle(path pInputFile, ostream &pOutput) {
   }
   if (sBlacklist.find(lTestName) != sBlacklist.end())
     return;
+  /*if (lTestName != "linking")
+    return;*/
   ifstream is(pInputFile, ios::ate);
   if (!is.is_open())
     throw runtime_error(string("couldn't open file ") + pInputFile.string());
