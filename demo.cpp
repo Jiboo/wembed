@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
   int32_t glob = 0;
 
   // Define a resolver that will be used to resolve imports from the "host" namespace
-  auto lHostResolver = [&glob](std::string_view pFieldName) -> wembed::resolve_result_t {
+  auto lHostResolver = [&glob](wembed::context&, std::string_view pFieldName) -> wembed::resolve_result_t {
 
     // Static hardcoded table
     const static std::unordered_map<std::string_view, wembed::resolve_result_t> sSpectestMappings = {

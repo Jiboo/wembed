@@ -11,7 +11,7 @@ using namespace std::literals::string_literals;
 
 TEST(debug, case){
   std::unordered_map<std::string_view, context*> declared, registered;
-  auto lSpectestResolver = [](std::string_view pFieldName) -> resolve_result_t {
+  auto lSpectestResolver = [](context&, std::string_view pFieldName) -> resolve_result_t {
     const static std::unordered_map<std::string_view, resolve_result_t> sSpectestMappings = {
         {"global_i32",    expose_cglob(&spectest_global_i32)},
         {"global_f32",    expose_cglob(&spectest_global_f32)},
@@ -37,7 +37,7 @@ TEST(debug, case){
   struct module_resolver {
     context *mContext;
     module_resolver(context *pContext) : mContext(pContext) {}
-    resolve_result_t operator()(std::string_view pFieldName) {
+    resolve_result_t operator()(context&, std::string_view pFieldName) {
       return mContext->get_export(std::string(pFieldName));
     }
   };

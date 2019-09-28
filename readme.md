@@ -48,6 +48,11 @@ Out of scope
 - Any post-MVP feature below phase 4
 - wasm64
 
+WASI support
+------------
+
+WASI support is minimal, unstable and probably unsafe.
+
 Dependencies
 ------------
 
@@ -57,4 +62,4 @@ Dependencies
 Optional (required for tests):
 - google-test (unittests and running testsuite)
 - wabt (used to generate wasm binaries from testsuite text)
-- wasmception (used to generate wasm32 from some C test cases)
+- wasm-libc (used to generate wasm32 from some C test cases)

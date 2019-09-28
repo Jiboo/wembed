@@ -32,7 +32,8 @@ namespace wembed {
     return lRet;
   }
 
-  context::context(module &pModule, const resolvers_t &pResolver) : mModule(pModule) {
+  context::context(module &pModule, const resolvers_t &pResolver, void *pUserData)
+    : mModule(pModule), mUserData(pUserData) {
     profile_step("  context/ctr");
 
     char *lTriple = LLVMGetDefaultTargetTriple();
@@ -95,7 +96,7 @@ namespace wembed {
         if (lResolverSearch == pResolver.end())
           throw unlinkable_exception("import from unknown module: "s + std::string(lImportModule.first));
         for (const auto &lImportField : lFields) {
-          auto lResolverResult = lResolverSearch->second(lImportField.first);
+          auto lResolverResult = lResolverSearch->second(*this, lImportField.first);
           if (lResolverResult.mPointer == nullptr || lResolverResult.mKind != lImportField.second.mKind || lResolverResult.mTypeHash != lImportField.second.mTypeHash)
             throw unlinkable_exception(
                 "can't import symbol: "s + lImportField.first + " in module " + std::string(lImportModule.first));
@@ -122,7 +123,7 @@ namespace wembed {
         auto lResolverSearch = pResolver.find(lImport.mModule);
         if (lResolverSearch == pResolver.end())
           throw unlinkable_exception("import memory from unknown module: "s + std::string(lImport.mModule));
-        auto lResolverResult = lResolverSearch->second(lImport.mField);
+        auto lResolverResult = lResolverSearch->second(*this, lImport.mField);
         if (lResolverResult.mPointer == nullptr)
           throw unlinkable_exception("can't memory symbol: "s + lImport.mField + " in module " + std::string(lImport.mModule));
         mExternalMemory = static_cast<memory*>(lResolverResult.mPointer);
@@ -164,7 +165,7 @@ namespace wembed {
         auto lResolverSearch = pResolver.find(lImport.mModule);
         if (lResolverSearch == pResolver.end())
           throw unlinkable_exception("import table from unknown module: "s + std::string(lImport.mModule));
-        auto lResolverResult = lResolverSearch->second(lImport.mField);
+        auto lResolverResult = lResolverSearch->second(*this, lImport.mField);
         if (lResolverResult.mPointer == nullptr)
           throw unlinkable_exception("can't import table: "s + lImport.mField + " in module " + std::string(lImport.mModule));
         mExternalTable = static_cast<table*>(lResolverResult.mPointer);

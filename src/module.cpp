@@ -20,7 +20,7 @@
 
 namespace wembed {
 
-  module::module(uint8_t *pInput, size_t pLen, bool pDebugSupport) : mDebugSupport(pDebugSupport) {
+  module::module(uint8_t *pInput, size_t pLen, std::initializer_list<std::string_view> pContextImportNs, bool pDebugSupport) : mDebugSupport(pDebugSupport) {
     profile_step("  module/ctr");
     if (pInput == nullptr || pLen < 4)
       throw malformed_exception("invalid input");
@@ -57,7 +57,7 @@ namespace wembed {
     profile_step("  module/init");
 
     switch(parse<uint32_t>()) { // version
-      case 1: parse_sections(); break;
+      case 1: parse_sections(pContextImportNs); break;
       default: throw malformed_exception("unexpected version");
     }
     profile_step("  module/parsed");
@@ -404,7 +404,7 @@ namespace wembed {
     return (external_kind)parse<uint8_t>();
   }
 
-  void module::parse_sections() {
+  void module::parse_sections(std::initializer_list<std::string_view> pContextImportNs) {
     while(mCurrent < mEnd) {
       uint8_t lId = parse<uint8_t>();
       uint32_t lPayloadSize = parse_uleb128<uint32_t>();
@@ -420,7 +420,7 @@ namespace wembed {
           parse_custom_section(lName, lInternalSize);
         } break;
         case 1: parse_types(); break;
-        case 2: parse_imports(); break;
+        case 2: parse_imports(pContextImportNs); break;
         case 3: parse_functions(); break;
         case 4: parse_section_table(lPayloadSize); break;
         case 5: parse_section_memory(lPayloadSize); break;
@@ -1591,11 +1591,12 @@ namespace wembed {
     profile_step("  module/types");
   }
 
-  void module::parse_imports() {
+  void module::parse_imports(std::initializer_list<std::string_view> pContextImportNs) {
     uint32_t lCount = parse_uleb128<uint32_t>();
     for (size_t lImport = 0; lImport < lCount; lImport++) {
       uint32_t lSize = parse_uleb128<uint32_t>();
       std::string_view lModule = parse_str(lSize);
+      const bool lContextImportMod = std::find(pContextImportNs.begin(), pContextImportNs.end(), lModule);
       lSize = parse_uleb128<uint32_t>();
       std::string_view lField = parse_str(lSize);
       external_kind lKind = (external_kind)parse<uint8_t>();
@@ -1608,15 +1609,19 @@ namespace wembed {
             throw invalid_exception("invalid type index");
           LLVMTypeRef lType = mTypes[lTypeIndex];
 
-          // Add base memory as parameter
-          size_t lParamCount = LLVMCountParamTypes(lType);
-          std::vector<LLVMTypeRef> lParams(lParamCount);
-          LLVMGetParamTypes(lType, lParams.data());
+          if (lContextImportMod) {
+            // Add context as parameter
+            size_t lParamCount = LLVMCountParamTypes(lType);
+            std::vector<LLVMTypeRef> lParams(lParamCount + 1);
+            lParams[0] = map_ctype<void*>();
+            LLVMGetParamTypes(lType, lParams.data() + 1);
+            lType = LLVMFunctionType(LLVMGetReturnType(lType), lParams.data(), lParams.size(), false);
+          }
 
           LLVMValueRef lFunction = LLVMAddFunction(mModule, "wembed.func", lType);
           LLVMSetLinkage(lFunction, LLVMLinkage::LLVMExternalLinkage);
           const uint64_t lTypeHash = hash_fn_type(lType);
-          mFunctions.emplace_back(lFunction, lTypeHash);
+          mFunctions.emplace_back(lFunction, lTypeHash, lContextImportMod);
           mImports[std::string(lModule)].emplace(std::string(lField), symbol_t{ek_function, hash_fn_type(lType), lFunction});
   #ifdef WEMBED_VERBOSE
           std::cout << "Import func " << mFunctions.size() << ": " << LLVMPrintTypeToString(lType) << ", hash:" << hash_fn_type(lType) << std::endl;
@@ -2282,20 +2287,30 @@ namespace wembed {
             uint32_t lCalleeIndex = parse_uleb128<uint32_t>();
             if (lCalleeIndex >= mFunctions.size())
               throw invalid_exception("function index out of bounds");
-            LLVMValueRef lCallee = mFunctions[lCalleeIndex].mValue;
+            auto lCalleeDef = mFunctions[lCalleeIndex];
+            LLVMValueRef lCallee = lCalleeDef.mValue;
             LLVMTypeRef lCalleeType = LLVMGetElementType(LLVMTypeOf(lCallee));
             size_t lCalleeParamCount = LLVMCountParams(lCallee);
+            size_t lArgsOffset = 0;
+            std::vector<LLVMValueRef> lCalleeParams(lCalleeParamCount);
+
+            if (lCalleeDef.mWithContext) {
+              lCalleeParamCount--;
+              lArgsOffset = 1;
+              lCalleeParams[0] = LLVMBuildPointerCast(mBuilder, mContextRef, map_ctype<void*>(), "cast ctx to void*");
+            }
             if (lCalleeParamCount > mEvalStack.size())
               throw invalid_exception("not enough args in stack");
-            std::vector<LLVMValueRef> lCalleeParams(lCalleeParamCount);
-            std::copy(mEvalStack.end() - lCalleeParamCount, mEvalStack.end(), lCalleeParams.begin());
+            std::copy(mEvalStack.end() - lCalleeParamCount, mEvalStack.end(), lCalleeParams.begin() + lArgsOffset);
             mEvalStack.resize(mEvalStack.size() - lCalleeParamCount);
+
             std::vector<LLVMTypeRef> lArgTypes(LLVMCountParamTypes(lCalleeType));
             LLVMGetParamTypes(lCalleeType, lArgTypes.data());
             for (size_t i = 0; i < lCalleeParamCount; i++) {
               if (LLVMTypeOf(lCalleeParams[i]) != lArgTypes[i])
                 throw invalid_exception("arg type mismatch");
             }
+
             bool lCalleeReturnValue = LLVMGetReturnType(lCalleeType) != LLVMVoidType();
             lLastValue = LLVMBuildCall(mBuilder, lCallee, lCalleeParams.data(), lCalleeParams.size(),
                                          lCalleeReturnValue ? "call" : "");
@@ -2333,6 +2348,7 @@ namespace wembed {
                                                             "tableType");
             LLVMValueRef lTableTypePtr = LLVMBuildInBoundsGEP(mBuilder, lTableTypes, &lCalleeIndice, 1, "gep");
             LLVMValueRef lType = LLVMBuildLoad(mBuilder, lTableTypePtr, "loadPtr");
+            // FIXME JBL: It would be uninitialized if ptr was, this is a type mismatch error
             LLVMValueRef lTestType = LLVMBuildICmp(mBuilder, LLVMIntNE, get_const(lTypeHash), lType, "testType");
             static const char *lErrorString = "call to uninitialized table element";
             trap_if(lFunc, lTestType, mThrowVMException, {get_string(lErrorString)});

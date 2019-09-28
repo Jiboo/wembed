@@ -61,8 +61,7 @@ TEST(try_signal, returnparams) {
 TEST(try_signal, trap_fpe) {
   try {
     sig::try_signal([] {
-      int a = 0;
-      std::cout << (11 / a);
+      std::cout << (11 / std::stoi("0")) << std::endl;
       ASSERT_FALSE(true); // Should be unreachable
     });
     ASSERT_FALSE(true); // Should be unreachable
@@ -73,11 +72,9 @@ TEST(try_signal, trap_fpe) {
   }
   ASSERT_FALSE(false); // Should be executed
 
-
   try {
     sig::try_signal([] {
-      int a = -1;
-      std::cout << (std::numeric_limits<int>::min() / a);
+      std::cout << (std::numeric_limits<int>::min() / std::stoi("-1")) << std::endl;
       ASSERT_FALSE(true); // Should be unreachable
     });
     ASSERT_FALSE(true); // Should be unreachable
@@ -92,8 +89,8 @@ TEST(try_signal, trap_fpe) {
 TEST(try_signal, trap_segv) {
   try {
     sig::try_signal([] {
-      int *lTarget = nullptr;
-      std::cout << *lTarget;
+      int *lTarget = (int*)std::stol("0");
+      std::cout << *lTarget << std::endl;
       ASSERT_FALSE(true); // Should be unreachable
     });
     ASSERT_FALSE(true); // Should be unreachable
@@ -111,7 +108,7 @@ TEST(try_signal, trap_segv_map) {
   try {
     sig::try_signal([&lMemory] {
       uint8_t *lTarget = lMemory.data();
-      std::cout << *lTarget;
+      std::cout << *lTarget << std::endl;
       ASSERT_FALSE(true); // Should be unreachable
     });
     ASSERT_FALSE(true); // Should be unreachable
@@ -127,7 +124,7 @@ TEST(try_signal, trap_segv_map) {
   try {
     sig::try_signal([&lMemory] {
       uint8_t *lTarget = lMemory.data();
-      std::cout << *lTarget;
+      std::cout << *lTarget << std::endl;
       ASSERT_FALSE(false); // Should be reachable
     });
     ASSERT_FALSE(false); // Should be reachable
@@ -142,7 +139,7 @@ TEST(try_signal, trap_segv_map) {
   try {
     sig::try_signal([&lMemory] {
       uint8_t *lTarget = lMemory.data() + wembed::sPageSize;
-      std::cout << *lTarget;
+      std::cout << *lTarget << std::endl;
       ASSERT_FALSE(true); // Should be unreachable
     });
     ASSERT_FALSE(true); // Should be unreachable
@@ -154,15 +151,19 @@ TEST(try_signal, trap_segv_map) {
   ASSERT_FALSE(false); // Should be executed
 }
 
-void loop(size_t i) {
-  while (i > 0)
-    loop(i--);
+void loop(size_t i, int *dst) {
+  while (i > 0) {
+    *dst = rand() + *dst * i;
+    loop(i--, dst);
+  }
 }
 
 TEST(try_signal, trap_so) {
   try {
     sig::try_signal([] {
-      loop(std::numeric_limits<size_t>::max());
+      int dst;
+      loop(std::numeric_limits<size_t>::max(), &dst);
+      std::cout << dst << std::endl;
       ASSERT_FALSE(true); // Should be unreachable
     });
     ASSERT_FALSE(true); // Should be unreachable

@@ -59,3 +59,21 @@ TEST(hashtype, cvsllvm) {
   EXPECT_EQ(hash_fn_type(LLVMFuncType(Void(), {I32()})), hash_fn_ctype_ptr(test_v_i32));
   EXPECT_EQ(hash_fn_type(LLVMFuncType(I32(), {I32(), I32()})), hash_fn_ctype_ptr(test_i32_i32i32));
 }
+
+TEST(maptype, cvsllvm) {
+  EXPECT_EQ(map_ctype<void>(), Void());
+  EXPECT_EQ(map_ctype<int32_t>(), I32());
+  EXPECT_EQ(map_ctype<int64_t>(), I64());
+  EXPECT_EQ(map_ctype<float>(), F32());
+  EXPECT_EQ(map_ctype<double>(), F64());
+  EXPECT_EQ(map_ctype<const int32_t>(), I32());
+  EXPECT_EQ(map_ctype<const int64_t>(), I64());
+  EXPECT_EQ(map_ctype<const float>(), F32());
+  EXPECT_EQ(map_ctype<const double>(), F64());
+
+  EXPECT_EQ(map_fn_ctype<void()>(), LLVMFuncType(Void(), {}));
+  EXPECT_EQ(map_fn_ctype<int32_t()>(), LLVMFuncType(I32(), {}));
+  EXPECT_NE(map_fn_ctype<int32_t()>(), LLVMFuncType(F32(), {}));
+  EXPECT_EQ(map_fn_ctype<float(int32_t)>(), LLVMFuncType(F32(), {I32()}));
+  EXPECT_NE(map_fn_ctype<double(int32_t)>(), LLVMFuncType(F32(), {I32()}));
+}

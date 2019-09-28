@@ -197,7 +197,7 @@ public:
                "using namespace std::literals::string_literals;\n\n"
                "TEST(testsuite," << mTestName << ") {\n"
                "  std::unordered_map<std::string_view, context*> declared, registered;\n"
-               "  auto lSpectestResolver = [](std::string_view pFieldName) -> resolve_result_t {\n"
+               "  auto lSpectestResolver = [](context&, std::string_view pFieldName) -> resolve_result_t {\n"
                "    const static std::unordered_map<std::string_view, resolve_result_t> sSpectestMappings = {\n"
                "      {\"global_i32\",    expose_cglob(&spectest_global_i32)},\n"
                "      {\"global_f32\",    expose_cglob(&spectest_global_f32)},\n"
@@ -222,7 +222,7 @@ public:
                "  struct module_resolver {\n"
                "    context *mContext;\n"
                "    module_resolver(context *pContext) : mContext(pContext) {}\n"
-               "    resolve_result_t operator()(std::string_view pFieldName) {\n"
+               "    resolve_result_t operator()(context&, std::string_view pFieldName) {\n"
                "      return mContext->get_export(std::string(pFieldName));\n"
                "    }\n"
                "  };\n\n";

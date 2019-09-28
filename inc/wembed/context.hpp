@@ -17,6 +17,7 @@
 #include "intrinsics.hpp"
 
 namespace wembed {
+  class context;
 
   // Runtime table/memory types
   class table {
@@ -84,7 +85,7 @@ namespace wembed {
     external_kind mKind;
     uint64_t mTypeHash;
   };
-  using resolver_t = std::function<resolve_result_t(std::string_view)>;
+  using resolver_t = std::function<resolve_result_t(context&, std::string_view)>;
   using resolvers_t = std::unordered_map<std::string_view, resolver_t>;
 
   template<typename T>
@@ -114,8 +115,12 @@ namespace wembed {
   public:
     friend uint64_t orc_sym_resolver(const char *pName, void *pCtx);
 
-    context(module &pModule, const resolvers_t &pResolvers = {});
+    context(module &pModule, const resolvers_t &pResolvers = {}, void *pUserData = nullptr);
     ~context();
+
+    memory *mem();
+    table *tab();
+    void *user() { return mUserData; }
 
     template<typename T = void>
     T *get_pointer(const char *pName) {
@@ -206,14 +211,11 @@ namespace wembed {
     memory *mExternalMemory = nullptr;
     std::optional<table> mSelfTable;
     table *mExternalTable = nullptr;
+    void *mUserData;
 
     std::unordered_map<std::string, void*> mSymbols;
 
     void replace_tables_indices();
-
-  public:
-    memory *mem();
-    table *tab();
   };  // class context
 
 }  // namespace wembed

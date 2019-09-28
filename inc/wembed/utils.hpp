@@ -88,23 +88,58 @@ namespace wembed {
   constexpr uint64_t WEMBED_HASH_TABLE = 0x10;
   constexpr uint64_t WEMBED_HASH_MEMORY = 0x11;
 
+  template<typename T>
+  LLVMTypeRef map_ctype() {
+    throw std::runtime_error("can't map ctype to llvm");
+  }
+
+  template<> inline LLVMTypeRef map_ctype<void>()    { return LLVMVoidType(); }
+  template<> inline LLVMTypeRef map_ctype<void*>()    { return LLVMPointerType(LLVMVoidType(), 0); }
+  template<> inline LLVMTypeRef map_ctype<int8_t>() { return LLVMInt32Type(); }
+  template<> inline LLVMTypeRef map_ctype<uint8_t>() { return LLVMInt32Type(); }
+  template<> inline LLVMTypeRef map_ctype<int16_t>() { return LLVMInt32Type(); }
+  template<> inline LLVMTypeRef map_ctype<uint16_t>() { return LLVMInt32Type(); }
+  template<> inline LLVMTypeRef map_ctype<int32_t>() { return LLVMInt32Type(); }
+  template<> inline LLVMTypeRef map_ctype<uint32_t>() { return LLVMInt32Type(); }
+  template<> inline LLVMTypeRef map_ctype<int64_t>() { return LLVMInt64Type(); }
+  template<> inline LLVMTypeRef map_ctype<uint64_t>() { return LLVMInt64Type(); }
+  template<> inline LLVMTypeRef map_ctype<float>()   { return LLVMFloatType(); }
+  template<> inline LLVMTypeRef map_ctype<double>()  { return LLVMDoubleType(); }
+  template<> inline LLVMTypeRef map_ctype<const int32_t>() { return LLVMInt32Type(); }
+  template<> inline LLVMTypeRef map_ctype<const int64_t>() { return LLVMInt64Type(); }
+  template<> inline LLVMTypeRef map_ctype<const float>()   { return LLVMFloatType(); }
+  template<> inline LLVMTypeRef map_ctype<const double>()  { return LLVMDoubleType(); }
+
+  template <typename TFunc>
+  struct __map_fn_ctype {
+    LLVMTypeRef operator()() {
+      throw std::runtime_error("invalid type in hash_fn_ctype");
+    }
+  };
+
+  template <typename TReturn, typename...TParams>
+  struct __map_fn_ctype<TReturn (TParams...)> {
+    LLVMTypeRef operator()() {
+      LLVMTypeRef param_types[] = {map_ctype<TParams>()...};
+      return LLVMFunctionType(map_ctype<TReturn>(), param_types, sizeof(param_types) / sizeof(LLVMTypeRef), false);
+    }
+  };
+
+  template <typename T>
+  inline LLVMTypeRef map_fn_ctype() {
+    return __map_fn_ctype<T>{}();
+  }
+
   uint64_t hash_type(LLVMTypeRef pType, bool pConst = false);
   uint64_t hash_fn_type(LLVMTypeRef pType);
 
   template <typename T>
   inline uint64_t hash_ctype() {
-    throw std::runtime_error("invalid type in hash_ctype");
+    if constexpr(std::is_enum<T>::value)
+      return hash_type(map_ctype<typename std::underlying_type<T>::type>(), std::is_const<T>::value);
+    else
+      return hash_type(map_ctype<typename std::remove_const<T>::type>(), std::is_const<T>::value);
   }
-
-  template<> inline uint64_t hash_ctype<void>()    { return hash_type(LLVMVoidType(), false); }
-  template<> inline uint64_t hash_ctype<int32_t>() { return hash_type(LLVMInt32Type(), false); }
-  template<> inline uint64_t hash_ctype<int64_t>() { return hash_type(LLVMInt64Type(), false); }
-  template<> inline uint64_t hash_ctype<float>()   { return hash_type(LLVMFloatType(), false); }
-  template<> inline uint64_t hash_ctype<double>()  { return hash_type(LLVMDoubleType(), false); }
-  template<> inline uint64_t hash_ctype<const int32_t>() { return hash_type(LLVMInt32Type(), true); }
-  template<> inline uint64_t hash_ctype<const int64_t>() { return hash_type(LLVMInt64Type(), true); }
-  template<> inline uint64_t hash_ctype<const float>()   { return hash_type(LLVMFloatType(), true); }
-  template<> inline uint64_t hash_ctype<const double>()  { return hash_type(LLVMDoubleType(), true); }
 
   template <typename TLast>
   void typehash_combine(uint64_t &pSeed) {

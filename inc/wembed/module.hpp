@@ -33,7 +33,7 @@ namespace wembed {
   class module {
     friend class context;
   public:
-    module(uint8_t *pInput, size_t pLen, bool pDebugSupport = false);
+    module(uint8_t *pInput, size_t pLen, std::initializer_list<std::string_view> pContextImportNs = {}, bool pDebugSupport = false);
     virtual ~module();
 
     void optimize(uint8_t pOptLevel = 4);
@@ -126,9 +126,10 @@ namespace wembed {
       LLVMValueRef mValue;
       std::string mName;
       uint64_t mType;
+      bool mWithContext;
 
-      FuncDef(LLVMValueRef pValue, uint64_t pTypeHash)
-        : mValue(pValue), mType(pTypeHash) {}
+      FuncDef(LLVMValueRef pValue, uint64_t pTypeHash, bool pWithContext = false)
+        : mValue(pValue), mType(pTypeHash), mWithContext(pWithContext) {}
 
       void retreiveName() {
         size_t lSize;
@@ -224,7 +225,7 @@ namespace wembed {
     table_type parse_table_type();
     external_kind parse_external_kind();
 
-    void parse_sections();
+    void parse_sections(std::initializer_list<std::string_view> pContextImportNs);
     void parse_custom_section(const std::string_view &pName, size_t pInternalSize);
     void parse_names(size_t pInternalSize);
 
@@ -411,7 +412,7 @@ namespace wembed {
                             LLVMValueRef pConstNanBit);
 
     void parse_types();
-    void parse_imports();
+    void parse_imports(std::initializer_list<std::string_view> pContextImportNs);
     void parse_functions();
     void parse_section_table(uint32_t pSectionSize);
     void parse_section_memory(uint32_t pSectionSize);
