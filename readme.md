@@ -6,20 +6,23 @@ Branch info
 -----------
 
 This branch has experimental DWARF (yurydelendik/webassembly-dwarf) to LLVM IR
-debug metadata, partially working on some simple C input (source+lines only).
+debug metadata, partially working on some simple C input (functions/files/lines/parameters).
 
 It depends on some LLVM patches before merging into master:
   - https://reviews.llvm.org/D58323
   - https://reviews.llvm.org/D58334
 
-Also you should remove the value of DEBUG_PREFIX_MAP in wasmception/Makefile so
-that file path don't start with `wasmception://` and GDB may find them.
-``
 TODO:
   - DW_TAG_lexical_block
   - DW_TAG_variable
+    * https://reviews.llvm.org/D52634
   - DW_TAG_inlined_subroutine
   - Macro sections
+    * Apparently macro are not included in debug info by default, not sure if useful
+
+FIXME:
+  - Refactor to parse debug info earlier? As WASM was designed to be parsed with one-pass, wembed is too, although we need to book-keep a lot of info (notably, every instr offset) because debug sections are after code section
+  - How to ask debugger to show pointers as 32bit? And offset them to our memory base?
 
 Usage
 -----
@@ -47,6 +50,7 @@ Out of scope
 - WAST support, only binary modules can be imported
 - Any post-MVP feature below phase 4
 - wasm64
+- c/c++ api proposal
 
 WASI support
 ------------

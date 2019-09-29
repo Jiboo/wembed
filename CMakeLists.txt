@@ -57,7 +57,7 @@ if (GTEST_FOUND)
       "${TESTSUITE_PATH}/*.wast"
       "${TESTSUITE_PATH}/proposals/sign-extension-ops/*.wast"
       "${TESTSUITE_PATH}/proposals/nontrapping-float-to-int-conversions/*.wast")
-  set(TESTSUITE_FILES "")
+  #set(TESTSUITE_FILES "${TESTSUITE_PATH}/address.wast")
   foreach(TESTCASE_WAST ${TESTSUITE_FILES})
     string(REGEX REPLACE "${TESTSUITE_PATH}/(.*).wast" "${TESTSUITE_OUTPUT}/\\1.cpp" TESTCASE_CPP "${TESTCASE_WAST}")
     add_custom_command(OUTPUT ${TESTCASE_CPP}

@@ -1,11 +1,10 @@
 /**
- * This program is used tp run wasm32 generated through wasmception
+ * This program is used to run wasm32 generated through wasi sysroot
  */
 
 #include <chrono>
 #include <fstream>
 #include <filesystem>
-#include <iomanip>
 #include <iostream>
 #include <vector>
 

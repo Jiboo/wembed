@@ -17,6 +17,9 @@
 #include "utils.hpp"
 
 namespace wembed {
+  // Special type hashs for table/memory imports/exports
+  constexpr uint64_t WEMBED_HASH_TABLE = 0x10;
+  constexpr uint64_t WEMBED_HASH_MEMORY = 0x11;
 
   class malformed_exception : public std::runtime_error {
   public:
@@ -58,9 +61,13 @@ namespace wembed {
     std::unordered_map<std::string_view, Section> mCustomSections;
     Section get_custom_section(const std::string_view &pName);
 
+    struct externsym {
+      std::string mModule, mField;
+    };
+    externsym mMemoryImport, mTableImport;
+
     LLVMBuilderRef mBuilder;
     std::vector<memory_type> mMemoryTypes;
-    externsym mMemoryImport, mTableImport;
     LLVMValueRef mBaseMemory = nullptr;
     LLVMValueRef mContextRef;
     struct Table {
@@ -290,6 +297,7 @@ namespace wembed {
     struct DIE {
       size_t mOffset;
       LLVMMetadataRef mMetadata = nullptr;
+      LLVMValueRef mValue = nullptr;
       llvm::dwarf::Tag mTag;
       AttrValues mAttributes;
       std::list<DIE> mChildren;
@@ -327,10 +335,13 @@ namespace wembed {
     std::unordered_set<DIE*> mEvaluatingDIE;
     unsigned mDbgKind;
 
-    /* When debug support is enabled, we need to keep a mapping between wasm instructions offsets and LLVMValues so
-     * that we may attach debug metadata later.
+    /* FIXME JBL: Because of the ordering of debug sections (after everything), we need to bookkeep some infos to later
+     * attach debug infos to them. This is uneffective, we might need to forget about the "single pass" principle and
+     * parse debug info before, so that we can attach when constructing the IR.
+     * This will be required when LLVM lands new way to track variables, that may point to index in the eval stack.
      */
     std::unordered_map<size_t, LLVMValueRef> mInstructions;
+    std::unordered_map<LLVMValueRef, std::vector<LLVMValueRef>> mFuncParams;
 
     struct FuncRange {
       uint32_t mStartAddress, mEndAddress;

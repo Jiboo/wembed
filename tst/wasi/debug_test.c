@@ -1,3 +1,6 @@
+#include <stdio.h>
+#include <stdlib.h>
+
 struct teststruct {
   int a;
   float b;
@@ -52,6 +55,8 @@ void* add_ptr(void (*pPtr)(), unsigned pOffset) {
 }
 
 int main(int argc, char** argv) {
+  printf("argv at %p\n", argv);
+
   struct teststruct a;
   struct testbitfield b;
 

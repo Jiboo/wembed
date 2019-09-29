@@ -16,6 +16,14 @@ namespace wembed {
 
   using namespace std::literals::string_literals;
 
+  void llvm_init();
+
+  using hrclock = std::chrono::high_resolution_clock;
+  std::ostream &operator<<(std::ostream &pOS, const hrclock::duration &pDur);
+  void profile_step(const char *pName);
+
+  void dump_hex(const void* data, size_t size);
+
   // Zeroed 4GB memory segment
   class virtual_mapping {
   public:
@@ -30,10 +38,6 @@ namespace wembed {
   protected:
     uint8_t *mAddress = nullptr;
     size_t mCurSize = 0;
-  };
-
-  struct externsym {
-    std::string mModule, mField;
   };
 
   // FP info and bit manipulation
@@ -84,9 +88,6 @@ namespace wembed {
     fp_bits(const double pValue) : mValue(pValue) {}
     operator double() const { return mValue; }
   };
-
-  constexpr uint64_t WEMBED_HASH_TABLE = 0x10;
-  constexpr uint64_t WEMBED_HASH_MEMORY = 0x11;
 
   template<typename T>
   LLVMTypeRef map_ctype() {
@@ -177,13 +178,5 @@ namespace wembed {
   inline uint64_t hash_fn_ctype_ptr(TReturn (*)(TParams...)) {
     return __hash_fn_ctype<TReturn(TParams...)>{}();
   }
-
-  void llvm_init();
-
-  using hrclock = std::chrono::high_resolution_clock;
-  std::ostream &operator<<(std::ostream &pOS, const hrclock::duration &pDur);
-  void profile_step(const char *pName);
-
-  void dump_hex(const void* data, size_t size);
 
 }  // namespace wembed

@@ -1154,13 +1154,28 @@ namespace wembed {
             break;
         }
         auto lTypeDie = mDIOffsetCache.find(lType);
-        if(lTypeDie != mDIOffsetCache.end())
+        if(lTypeDie == mDIOffsetCache.end())
           break;
 
         if (!lName.empty()) {
           pDIE.mMetadata = LLVMDIBuilderCreateParameterVariable(
               pDIBuilder, pDIE.mParent->mMetadata, lName.data(), lName.size(), lIndex + 1,
               lFile, lLine, lTypeDie->second->mMetadata, true, LLVMDIFlagZero);
+
+          auto lFunc = pDIE.mParent->mValue;
+          if (lFunc) {
+            const auto lIt = mFuncParams.find(lFunc);
+            if (lIt != mFuncParams.end()) {
+              const std::vector<LLVMValueRef> &lParams = lIt->second;
+              auto lValue = lParams[lIndex];
+              LLVMMetadataRef lExpr = LLVMDIBuilderCreateExpression(pDIBuilder, nullptr, 0);
+              /* FIXME  JBL: The "bit size" of pointer in LLVM DI IR is lost when translated to dwarf for our module
+               * hence, the debugger tries to read 64bit pointers. Trying different lExpr didn't work, it's used to
+               * change the address to read, and not how to display the value. */
+              auto lDebugLoc = LLVMDIBuilderCreateDebugLocation(LLVMGetGlobalContext(), lLine, 0, pDIE.mParent->mMetadata, nullptr);
+              LLVMDIBuilderInsertDeclareBefore(pDIBuilder, lValue, pDIE.mMetadata, lExpr, lDebugLoc, lValue);
+            }
+          }
         }
       } break;
 
@@ -1198,6 +1213,7 @@ namespace wembed {
         auto lLowPC = pDIE.attr<uint64_t>(DW_AT_low_pc, -1);
         auto lHighPC = lLowPC + pDIE.attr<uint64_t>(DW_AT_high_pc, -1);
         auto lFunc = find_func_by_range(lLowPC, lHighPC);
+        pDIE.mValue = lFunc;
         if (lFunc) {
           LLVMGlobalSetMetadata(lFunc, mDbgKind, pDIE.mMetadata);
 
@@ -1969,9 +1985,9 @@ namespace wembed {
       uint8_t *lBefore = mCurrent;
 
       uint32_t lFuncOffsetStart = mCurrent - lCodeSectionStart;
-      /*if (mDebugSupport) {
-        mInstructions[lFuncOffsetStart] = LLVMBasicBlockAsValue(lFuncEntry);
-      }*/
+      if (mDebugSupport) {
+        mFuncParams[lFunc] = lLocals;
+      }
 
 #ifdef WEMBED_VERBOSE
       std::cout << "At PC 0x" << std::hex << lFuncOffsetStart << std::dec

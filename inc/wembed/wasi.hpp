@@ -69,7 +69,6 @@ namespace wembed::wasi {
       std::vector<uint8_t> mBuffer;
       std::vector<size_t> mElements;
     };
-
     strings_buff mArgs, mEnv;
 
     std::unordered_map<fd_w, std::unique_ptr<file>> mFiles;
@@ -85,7 +84,7 @@ namespace wembed::wasi {
 
     friend errno_w fd_close(void*, fd_w);
     friend errno_w fd_seek(void*, fd_w, filedelta_w, whence_w, filesizeptr_w);
-    friend errno_w fd_write(void*, fd_w, const ciovecptr_w, size_w, sizeptr_w);
+    friend errno_w fd_write(void*, fd_w, ciovecptr_w, size_w, sizeptr_w);
   };
 
   resolver_t make_unstable_resolver();
