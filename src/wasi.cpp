@@ -101,6 +101,12 @@ bool host_file::seek(filedelta_w delta, whence_w whence, filesize_w *out_size) {
   return lSeekOk;
 }
 
+bool host_file::tell(filesize_w *out_size) {
+  if (out_size != nullptr)
+    *out_size = ftell(mStream);
+  return true;
+}
+
 bool host_file::write(const std::vector<std::string_view> &iovecs, size_w *out_written) {
   size_w lTotalWritten = 0;
   for (auto lView : iovecs) {
@@ -269,6 +275,23 @@ errno_w fd_seek(void *ctx, fd_w fd, filedelta_w offset, whence_w whence, filesiz
   TRACE_WASI_RETURN(__WASI_ESUCCESS);
 }
 
+errno_w fd_tell(void *ctx, fd_w fd, filesizeptr_w newoffset) {
+  TRACE_WASI_CALLS(fd, newoffset);
+
+  auto *lWasmCtx = static_cast<context*>(ctx);
+  auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
+  auto *lOffset = (filesize_w*)(lWasmCtx->mem()->data() + newoffset);
+
+  auto lIt = lWasiCtx->mFiles.find(fd);
+  if (lIt == lWasiCtx->mFiles.end())
+    TRACE_WASI_RETURN(__WASI_EBADF);
+
+  if (!lIt->second->tell(lOffset))
+    TRACE_WASI_RETURN(__WASI_EIO);
+
+  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+}
+
 errno_w fd_write(void *ctx, fd_w fd, const ciovecptr_w iovs, size_w iovs_len, sizeptr_w nwritten) {
   TRACE_WASI_CALLS(fd, iovs, iovs_len, nwritten);
 
@@ -309,6 +332,7 @@ resolver_t make_unstable_resolver() {
       {"fd_close",            expose_func(&fd_close)},
       {"fd_seek",             expose_func(&fd_seek)},
       {"fd_write",            expose_func(&fd_write)},
+      {"fd_tell",             expose_func(&fd_tell)},
     };
 
     auto lFound = sEnvMappings.find(pFieldName);

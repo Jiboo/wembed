@@ -440,7 +440,6 @@ namespace wembed {
     if (pName == "name") {
       // "name" http://webassembly.org/docs/binary-encoding/#name-section
       parse_names(pInternalSize);
-      mCurrent += pInternalSize;
     }
     else if (pName == "dylink") {
       // TODO https://github.com/WebAssembly/tool-conventions/blob/master/DynamicLinking.md
@@ -1138,42 +1137,70 @@ namespace wembed {
       case DW_TAG_lexical_block: {
         // TODO
       } break;
-      case DW_TAG_variable: {
-        // TODO
-      } break;
 
+      //case DW_TAG_variable:
       case DW_TAG_formal_parameter: {
-        auto lName = pDIE.attr<std::string_view>(DW_AT_name);
-        auto lFile = get_debug_file(pDIBuilder, &pDIE, pDIE.attr<uint64_t>(DW_AT_decl_file));
-        auto lLine = pDIE.attr<uint64_t>(DW_AT_decl_line);
-        auto lParentParams = pDIE.mParent->children(DW_TAG_formal_parameter);
-        assert(lParentParams.size() > 0);
-        size_t lIndex = 0;
-        for (; lIndex < lParentParams.size(); lIndex++) {
-          if (lParentParams[lIndex] == &pDIE)
-            break;
-        }
+        // FIXME JBL: No support for variables in lexical blocks
+        if (pDIE.mParent->mTag != DW_TAG_subprogram)
+          break;
+
         auto lTypeDie = mDIOffsetCache.find(lType);
         if(lTypeDie == mDIOffsetCache.end())
           break;
 
-        if (!lName.empty()) {
+        auto lName = pDIE.attr<std::string_view>(DW_AT_name);
+        auto lFile = get_debug_file(pDIBuilder, &pDIE, pDIE.attr<uint64_t>(DW_AT_decl_file));
+        auto lLine = pDIE.attr<uint64_t>(DW_AT_decl_line);
+
+        if (lName.empty())
+          break;
+
+        /* NOTE JBL: The index computing rely on the fact that the tags in dwarf appear in the same order than
+         * the locals in wasm.. FIXME JBL: Use DW_AT_location */
+        auto lParentParams = pDIE.mParent->children(DW_TAG_formal_parameter);
+        auto lParentVars = pDIE.mParent->children(DW_TAG_variable);
+        size_t lIndex = 0;
+        bool found = false;
+        for (; lIndex < lParentParams.size(); lIndex++) {
+          if (lParentParams[lIndex] == &pDIE) {
+            found = true;
+            break;
+          }
+        }
+        for (; !found && lIndex < lParentVars.size(); lIndex++) {
+          if (lParentVars[lIndex] == &pDIE)
+            break;
+        }
+
+        if (pDIE.mTag == DW_TAG_formal_parameter) {
           pDIE.mMetadata = LLVMDIBuilderCreateParameterVariable(
               pDIBuilder, pDIE.mParent->mMetadata, lName.data(), lName.size(), lIndex + 1,
-              lFile, lLine, lTypeDie->second->mMetadata, true, LLVMDIFlagZero);
+              lFile, lLine, lTypeDie->second->mMetadata, false, LLVMDIFlagZero);
+        }
+        else {
+          pDIE.mMetadata = LLVMDIBuilderCreateAutoVariable(
+              pDIBuilder, pDIE.mParent->mMetadata, lName.data(), lName.size(), lFile, lLine,
+              lTypeDie->second->mMetadata, false, LLVMDIFlagZero, 32);
+        }
 
-          auto lFunc = pDIE.mParent->mValue;
-          if (lFunc) {
-            const auto lIt = mFuncParams.find(lFunc);
-            if (lIt != mFuncParams.end()) {
-              const std::vector<LLVMValueRef> &lParams = lIt->second;
-              auto lValue = lParams[lIndex];
-              LLVMMetadataRef lExpr = LLVMDIBuilderCreateExpression(pDIBuilder, nullptr, 0);
-              /* FIXME  JBL: The "bit size" of pointer in LLVM DI IR is lost when translated to dwarf for our module
-               * hence, the debugger tries to read 64bit pointers. Trying different lExpr didn't work, it's used to
-               * change the address to read, and not how to display the value. */
-              auto lDebugLoc = LLVMDIBuilderCreateDebugLocation(LLVMGetGlobalContext(), lLine, 0, pDIE.mParent->mMetadata, nullptr);
-              LLVMDIBuilderInsertDeclareBefore(pDIBuilder, lValue, pDIE.mMetadata, lExpr, lDebugLoc, lValue);
+        auto lFunc = pDIE.mParent->mValue;
+        if (lFunc) {
+          const auto lIt = mLocalsTracking.find(lFunc);
+          if (lIt != mLocalsTracking.end()) {
+            const std::vector<LLVMValueRef> &lLocals = lIt->second.mLocals;
+            auto lValue = lLocals[lIndex];
+            LLVMMetadataRef lExpr = LLVMDIBuilderCreateExpression(pDIBuilder, nullptr, 0);
+            /* FIXME  JBL: The "bit size" of pointer in LLVM DI IR is lost when translated to dwarf for our module
+             * hence, the debugger tries to read 64bit pointers. Trying different lExpr didn't work, it's used to
+             * change the address to read, and not how to display the value. */
+            auto lDebugLoc = LLVMDIBuilderCreateDebugLocation(LLVMGetGlobalContext(), lLine, 0, pDIE.mParent->mMetadata, nullptr);
+            LLVMDIBuilderInsertDeclareBefore(pDIBuilder, lValue, pDIE.mMetadata, lExpr, lDebugLoc, lValue);
+
+            const auto &lChanges = lIt->second.mChanges;
+            for (const auto &lChange : lChanges) {
+              if (lChange.mIndex == lIndex) {
+                //LLVMDIBuilderInsertDbgValueBefore(pDIBuilder, lChange.mNewValue, pDIE.mMetadata, lExpr, lDebugLoc, lChange.mNewValue);
+              }
             }
           }
         }
@@ -1985,10 +2012,6 @@ namespace wembed {
       uint8_t *lBefore = mCurrent;
 
       uint32_t lFuncOffsetStart = mCurrent - lCodeSectionStart;
-      if (mDebugSupport) {
-        mFuncParams[lFunc] = lLocals;
-      }
-
 #ifdef WEMBED_VERBOSE
       std::cout << "At PC 0x" << std::hex << lFuncOffsetStart << std::dec
                 << " parsing code for func " << lFIndex << ": " << LLVMGetValueName(lFunc)
@@ -2005,7 +2028,16 @@ namespace wembed {
           lLocals.emplace_back(lAlloc);
           lLocalTypes.emplace_back(LLVMTypeOf(lAlloc));
           LLVMBuildStore(mBuilder, lZero, lAlloc);
+          if (mDebugSupport) {
+            auto lLocalIndex = lLocal + lParams.size();
+            LLVMValueRef lNewValue = LLVMBuildLoad(mBuilder, lLocals[lLocalIndex], "zeroLoad");
+            mLocalsTracking[lFunc].mChanges.emplace_back(lLocalIndex, lNewValue);
+          }
         }
+      }
+
+      if (mDebugSupport) {
+        mLocalsTracking[lFunc].mLocals = lLocals;
       }
 
       size_t lCodeSize = lBodySize - (mCurrent - lBefore);
@@ -2412,6 +2444,10 @@ namespace wembed {
             auto lValueType = LLVMGetElementType(lLocalTypes[lLocalIndex]);
             auto lValue = LLVMBuildIntToPtr(mBuilder, pop(lValueType), lValueType, "setLocal");
             lLastValue = LLVMBuildStore(mBuilder, lValue, lLocals[lLocalIndex]);
+            if (mDebugSupport) {
+              LLVMValueRef lNewValue = LLVMBuildLoad(mBuilder, lLocals[lLocalIndex], "dgbLoad");
+              mLocalsTracking[lFunc].mChanges.emplace_back(lLocalIndex, lNewValue);
+            }
           } break;
           case o_tee_local: {
             uint32_t lLocalIndex = parse_uleb128<uint32_t>();
@@ -2420,6 +2456,10 @@ namespace wembed {
             auto lValueType = LLVMGetElementType(lLocalTypes[lLocalIndex]);
             auto lValue = LLVMBuildIntToPtr(mBuilder, top(lValueType), lValueType, "teeLocal");
             lLastValue = LLVMBuildStore(mBuilder, lValue, lLocals[lLocalIndex]);
+            if (mDebugSupport) {
+              LLVMValueRef lNewValue = LLVMBuildLoad(mBuilder, lLocals[lLocalIndex], "dgbLoad");
+              mLocalsTracking[lFunc].mChanges.emplace_back(lLocalIndex, lNewValue);
+            }
           } break;
 
           case o_get_global: {

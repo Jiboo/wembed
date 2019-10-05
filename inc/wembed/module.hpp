@@ -219,7 +219,7 @@ namespace wembed {
       } while (lByte & 0x80);
       const size_t lSize = sizeof(T) * 8;
       if ((lShift < lSize) && (lByte & 0x40))
-        lResult |= - (1 << lShift);
+        lResult |= (T(~0ULL) << lShift);
       return boost::endian::little_to_native(lResult);
     }
 
@@ -341,7 +341,18 @@ namespace wembed {
      * This will be required when LLVM lands new way to track variables, that may point to index in the eval stack.
      */
     std::unordered_map<size_t, LLVMValueRef> mInstructions;
-    std::unordered_map<LLVMValueRef, std::vector<LLVMValueRef>> mFuncParams;
+
+    struct FuncLocalsTracking {
+      std::vector<LLVMValueRef> mLocals;
+      struct Change {
+        uint64_t mIndex;
+        LLVMValueRef mNewValue;
+
+        Change(uint64_t pIndex, LLVMValueRef pValue) : mIndex(pIndex), mNewValue(pValue) {}
+      };
+      std::vector<Change> mChanges;
+    };
+    std::unordered_map<LLVMValueRef, FuncLocalsTracking> mLocalsTracking;
 
     struct FuncRange {
       uint32_t mStartAddress, mEndAddress;

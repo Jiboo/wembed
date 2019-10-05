@@ -36,6 +36,7 @@ namespace wembed::wasi {
     virtual fdstat_w status() const;
     virtual bool close() { return false; }
     virtual bool seek(filedelta_w delta, whence_w whence, filesize_w *out_size) { return false; }
+    virtual bool tell(filesize_w *out_size) { return false; }
     virtual bool write(const std::vector<std::string_view> &iovecs, size_w *out_written) { return false; }
   };
 
@@ -46,6 +47,7 @@ namespace wembed::wasi {
 
     bool close() override;
     bool seek(filedelta_w delta, whence_w whence, filesize_w *out_size) override;
+    bool tell(filesize_w *out_size) override;
     bool write(const std::vector<std::string_view> &iovecs, size_w *out_written) override;
   };
 
@@ -85,6 +87,7 @@ namespace wembed::wasi {
     friend errno_w fd_close(void*, fd_w);
     friend errno_w fd_seek(void*, fd_w, filedelta_w, whence_w, filesizeptr_w);
     friend errno_w fd_write(void*, fd_w, ciovecptr_w, size_w, sizeptr_w);
+    friend errno_w fd_tell(void*, fd_w, filesizeptr_w);
   };
 
   resolver_t make_unstable_resolver();

@@ -115,7 +115,7 @@ int main(int argc, char **argv) {
                   istreambuf_iterator<char>());
   lModuleHandle.close();
 
-  profile_step("Module read");
+  profile_step("Read wasm file to memory");
 
   resolvers_t lResolvers = {
       {"wasi_unstable", wasi::make_unstable_resolver()},

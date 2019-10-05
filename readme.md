@@ -67,3 +67,8 @@ Optional (required for tests):
 - google-test (unittests and running testsuite)
 - wabt (used to generate wasm binaries from testsuite text)
 - wasm-libc (used to generate wasm32 from some C test cases)
+
+TODO
+----
+
+- load/store opt, don't check overflow if offset == 0, else mark branch without overflow as "likely"
