@@ -72,6 +72,7 @@ namespace wembed {
 
     void resize(size_t pNewSize) { mImpl.resize(pNewSize * sPageSize); }
     size_t size() { return mImpl.size() / sPageSize; }
+    size_t byte_size() { return mImpl.size(); }
     size_t capacity() { return mType.maximum(); }
     resizable_limits limits() { return mType.mLimits; }
 

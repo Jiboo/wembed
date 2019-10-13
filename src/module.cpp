@@ -46,13 +46,17 @@ namespace wembed {
     LLVMTargetRef lTarget;
     if (LLVMGetTargetFromTriple(lTriple, &lTarget, nullptr))
       throw std::runtime_error("can't get triple for host");
-    LLVMTargetMachineRef lTMachine = LLVMCreateTargetMachine(lTarget, lTriple, "", "", LLVMCodeGenLevelNone, LLVMRelocStatic, LLVMCodeModelJITDefault);
-    LLVMTargetDataRef lDataLayoutRef = LLVMCreateTargetDataLayout(lTMachine);
+
+    char* lHostCPU = LLVMGetHostCPUName();
+    char* lHostCPUFeatures = LLVMGetHostCPUFeatures();
+    mMachine = LLVMCreateTargetMachine(lTarget, lTriple, lHostCPU, lHostCPUFeatures, LLVMCodeGenLevelNone, LLVMRelocStatic, LLVMCodeModelJITDefault);
+    LLVMTargetDataRef lDataLayoutRef = LLVMCreateTargetDataLayout(mMachine);
     LLVMSetModuleDataLayout(mModule, lDataLayoutRef);
     LLVMDisposeTargetData(lDataLayoutRef);
     LLVMSetTarget(mModule, lTriple);
     LLVMDisposeMessage(lTriple);
-    LLVMDisposeTargetMachine(lTMachine);
+    LLVMDisposeMessage(lHostCPU);
+    LLVMDisposeMessage(lHostCPUFeatures);
 
     profile_step("  module/init");
 
@@ -103,7 +107,9 @@ namespace wembed {
   }
 
   module::~module() {
-    //LLVMDisposeModule(mModule);
+    if (mOwned)
+      LLVMDisposeModule(mModule);
+    LLVMDisposeTargetMachine(mMachine);
   }
 
   void module::dump_ll(std::ostream &os) {
@@ -916,7 +922,7 @@ namespace wembed {
       return nullptr;
     auto lCU = pContext->parent(DW_TAG_compile_unit);
     uint64_t lLinesOffset = lCU->attr<uint64_t>(DW_AT_stmt_list, -1);
-    assert(lLinesOffset != -1);
+    assert(lLinesOffset != -1ULL);
     auto lContext = mParsedLines.find(lLinesOffset);
     assert(lContext != mParsedLines.end());
     const auto &lFile = lContext->second.mFiles[pIndex - 1];
@@ -1138,7 +1144,7 @@ namespace wembed {
         // TODO
       } break;
 
-      //case DW_TAG_variable:
+      case DW_TAG_variable:
       case DW_TAG_formal_parameter: {
         // FIXME JBL: No support for variables in lexical blocks
         if (pDIE.mParent->mTag != DW_TAG_subprogram)
@@ -1149,7 +1155,7 @@ namespace wembed {
           break;
 
         auto lName = pDIE.attr<std::string_view>(DW_AT_name);
-        auto lFile = get_debug_file(pDIBuilder, &pDIE, pDIE.attr<uint64_t>(DW_AT_decl_file));
+        auto lFile = get_debug_file(pDIBuilder, &pDIE, pDIE.self_or_parent_attr<uint64_t>(DW_AT_decl_file));
         auto lLine = pDIE.attr<uint64_t>(DW_AT_decl_line);
 
         if (lName.empty())
@@ -1249,7 +1255,7 @@ namespace wembed {
 
           auto lCUDie = pDIE.parent(DW_TAG_compile_unit);
           auto lStatements = lCUDie->attr<uint64_t>(DW_AT_stmt_list, -1);
-          if (lStatements != -1 && lLowPC != -1) {
+          if (lStatements != -1ULL && lLowPC != -1UL) {
             auto &lLines = mParsedLines[lStatements].find_sequence(lLowPC, lHighPC);
             for (auto &lLineItem : lLines.mLines) {
               auto lInstr = mInstructions.find(lLineItem.mAddress);
@@ -2345,7 +2351,7 @@ namespace wembed {
             if (lCalleeDef.mWithContext) {
               lCalleeParamCount--;
               lArgsOffset = 1;
-              lCalleeParams[0] = LLVMBuildPointerCast(mBuilder, mContextRef, map_ctype<void*>(), "cast ctx to void*");
+              lCalleeParams[0] = LLVMBuildPointerCast(mBuilder, mContextRef, map_ctype<void*>(), "cast ctx to char*");
             }
             if (lCalleeParamCount > mEvalStack.size())
               throw invalid_exception("not enough args in stack");
@@ -2948,7 +2954,8 @@ namespace wembed {
     addInstructionCombiningPass(pPass);
   }
 
-  void addLTOOptimizationPasses(uint8_t pOptLevel, LLVMPassManagerRef pPass) {
+  void addLTOOptimizationPasses(uint8_t pOptLevel, LLVMTargetMachineRef pMachine, LLVMPassManagerRef pPass) {
+    LLVMAddAnalysisPasses(pMachine, pPass);
     LLVMAddGlobalDCEPass(pPass);
     addInitialAliasAnalysisPasses(pPass);
     //createForceFunctionAttrsLegacyPass
@@ -3015,7 +3022,7 @@ namespace wembed {
     mOptLevel = pOptLevel;
     LLVMPassManagerRef lPass = LLVMCreatePassManager();
 
-    addLTOOptimizationPasses(pOptLevel, lPass);
+    addLTOOptimizationPasses(pOptLevel, mMachine, lPass);
     addLateLTOOptimizationPasses(pOptLevel, lPass);
 
     LLVMRunPassManager(lPass, mModule);

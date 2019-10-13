@@ -10,6 +10,7 @@
 #include <boost/endian/conversion.hpp>
 
 #include <llvm-c/Core.h>
+#include <llvm-c/TargetMachine.h>
 
 #include <llvm/BinaryFormat/Dwarf.h>
 
@@ -48,6 +49,9 @@ namespace wembed {
     LLVMValueRef symbol1(const std::string_view &pName);
 
   protected:
+    LLVMTargetMachineRef mMachine;
+
+    bool mOwned = true;
     bool mDebugSupport;
     uint8_t mOptLevel = 0;
     uint8_t *mCurrent, *mEnd;
@@ -309,6 +313,18 @@ namespace wembed {
         if (lFound == mAttributes.end())
           return pDefault;
         return std::get<T>(lFound->second);
+      }
+
+      template<typename T>
+      T self_or_parent_attr(llvm::dwarf::Attribute pAttr, T pDefault = {}) {
+        DIE *lCurrent = this;
+        while (lCurrent != nullptr) {
+          auto lFound = lCurrent->mAttributes.find(pAttr);
+          if (lFound != lCurrent->mAttributes.end())
+            return std::get<T>(lFound->second);
+          lCurrent = lCurrent->mParent;
+        }
+        return pDefault;
       }
 
       // List all children with the requested tag

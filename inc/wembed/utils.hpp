@@ -95,7 +95,7 @@ namespace wembed {
   }
 
   template<> inline LLVMTypeRef map_ctype<void>()    { return LLVMVoidType(); }
-  template<> inline LLVMTypeRef map_ctype<void*>()    { return LLVMPointerType(LLVMVoidType(), 0); }
+  template<> inline LLVMTypeRef map_ctype<void*>()    { return LLVMPointerType(LLVMInt8Type(), 0); }
   template<> inline LLVMTypeRef map_ctype<int8_t>() { return LLVMInt32Type(); }
   template<> inline LLVMTypeRef map_ctype<uint8_t>() { return LLVMInt32Type(); }
   template<> inline LLVMTypeRef map_ctype<int16_t>() { return LLVMInt32Type(); }

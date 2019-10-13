@@ -52,11 +52,14 @@ void wembed::profile_step(const char *pName) {
     sInitialized = true;
   }
 
-  std::ios_base::fmtflags lIOFlags(std::cout.flags());
-  std::chrono::duration<double, std::milli> lElapsed = lNow - sFirst;
-  std::cout << "[" << std::fixed << std::setw(12) << std::setprecision(6) << lElapsed.count();
-  std::cout.flags(lIOFlags);
-  std::cout << "] " << pName << " (diff: " << (lNow - sLast) << ")" << std::endl;
+  if (pName) {
+    std::ios_base::fmtflags lIOFlags(std::cout.flags());
+    std::chrono::duration<double, std::milli> lElapsed = lNow - sFirst;
+    std::cout << "[" << std::fixed << std::setw(8) << std::setprecision(2) << lElapsed.count();
+    std::cout.flags(lIOFlags);
+    std::cout << "] " << pName << " (diff: " << std::fixed << (lNow - sLast) << ")" << std::endl;
+    std::cout.flags(lIOFlags);
+  }
 
   sLast = lNow;
 #endif

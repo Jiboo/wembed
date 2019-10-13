@@ -5,22 +5,22 @@
 
 namespace wembed::wasi {
 
-using voiptr_w = int32_t;
-using size_w = int32_t;
-using sizeptr_w = int32_t;
-using charptr_w = int32_t;
-using charptrptr_w = int32_t;
-using timestampptr_w = int32_t;
-using prestatptr_w = int32_t;
-using iovecptr_w = int32_t;
-using ciovecptr_w = int32_t;
-using filesizeptr_w = int32_t;
-using fdstatptr_w = int32_t;
-using fdptr_w = int32_t;
-using filestatptr_w = int32_t;
-using eventptr_w = int32_t;
-using subscriptionptr_w = int32_t;
-using roflagsptr_w = int32_t;
+using voiptr_w = uint32_t;
+using size_w = uint32_t;
+using sizeptr_w = uint32_t;
+using charptr_w = uint32_t;
+using charptrptr_w = uint32_t;
+using timestampptr_w = uint32_t;
+using prestatptr_w = uint32_t;
+using iovecptr_w = uint32_t;
+using ciovecptr_w = uint32_t;
+using filesizeptr_w = uint32_t;
+using fdstatptr_w = uint32_t;
+using fdptr_w = uint32_t;
+using filestatptr_w = uint32_t;
+using eventptr_w = uint32_t;
+using subscriptionptr_w = uint32_t;
+using roflagsptr_w = uint32_t;
 
 static_assert(alignof(int8_t) == 1, "non-wasi data layout");
 static_assert(alignof(uint8_t) == 1, "non-wasi data layout");
@@ -701,7 +701,7 @@ __wasi_errno_t __wasi_poll_oneoff(
     sizeptr_w nevents
 ) __WASI_SYSCALL_NAME(poll_oneoff) __attribute__((__warn_unused_result__));
 
-_Noreturn void __wasi_proc_exit(
+void __wasi_proc_exit(
     __wasi_exitcode_t rval
 ) __WASI_SYSCALL_NAME(proc_exit);
 

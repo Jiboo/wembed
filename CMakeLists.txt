@@ -51,7 +51,7 @@ if (GTEST_FOUND)
   set(TESTSUITE_OUTPUT ${CMAKE_BINARY_DIR}/tst/testsuite)
   file(MAKE_DIRECTORY ${TESTSUITE_OUTPUT})
 
-  set(TESTSUITE_SRC)
+  set(TESTSUITE_SRC tst/wasi/dep/minunit.h)
   set(TESTSUITE_PATH "${CMAKE_SOURCE_DIR}/dep/testsuite")
   file(GLOB TESTSUITE_FILES
       "${TESTSUITE_PATH}/*.wast"
@@ -95,12 +95,13 @@ if (NOT "$ENV{WASI_SYSROOT}" STREQUAL "")
     string(REGEX REPLACE "${WASI_PATH}/(.*).c" "\\1" TESTCASE "${TESTCASE_C}")
     set(TESTCASE_WASM "${WASI_OUTPUT}/${TESTCASE}.wasm")
     add_custom_command(OUTPUT "${TESTCASE_WASM}"
-        COMMAND clang --target=wasm32-unknown-wasi --sysroot "$ENV{WASI_SYSROOT}" "${TESTCASE_C}" -O0 -g -o "${TESTCASE_WASM}"
+        COMMAND clang -std=c11 -Wall --target=wasm32-unknown-wasi --sysroot "$ENV{WASI_SYSROOT}" "${TESTCASE_C}" -O0 -g -o "${TESTCASE_WASM}"
         DEPENDS ${TESTCASE_C}
         )
     set(TESTCASE_TARGET "WASI_${TESTCASE}")
     set(GEN_TESTCASE_TARGET "gen_${TESTCASE_TARGET}")
     #add_executable(${TESTCASE_TARGET} ${TESTCASE_C})
+    #target_include_directories(${TESTCASE_TARGET} SYSTEM BEFORE PRIVATE $ENV{WASI_SYSROOT}/include)
     add_custom_target(${GEN_TESTCASE_TARGET} DEPENDS ${TESTCASE_WASM})
     #add_dependencies(${TESTCASE_TARGET} ${GEN_TESTCASE_TARGET})
     add_dependencies(wembed-driver ${GEN_TESTCASE_TARGET})

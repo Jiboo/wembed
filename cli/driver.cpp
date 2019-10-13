@@ -10,30 +10,33 @@
 
 #include <wembed.hpp>
 
+#include <llvm-c/Support.h>
+
 using namespace std;
 using namespace std::filesystem;
 using namespace wembed;
 
 void usage(const string &pProgName) {
-  cout << "usage: " << pProgName << " <flags> [-- <args>]\n"
-          "  \n"
+  cout << "usage: " << pProgName << " <flags> [--llvm <llvm args>] [-- <module 'main' args>]\n"
+          "\n"
           "  runs '_start' from a wasm32 module, compiled with clang&wasi-libc\n"
-          "  \n"
+          "\n"
           "  available flags:\n"
           "    -i <wasm>  module input path (required)\n"
           "    -O<level>  optimisation level ([0-4] default: 0)\n"
           "    -g         enable debug support\n"
           "    -d         emit optimized llvm IR before executing\n"
-          "  \n"
-          "  result 1 in case of error, or the return value of the wasm's main function."
+          "\n"
+          "  result 1 in case of error, or the return value of the wasm's main function.\n"
+          "\n"
+          "  llvm args are passed through LLVMParseCommandLineOptions."
        << endl;
 }
 
 int main(int argc, char **argv) {
-  profile_step("Start");
+  profile_step(nullptr);
 
   llvm_init();
-
   profile_step("LLVM Init");
 
   if (argc < 2) {
@@ -47,9 +50,10 @@ int main(int argc, char **argv) {
   bool lDump = false;
   bool lDebug = false;
   vector<string_view> lArgs;
+  std::filesystem::path lRoot = std::filesystem::current_path();
 
   for (int i = 1; i < argc; i++) {
-    if (argv[i] == std::string("--")) {
+    if (argv[i] == "--"sv) {
       if (argc == i + 1) {
         cerr << "-- should be followed by at least one argument" << endl;
         usage(argv[0]);
@@ -57,6 +61,18 @@ int main(int argc, char **argv) {
       }
       for (int j = i + 1; j < argc; j++)
         lArgs.emplace_back(argv[j]);
+      break;
+    }
+    if (argv[i] == "--llvm"sv) {
+      auto begin = ++i;
+      while(i < argc && argv[i] != "--"sv)
+        i++;
+      if (begin > argc || i - begin == 0) {
+        cerr << "--llvm should be followed by at least one argument" << endl;
+        usage(argv[0]);
+        return EXIT_FAILURE;
+      }
+      LLVMParseCommandLineOptions(i - begin, static_cast<const char * const *>(argv+begin), "wembed driver options");
       break;
     }
     if (argv[i][0] == '-') {
@@ -103,7 +119,6 @@ int main(int argc, char **argv) {
     usage(argv[0]);
     return EXIT_FAILURE;
   }
-
   profile_step("Args parsing");
 
   ifstream lModuleHandle(lWasmPath, ios::binary);
@@ -111,10 +126,8 @@ int main(int argc, char **argv) {
     std::cerr << "can't open module: " << lWasmPath.string() << endl;
     return EXIT_FAILURE;
   }
-  std::string lModuleBin((istreambuf_iterator<char>(lModuleHandle)),
-                  istreambuf_iterator<char>());
+  std::string lModuleBin((istreambuf_iterator<char>(lModuleHandle)), istreambuf_iterator<char>());
   lModuleHandle.close();
-
   profile_step("Read wasm file to memory");
 
   resolvers_t lResolvers = {
@@ -133,7 +146,7 @@ int main(int argc, char **argv) {
       profile_step("Module dump");
     }
 
-    wasi::wasi_context lWasiContext;
+    wasi::wasi_context lWasiContext(lRoot);
     lWasiContext.add_preopen_host();
     lWasiContext.add_env_host();
     lWasiContext.add_arg(absolute(lWasmPath).string());
@@ -158,7 +171,13 @@ int main(int argc, char **argv) {
     auto lEntryFn = lContext.get_fn<void()>("_start");
     profile_step("Find _start symbol");
 
-    lEntryFn();
+    try {
+      lEntryFn();
+    }
+    catch (const wasi::proc_exit_exception &e) {
+      cerr << "module exit code: " << e.mCode << endl;
+      return e.mCode;
+    }
     profile_step("_start done");
 
     return EXIT_SUCCESS;
