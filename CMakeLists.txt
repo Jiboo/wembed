@@ -90,6 +90,11 @@ if (NOT "$ENV{WASI_SYSROOT}" STREQUAL "")
   else()
     set (WASM_CC "clang")
   endif()
+  if (DEFINED ENV{WASI_CFLAGS})
+    set (WASI_CFLAGS "$ENV{WASI_CFLAGS}")
+  else()
+    set (WASI_CFLAGS "")
+  endif()
   message(STATUS "WASI libc at $ENV{WASI_SYSROOT}")
   set(WASI_MODULES)
   set(WASI_PATH "${CMAKE_SOURCE_DIR}/tst/wasi")
@@ -100,9 +105,8 @@ if (NOT "$ENV{WASI_SYSROOT}" STREQUAL "")
     string(REGEX REPLACE "${WASI_PATH}/(.*).c" "\\1" TESTCASE "${TESTCASE_C}")
     set(TESTCASE_WASM "${WASI_OUTPUT}/${TESTCASE}.wasm")
     add_custom_command(OUTPUT "${TESTCASE_WASM}"
-        COMMAND ${WASM_CC} -v -std=c11 -Wall --target=wasm32-unknown-wasi --sysroot "$ENV{WASI_SYSROOT}" "${TESTCASE_C}" -O0 -g -o "${TESTCASE_WASM}"
-        DEPENDS ${TESTCASE_C}
-        )
+        COMMAND ${WASM_CC} -v -std=c11 -Wall --target=wasm32-unknown-wasi ${WASI_CFLAGS} --sysroot "$ENV{WASI_SYSROOT}"
+        "${TESTCASE_C}" -O0 -g -o "${TESTCASE_WASM}" DEPENDS ${TESTCASE_C})
     set(TESTCASE_TARGET "WASI_${TESTCASE}")
     set(GEN_TESTCASE_TARGET "gen_${TESTCASE_TARGET}")
     #add_executable(${TESTCASE_TARGET} ${TESTCASE_C})

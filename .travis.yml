@@ -26,6 +26,7 @@ before_script:
   - export WASM_CC=clang-10
   - export WASM_NM=llvm-nm-10
   - export WASM_AR=llvm-ar-10
+  - export WASI_CFLAGS=-fuse-ld=wasm-ld-10
   # libgtest-dev require compilation
   - mkdir gtest-build
   - cd gtest-build
