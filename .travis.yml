@@ -4,6 +4,7 @@ compiler: clang
 
 addons:
   apt:
+    update: true
     sources:
       - sourceline: 'deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic main'
         key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
@@ -41,6 +42,12 @@ before_script:
   - make
   - sudo make install
   - cd ../..
+  # WASI libc
+  - git clone https://github.com/CraneStation/wasi-libc
+  - cd wasi-libc
+  - make
+  - export WASI_SYSROOT=`pwd`
+  - cd ..
   # Done with dependencies
   - cd ..
   # Generate build script for wembed

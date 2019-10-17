@@ -1490,7 +1490,7 @@ __wasi_errno_t path_rename(void *ctx, __wasi_fd_t old_fd, const charptr_w old_pa
   if (lNew == lWasiCtx->mFiles.end())
     TRACE_WASI_RETURN(__WASI_EBADF);
 
-  if (renameat2(lOld->second.mHostFD, lOldPath, lNew->second.mHostFD, lNewPath, RENAME_NOREPLACE))
+  if (renameat(lOld->second.mHostFD, lOldPath, lNew->second.mHostFD, lNewPath))
     TRACE_WASI_RETURN(errno_translate());
   TRACE_WASI_RETURN(__WASI_ESUCCESS);
 }
