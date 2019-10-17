@@ -49,7 +49,7 @@ before_script:
   - git clone https://github.com/CraneStation/wasi-libc
   - cd wasi-libc
   - make
-  - export WASI_SYSROOT=`pwd`
+  - export WASI_SYSROOT=`pwd`/sysroot
   - cd ..
   # Done with dependencies
   - cd ..
