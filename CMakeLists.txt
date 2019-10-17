@@ -100,7 +100,7 @@ if (NOT "$ENV{WASI_SYSROOT}" STREQUAL "")
     string(REGEX REPLACE "${WASI_PATH}/(.*).c" "\\1" TESTCASE "${TESTCASE_C}")
     set(TESTCASE_WASM "${WASI_OUTPUT}/${TESTCASE}.wasm")
     add_custom_command(OUTPUT "${TESTCASE_WASM}"
-        COMMAND ${WASM_CC} -std=c11 -Wall --target=wasm32-unknown-wasi --sysroot "$ENV{WASI_SYSROOT}" "${TESTCASE_C}" -O0 -g -o "${TESTCASE_WASM}"
+        COMMAND ${WASM_CC} -v -std=c11 -Wall --target=wasm32-unknown-wasi --sysroot "$ENV{WASI_SYSROOT}" "${TESTCASE_C}" -O0 -g -o "${TESTCASE_WASM}"
         DEPENDS ${TESTCASE_C}
         )
     set(TESTCASE_TARGET "WASI_${TESTCASE}")
