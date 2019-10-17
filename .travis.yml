@@ -51,6 +51,9 @@ before_script:
   - make
   - export WASI_SYSROOT=`pwd`/sysroot
   - cd ..
+  # libclang_rt
+  - wget https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-7/libclang_rt.builtins-wasm32-wasi-7.0.tar.gz
+  - tar -xvzf libclang_rt.builtins-wasm32-wasi-7.0.tar.gz --directory /usr/lib/llvm-10/lib/clang/10.0.0/
   # Done with dependencies
   - cd ..
   # Generate build script for wembed
