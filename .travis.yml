@@ -32,7 +32,7 @@ before_script:
   - mkdir gtest-build
   - cd gtest-build
   - cmake /usr/src/gtest/
-  - make
+  - make -j`nproc`
   - sudo cp *.a /usr/local/lib
   - cd ..
   # Download, build, install required dependencies (not included as submodules)
@@ -44,13 +44,13 @@ before_script:
   - mkdir build
   - cd build
   - cmake ..
-  - make
+  - make -j`nproc`
   - sudo make install
   - cd ../..
   # WASI libc
   - git clone https://github.com/CraneStation/wasi-libc
   - cd wasi-libc
-  - make
+  - make -j`nproc`
   - export WASI_SYSROOT=`pwd`/sysroot
   - cd ..
   # libclang_rt
@@ -63,4 +63,4 @@ before_script:
   - cd build
   - cmake ..
 
-script: make && make test ARGS="-V"
+script: make -j`nproc` && make test ARGS="-V"
