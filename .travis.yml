@@ -27,9 +27,9 @@ before_script:
   - export WASM_CC=clang-10
   - export WASM_NM=llvm-nm-10
   - export WASM_AR=llvm-ar-10
-  - sudo apt-get remove clang
-  - sudo apt-get remove llvm
-  - sudo apt-get remove lld
+  - whereis wasm-ld
+  - sudo ln -s /usr/bin/wasm-ld-10 /usr/bin/wasm-ld
+  - whereis wasm-ld
   # libgtest-dev require compilation
   - mkdir gtest-build
   - cd gtest-build
