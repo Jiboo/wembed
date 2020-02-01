@@ -559,16 +559,36 @@ MU_TEST(fd_readdir) {
   uint8_t underbuf[sizeof(__wasi_dirent_t) + strlen("..") + 1];
   dirent = (__wasi_dirent_t*)underbuf;
   check_success(__wasi_fd_readdir, dirfd, underbuf, sizeof(underbuf), 0, &buf_used);
-  mu_assert_int_eq(sizeof(__wasi_dirent_t) + strlen("."), buf_used);
-  mu_assert_int_eq(1, dirent->d_namlen);
   underbuf[sizeof(__wasi_dirent_t) + dirent->d_namlen] = 0;
-  mu_assert_string_eq(".", (char*)underbuf + sizeof(__wasi_dirent_t));
+  switch (dirent->d_namlen) {
+    case 1:
+      mu_assert_int_eq(sizeof(__wasi_dirent_t) + strlen("."), buf_used);
+      mu_assert_int_eq(1, dirent->d_namlen);
+      mu_assert_string_eq(".", (char*)underbuf + sizeof(__wasi_dirent_t));
+      break;
+    case 2:
+      mu_assert_int_eq(sizeof(__wasi_dirent_t) + strlen(".."), buf_used);
+      mu_assert_int_eq(2, dirent->d_namlen);
+      mu_assert_string_eq("..", (char*)underbuf + sizeof(__wasi_dirent_t));
+      break;
+    default: mu_fail("unexpected");
+  }
 
   check_success(__wasi_fd_readdir, dirfd, underbuf, sizeof(underbuf), dirent->d_next, &buf_used);
-  mu_assert_int_eq(sizeof(__wasi_dirent_t) + strlen(".."), buf_used);
-  mu_assert_int_eq(2, dirent->d_namlen);
   underbuf[ sizeof(__wasi_dirent_t) + dirent->d_namlen] = 0;
-  mu_assert_string_eq("..", (char*)underbuf + sizeof(__wasi_dirent_t));
+  switch (dirent->d_namlen) {
+    case 1:
+      mu_assert_int_eq(sizeof(__wasi_dirent_t) + strlen("."), buf_used);
+      mu_assert_int_eq(1, dirent->d_namlen);
+      mu_assert_string_eq(".", (char*)underbuf + sizeof(__wasi_dirent_t));
+      break;
+    case 2:
+      mu_assert_int_eq(sizeof(__wasi_dirent_t) + strlen(".."), buf_used);
+      mu_assert_int_eq(2, dirent->d_namlen);
+      mu_assert_string_eq("..", (char*)underbuf + sizeof(__wasi_dirent_t));
+      break;
+    default: mu_fail("unexpected");
+  }
 
   check_success(__wasi_fd_close, dirfd);
   check_success(__wasi_path_remove_directory, 3, "test_dir", strlen("test_dir"));
@@ -1114,12 +1134,11 @@ void clean_fs(const char *_name) {
   int result;
   result = __wasi_path_remove_directory(3, _name, strlen(_name));
   result = __wasi_path_unlink_file(3, _name, strlen(_name));
-
 }
 
 void test_suite_setup() {
-  clean_fs("test_dir");
   clean_fs("test_dir/test_subdir");
+  clean_fs("test_dir");
   clean_fs("link1");
   clean_fs("link2");
   clean_fs("test.txt");
