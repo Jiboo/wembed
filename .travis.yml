@@ -8,26 +8,24 @@ addons:
     sources:
       - sourceline: 'deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic main'
         key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
-      - ubuntu-toolchain-r-test
     packages:
       - cmake
       - make
       - libstdc++-8-dev
-      - clang-10
-      - llvm-10-dev
-      - llvm-10-examples
-      - llvm-10-tools
-      - lld-10
-      - libboost-dev
+      - clang-11
+      - llvm-11-dev
+      - llvm-11-examples
+      - llvm-11-tools
+      - lld-11
       - libgtest-dev
 
 before_script:
-  - export CC=clang-10
-  - export CXX=clang++-10
-  - export WASM_CC=clang-10
-  - export WASM_NM=llvm-nm-10
-  - export WASM_AR=llvm-ar-10
-  - sudo ln -s /usr/bin/wasm-ld-10 /usr/bin/wasm-ld
+  - export CC=clang-11
+  - export CXX=clang++-11
+  - export WASM_CC=clang-11
+  - export WASM_NM=llvm-nm-11
+  - export WASM_AR=llvm-ar-11
+  - sudo ln -s /usr/bin/wasm-ld-11 /usr/bin/wasm-ld
   # libgtest-dev require compilation
   - mkdir gtest-build
   - cd gtest-build
@@ -54,8 +52,8 @@ before_script:
   - export WASI_SYSROOT=`pwd`/sysroot
   - cd ..
   # libclang_rt
-  - wget https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-7/libclang_rt.builtins-wasm32-wasi-7.0.tar.gz
-  - sudo tar -xvzf libclang_rt.builtins-wasm32-wasi-7.0.tar.gz --directory /usr/lib/llvm-10/lib/clang/10.0.0/
+  - wget https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-8/libclang_rt.builtins-wasm32-wasi-8.0.tar.gz
+  - sudo tar -xvzf libclang_rt.builtins-wasm32-wasi-8.0.tar.gz --directory /usr/lib/llvm-11/lib/clang/11.0.0/
   # Done with dependencies
   - cd ..
   # Generate build script for wembed
