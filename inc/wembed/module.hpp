@@ -1,13 +1,12 @@
 #pragma once
 
+#include <list>
 #include <ostream>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <variant>
 #include <vector>
-
-#include <boost/endian/conversion.hpp>
 
 #include <llvm-c/Core.h>
 #include <llvm-c/TargetMachine.h>
@@ -187,7 +186,7 @@ namespace wembed {
     template<typename T> T parse(uint8_t *&pPointer) {
       T lResult = *reinterpret_cast<T*>(pPointer);
       pPointer += sizeof(T);
-      return boost::endian::little_to_native(lResult);
+      return lendian_to_native(lResult);
     }
 
     template<typename T> T parse() {
@@ -205,7 +204,7 @@ namespace wembed {
         lResult |= T(lByte & (uint8_t) 0x7f) << lShift;
         lShift += 7;
       } while (lByte & 0x80);
-      return boost::endian::little_to_native(lResult);
+      return lendian_to_native(lResult);
     }
 
     template<typename T> T parse_uleb128() {
@@ -224,7 +223,7 @@ namespace wembed {
       const size_t lSize = sizeof(T) * 8;
       if ((lShift < lSize) && (lByte & 0x40))
         lResult |= (T(~0ULL) << lShift);
-      return boost::endian::little_to_native(lResult);
+      return lendian_to_native(lResult);
     }
 
     template<typename T> T parse_sleb128() {
@@ -269,8 +268,8 @@ namespace wembed {
       uint32_t mColumn;
     };
     struct LineSequence {
-      uint32_t mStartAddress;
-      uint32_t mEndAddress;
+      uint64_t mStartAddress;
+      uint64_t mEndAddress;
       std::vector<LineItem> mLines;
     };
     struct LineContext {
@@ -279,7 +278,7 @@ namespace wembed {
       std::vector<LineSequence> mSequences;
       std::vector<LineItem> mCurrentBuffer;
       void append_row(const LineState &pState);
-      LineSequence &find_sequence(uint32_t pStart, uint32_t pEnd);
+      LineSequence &find_sequence(uint64_t pStart, uint64_t pEnd);
     };
     std::unordered_map<size_t, LineContext> mParsedLines;
 
@@ -371,7 +370,7 @@ namespace wembed {
     std::unordered_map<LLVMValueRef, FuncLocalsTracking> mLocalsTracking;
 
     struct FuncRange {
-      uint32_t mStartAddress, mEndAddress;
+      uint64_t mStartAddress, mEndAddress;
       LLVMValueRef mFunc;
     };
     std::vector<FuncRange> mFuncRanges;
@@ -386,7 +385,7 @@ namespace wembed {
     LLVMMetadataRef get_debug_file(LLVMDIBuilderRef pDIBuilder, DIE *pContext, uint64_t pIndex);
     void apply_die_metadata(LLVMDIBuilderRef pDIBuilder, DIE &pDIE);
     void apply_die_metadata_on_child(LLVMDIBuilderRef pDIBuilder, DIE &pDIE);
-    LLVMValueRef find_func_by_range(uint32_t pStart, uint32_t pEnd);
+    LLVMValueRef find_func_by_range(uint64_t pStart, uint64_t pEnd);
 
     LLVMValueRef get_const(bool value) { return LLVMConstInt(LLVMInt1Type(), ull_t(value), false); }
     LLVMValueRef get_const(int32_t value) { return LLVMConstInt(LLVMInt32Type(), ull_t(value), true); }

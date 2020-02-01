@@ -208,13 +208,13 @@ namespace wembed {
                                       const std::initializer_list<LLVMTypeRef> &pArgTypes) {
 
     LLVMTypeRef *lArgTypes = const_cast<LLVMTypeRef*>(pArgTypes.begin());
-    LLVMTypeRef lType = LLVMFunctionType(pReturnType, lArgTypes, pArgTypes.size(), false);
+    LLVMTypeRef lType = LLVMFunctionType(pReturnType, lArgTypes, unsigned(pArgTypes.size()), false);
     return LLVMAddFunction(mModule, pName.c_str(), lType);
   }
 
   LLVMValueRef module::call_intrinsic(LLVMValueRef pIntrinsic, const std::initializer_list<LLVMValueRef> &pArgs) {
     LLVMValueRef *lArgs = const_cast<LLVMValueRef*>(pArgs.begin());
-    return LLVMBuildCall(mBuilder, pIntrinsic, lArgs, pArgs.size(), "");
+    return LLVMBuildCall(mBuilder, pIntrinsic, lArgs, unsigned(pArgs.size()), "");
   }
 
   LLVMValueRef module::init_mv_intrinsic(const std::string &pName,
@@ -222,8 +222,8 @@ namespace wembed {
                                          const std::initializer_list<LLVMTypeRef> &pArgTypes) {
     LLVMTypeRef *lArgTypes = const_cast<LLVMTypeRef*>(pArgTypes.begin());
     LLVMTypeRef *lReturnTypes = const_cast<LLVMTypeRef*>(pReturnTypes.begin());
-    LLVMTypeRef lReturnType = LLVMStructType(lReturnTypes, pReturnTypes.size(), false);
-    LLVMTypeRef lType = LLVMFunctionType(lReturnType, lArgTypes, pArgTypes.size(), false);
+    LLVMTypeRef lReturnType = LLVMStructType(lReturnTypes, unsigned(pReturnTypes.size()), false);
+    LLVMTypeRef lType = LLVMFunctionType(lReturnType, lArgTypes, unsigned(pArgTypes.size()), false);
     return LLVMAddFunction(mModule, pName.c_str(), lType);
   }
 
@@ -739,7 +739,7 @@ namespace wembed {
     }
   }
 
-  module::LineSequence &module::LineContext::find_sequence(uint32_t pStart, uint32_t pEnd) {
+  module::LineSequence &module::LineContext::find_sequence(uint64_t pStart, uint64_t pEnd) {
     for (auto &lSequence : mSequences) {
       if (lSequence.mStartAddress == pStart && lSequence.mEndAddress == pEnd)
         return lSequence;
@@ -747,7 +747,7 @@ namespace wembed {
     throw std::runtime_error("can't find inst sequence");
   }
 
-  LLVMValueRef module::find_func_by_range(uint32_t pStart, uint32_t pEnd) {
+  LLVMValueRef module::find_func_by_range(uint64_t pStart, uint64_t pEnd) {
     for (auto &lFuncRange : mFuncRanges) {
       if (lFuncRange.mStartAddress == pStart && lFuncRange.mEndAddress == pEnd)
         return lFuncRange.mFunc;
@@ -764,7 +764,7 @@ namespace wembed {
     while (lPointer < lEnd) {
       LineContext lContext;
       LineState lState;
-      uint32_t lSectionStart = lPointer - lSection.mStart;
+      auto lSectionStart = uint32_t(lPointer - lSection.mStart);
       //std::cout << "debug_line " << (void*)(lSectionStart) << std::endl;
       uint32_t lSectionSize = parse<uint32_t>(lPointer);
       uint8_t *lSectionEnd = lPointer + lSectionSize;
@@ -987,7 +987,7 @@ namespace wembed {
         auto lFile = get_debug_file(pDIBuilder, &pDIE, pDIE.attr<uint64_t>(DW_AT_decl_file));
         auto lLine = pDIE.attr<uint64_t>(DW_AT_decl_line);
         pDIE.mMetadata = LLVMDIBuilderCreateTypedef(pDIBuilder, lTypeDie->second->mMetadata,
-            lName.data(), lName.size(), lFile, lLine, pDIE.mParent->mMetadata);
+            lName.data(), unsigned(lName.size()), lFile, lLine, pDIE.mParent->mMetadata, 0);
       } break;
       case DW_TAG_subroutine_type: {
         std::vector<LLVMMetadataRef> lParamTypes;
@@ -1007,7 +1007,7 @@ namespace wembed {
         auto lCU = pDIE.parent(DW_TAG_compile_unit);
         auto lName = lCU->attr<std::string_view>(DW_AT_name);
         auto lFile = get_debug_abs_file(pDIBuilder, lName);
-        pDIE.mMetadata = LLVMDIBuilderCreateSubroutineType(pDIBuilder, lFile, lParamTypes.data(), lParamTypes.size(),
+        pDIE.mMetadata = LLVMDIBuilderCreateSubroutineType(pDIBuilder, lFile, lParamTypes.data(), unsigned(lParamTypes.size()),
                                                        LLVMDIFlagZero);
       } break;
       case DW_TAG_restrict_type:
@@ -1056,9 +1056,9 @@ namespace wembed {
           lEnumeratorRefs.emplace_back(lEnumerator->mMetadata);
 
         pDIE.mMetadata = LLVMDIBuilderCreateEnumerationType(pDIBuilder, pDIE.mParent->mMetadata,
-            lName.data(), lName.size(), lFile, lLine,
+            lName.data(), unsigned(lName.size()), lFile, unsigned(lLine),
             lByteSize * 8, 32, lEnumeratorRefs.data(),
-            lEnumeratorRefs.size(), lUnderlyingType);
+            unsigned(lEnumeratorRefs.size()), lUnderlyingType);
       } break;
 
       case DW_TAG_subrange_type: {
@@ -1080,7 +1080,7 @@ namespace wembed {
 
         pDIE.mMetadata = LLVMDIBuilderCreateArrayType(pDIBuilder, lTotalSize,
             32, lTypeDie->second->mMetadata,
-            lSubrangeRefs.data(), lSubrangeRefs.size());
+            lSubrangeRefs.data(), unsigned(lSubrangeRefs.size()));
       } break;
 
       case DW_TAG_member: {
@@ -1096,7 +1096,7 @@ namespace wembed {
 
         pDIE.mMetadata = LLVMDIBuilderCreateMemberType(
             pDIBuilder, pDIE.mParent->mMetadata, lName.data(),
-            lName.size(), lFile, lLine,
+            unsigned(lName.size()), lFile, unsigned(lLine),
             lBitSize, 32, lOffsetByte * 8 + lBitOffset,
             LLVMDIFlagZero, lTypeDie->second->mMetadata);
       } break;
@@ -1113,11 +1113,11 @@ namespace wembed {
 
         pDIE.mMetadata = LLVMDIBuilderCreateStructType(
             pDIBuilder, pDIE.mParent->mMetadata, lName.data(),
-            lName.size(), lFile, lLine,
+            unsigned(lName.size()), lFile, unsigned(lLine),
             lByteSize * 8, 32, LLVMDIFlagZero,
             nullptr, lMemberRefs.data(),
-            lMemberRefs.size(), 0, nullptr,
-            lName.data(), lName.size());
+            unsigned(lMemberRefs.size()), 0, nullptr,
+            lName.data(), unsigned(lName.size()));
       } break;
       case DW_TAG_union_type: {
         auto lName = pDIE.attr<std::string_view>(DW_AT_name);
@@ -1131,9 +1131,9 @@ namespace wembed {
 
         pDIE.mMetadata = LLVMDIBuilderCreateUnionType(
             pDIBuilder, pDIE.mParent->mMetadata, lName.data(),
-            lName.size(), lFile, lLine,
+            unsigned(lName.size()), lFile, unsigned(lLine),
             lByteSize * 8, 32, LLVMDIFlagZero,
-            lChilds.data(), lChilds.size(), 0,
+            lChilds.data(), unsigned(lChilds.size()), 0,
             nullptr, 0);
       } break;
 
@@ -1165,7 +1165,7 @@ namespace wembed {
          * the locals in wasm.. FIXME JBL: Use DW_AT_location */
         auto lParentParams = pDIE.mParent->children(DW_TAG_formal_parameter);
         auto lParentVars = pDIE.mParent->children(DW_TAG_variable);
-        size_t lIndex = 0;
+        unsigned lIndex = 0;
         bool found = false;
         for (; lIndex < lParentParams.size(); lIndex++) {
           if (lParentParams[lIndex] == &pDIE) {
@@ -1180,12 +1180,12 @@ namespace wembed {
 
         if (pDIE.mTag == DW_TAG_formal_parameter) {
           pDIE.mMetadata = LLVMDIBuilderCreateParameterVariable(
-              pDIBuilder, pDIE.mParent->mMetadata, lName.data(), lName.size(), lIndex + 1,
-              lFile, lLine, lTypeDie->second->mMetadata, false, LLVMDIFlagZero);
+              pDIBuilder, pDIE.mParent->mMetadata, lName.data(), unsigned(lName.size()), lIndex + 1,
+              lFile, unsigned(lLine), lTypeDie->second->mMetadata, false, LLVMDIFlagZero);
         }
         else {
           pDIE.mMetadata = LLVMDIBuilderCreateAutoVariable(
-              pDIBuilder, pDIE.mParent->mMetadata, lName.data(), lName.size(), lFile, lLine,
+              pDIBuilder, pDIE.mParent->mMetadata, lName.data(), unsigned(lName.size()), lFile, unsigned(lLine),
               lTypeDie->second->mMetadata, false, LLVMDIFlagZero, 32);
         }
 
@@ -1199,7 +1199,7 @@ namespace wembed {
             /* FIXME  JBL: The "bit size" of pointer in LLVM DI IR is lost when translated to dwarf for our module
              * hence, the debugger tries to read 64bit pointers. Trying different lExpr didn't work, it's used to
              * change the address to read, and not how to display the value. */
-            auto lDebugLoc = LLVMDIBuilderCreateDebugLocation(LLVMGetGlobalContext(), lLine, 0, pDIE.mParent->mMetadata, nullptr);
+            auto lDebugLoc = LLVMDIBuilderCreateDebugLocation(LLVMGetGlobalContext(), unsigned(lLine), 0, pDIE.mParent->mMetadata, nullptr);
             LLVMDIBuilderInsertDeclareBefore(pDIBuilder, lValue, pDIE.mMetadata, lExpr, lDebugLoc, lValue);
 
             const auto &lChanges = lIt->second.mChanges;
@@ -1234,14 +1234,14 @@ namespace wembed {
           lParamTypes.emplace_back(lParamTypeDIE->second->mMetadata);
         }
         auto lSubprogramTypes = LLVMDIBuilderCreateSubroutineType(pDIBuilder, lFile, lParamTypes.data(),
-            lParamTypes.size(), LLVMDIFlagZero);
+            unsigned(lParamTypes.size()), LLVMDIFlagZero);
 
         int lFlags = LLVMDIFlagZero;
         if (pDIE.attr<uint64_t>(DW_AT_prototyped))
           lFlags = LLVMDIFlagPrototyped;
 
-        pDIE.mMetadata = LLVMDIBuilderCreateFunction(pDIBuilder, pDIE.mParent->mMetadata, lName.data(), lName.size(),
-            nullptr, 0, lFile, lLine, lSubprogramTypes, !lExternal, true, 0, LLVMDIFlags(lFlags), 0);
+        pDIE.mMetadata = LLVMDIBuilderCreateFunction(pDIBuilder, pDIE.mParent->mMetadata, lName.data(), unsigned(lName.size()),
+            nullptr, 0, lFile, unsigned(lLine), lSubprogramTypes, !lExternal, true, 0, LLVMDIFlags(lFlags), 0);
 
         auto lLowPC = pDIE.attr<uint64_t>(DW_AT_low_pc, -1);
         auto lHighPC = lLowPC + pDIE.attr<uint64_t>(DW_AT_high_pc, -1);
@@ -1255,7 +1255,7 @@ namespace wembed {
 
           auto lCUDie = pDIE.parent(DW_TAG_compile_unit);
           auto lStatements = lCUDie->attr<uint64_t>(DW_AT_stmt_list, -1);
-          if (lStatements != -1ULL && lLowPC != -1UL) {
+          if (lStatements != 0xFFFFFFFFFFFFFFFFULL && lLowPC != 0xFFFFFFFFFFFFFFFFULL) {
             auto &lLines = mParsedLines[lStatements].find_sequence(lLowPC, lHighPC);
             for (auto &lLineItem : lLines.mLines) {
               auto lInstr = mInstructions.find(lLineItem.mAddress);
@@ -1306,8 +1306,8 @@ namespace wembed {
         auto lName = pDIE.attr<std::string_view>(DW_AT_name);
         auto lFile = get_debug_abs_file(pDIBuilder, lName);
         pDIE.mMetadata = LLVMDIBuilderCreateCompileUnit(pDIBuilder, LLVMDWARFSourceLanguage(lLang - 1),
-            lFile, lProducer.data(), lProducer.size(),
-            0, nullptr, 0, 0, nullptr, 0, LLVMDWARFEmissionFull, 0, 0, 0);
+            lFile, lProducer.data(), unsigned(lProducer.size()),
+            0, nullptr, 0, 0, nullptr, 0, LLVMDWARFEmissionFull, 0, 0, 0, nullptr, 0);
       } break;
 
       default:
@@ -1626,16 +1626,16 @@ namespace wembed {
     for (size_t lType = 0; lType < lCount; lType++) {
       parse<uint8_t>(); // "form", should always be 0x60
 
-      const size_t lParamTypeCount = parse_uleb128<uint32_t>();
-      LLVMTypeRef lParamTypes[lParamTypeCount];
+      unsigned lParamTypeCount = parse_uleb128<uint32_t>();
+      std::vector<LLVMTypeRef> lParamTypes(lParamTypeCount);
       for (size_t lParamType = 0; lParamType < lParamTypeCount; lParamType++)
         lParamTypes[lParamType] = parse_llvm_vtype();
 
-      const size_t lReturnTypesCount = parse_uleb128<uint32_t>();
+      size_t lReturnTypesCount = parse_uleb128<uint32_t>();
       if (lReturnTypesCount > 1)
         throw invalid_exception("only one return type supported");
       LLVMTypeRef lReturnType = lReturnTypesCount ? parse_llvm_vtype() : LLVMVoidType();
-      mTypes[lType] = LLVMFunctionType(lReturnType, lParamTypes, uint(lParamTypeCount), false);
+      mTypes[lType] = LLVMFunctionType(lReturnType, lParamTypes.data(), lParamTypeCount, false);
     }
     profile_step("  module/types");
   }
@@ -1664,7 +1664,7 @@ namespace wembed {
             std::vector<LLVMTypeRef> lParams(lParamCount + 1);
             lParams[0] = map_ctype<void*>();
             LLVMGetParamTypes(lType, lParams.data() + 1);
-            lType = LLVMFunctionType(LLVMGetReturnType(lType), lParams.data(), lParams.size(), false);
+            lType = LLVMFunctionType(LLVMGetReturnType(lType), lParams.data(), unsigned(lParams.size()), false);
           }
 
           LLVMValueRef lFunction = LLVMAddFunction(mModule, "wembed.func", lType);
@@ -2017,7 +2017,7 @@ namespace wembed {
       uint32_t lBodySize = parse_uleb128<uint32_t>();
       uint8_t *lBefore = mCurrent;
 
-      uint32_t lFuncOffsetStart = mCurrent - lCodeSectionStart;
+      uintptr_t lFuncOffsetStart = mCurrent - lCodeSectionStart;
 #ifdef WEMBED_VERBOSE
       std::cout << "At PC 0x" << std::hex << lFuncOffsetStart << std::dec
                 << " parsing code for func " << lFIndex << ": " << LLVMGetValueName(lFunc)
@@ -2312,7 +2312,7 @@ namespace wembed {
               LLVMAddIncoming(lDefaultTarget.mPhi, &lResult, &lWhere, 1);
             }
 
-            LLVMValueRef lLastValue = LLVMBuildSwitch(mBuilder, lIndex, lDefaultTarget.mBlock, lTargets.size());
+            LLVMValueRef lLastValue = LLVMBuildSwitch(mBuilder, lIndex, lDefaultTarget.mBlock, unsigned(lTargets.size()));
             for (size_t i = 0; i < lTargets.size(); i++) {
               const BlockEntry &lTarget = branch_depth(lTargets[i]);
               if (lTarget.mSignature != lDefaultTarget.mSignature)
@@ -2366,7 +2366,7 @@ namespace wembed {
             }
 
             bool lCalleeReturnValue = LLVMGetReturnType(lCalleeType) != LLVMVoidType();
-            lLastValue = LLVMBuildCall(mBuilder, lCallee, lCalleeParams.data(), lCalleeParams.size(),
+            lLastValue = LLVMBuildCall(mBuilder, lCallee, lCalleeParams.data(), unsigned(lCalleeParams.size()),
                                          lCalleeReturnValue ? "call" : "");
             if(lCalleeReturnValue) {
               push(lLastValue);
@@ -2413,7 +2413,7 @@ namespace wembed {
             LLVMValueRef lPointer = LLVMBuildInBoundsGEP(mBuilder, lTablePtr, &lCalleeIndice, 1, "gep");
             LLVMValueRef lRawFuncPtr = LLVMBuildLoad(mBuilder, lPointer, "loadPtr");
             LLVMValueRef lFuncPtr = LLVMBuildPointerCast(mBuilder, lRawFuncPtr, lCalleePtr, "cast");
-            lLastValue = LLVMBuildCall(mBuilder, lFuncPtr, lCalleeParams.data(), lCalleeParams.size(),
+            lLastValue = LLVMBuildCall(mBuilder, lFuncPtr, lCalleeParams.data(), unsigned(lCalleeParams.size()),
                                          lCalleeReturnValue ? "call" : "");
             if(lCalleeReturnValue) {
               push(lLastValue);
@@ -2548,7 +2548,7 @@ namespace wembed {
             LLVMValueRef lOffseted = LLVMBuildInBoundsGEP(mBuilder, mBaseMemory, &lTotalOffset, 1, "offseted"); \
             LLVMValueRef lCasted = LLVMBuildPointerCast(mBuilder, lOffseted, lPtrType, "casted"); \
             LLVMValueRef lLoad = LLVMBuildLoad(mBuilder, lCasted, "load"); \
-            uint lAlign = 1<<lFlags; \
+            unsigned lAlign = 1<<lFlags; \
             if (lAlign > BYTES) throw invalid_exception("unnatural alignment"); \
             LLVMSetAlignment(lLoad, lAlign); \
             LLVMSetVolatile(lLoad, true); \
@@ -2585,7 +2585,7 @@ namespace wembed {
             LLVMValueRef lOffseted = LLVMBuildInBoundsGEP(mBuilder, mBaseMemory, &lTotalOffset, 1, "offseted"); \
             LLVMValueRef lCasted = LLVMBuildPointerCast(mBuilder, lOffseted, lPtrType, "casted"); \
             LLVMValueRef lStore = LLVMBuildStore(mBuilder, CONVOP, lCasted); \
-            uint lAlign = 1<<lFlags; \
+            unsigned lAlign = 1<<lFlags; \
             if (lAlign > BYTES) throw invalid_exception("unnatural alignment"); \
             LLVMSetAlignment(lStore, lAlign); \
             LLVMSetVolatile(lStore, true); \
@@ -2890,7 +2890,7 @@ namespace wembed {
         lReturn = LLVMBuildRetVoid(mBuilder);
 
       if (mDebugSupport) {
-        uint32_t lFuncOffsetEnd = mCurrent - lCodeSectionStart;
+        uintptr_t lFuncOffsetEnd = mCurrent - lCodeSectionStart;
         mInstructions[lFuncOffsetEnd] = lReturn;
         FuncRange lFuncRange;
         lFuncRange.mStartAddress = lFuncOffsetStart;

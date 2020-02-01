@@ -28,6 +28,12 @@ extern "C" {
 #endif
 
 #if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <Windows.h>
 #if defined(_MSC_VER) && _MSC_VER < 1900
   #define snprintf _snprintf

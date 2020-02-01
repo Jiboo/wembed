@@ -3,16 +3,41 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <bit>
 #include <chrono>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 
-#include <boost/functional/hash.hpp>
-
 #include <llvm-c/Core.h>
 
 namespace wembed {
+
+  template <class T>
+  inline void hash_combine(std::size_t& seed, const T& v)
+  {
+    std::hash<T> hasher;
+    seed ^= hasher(v) + 0x9e3779b9 + (seed<<6) + (seed>>2);
+  }
+
+  template<typename T>
+  constexpr T endian_reverse(const T &x) {
+    static_assert(std::is_arithmetic_v<T>);
+    union adapter {
+      T whole;
+      uint8_t bytes[sizeof(T)];
+    };
+    adapter a{x};
+    std::reverse(std::begin(a.bytes), std::end(a.bytes));
+    return a.whole;
+  }
+
+  template<class T>
+  constexpr T lendian_to_native(const T& v) {
+    if constexpr (std::endian::native == std::endian::little)
+      return v;
+    return endian_reverse(v);
+  }
 
   using namespace std::literals::string_literals;
 
@@ -33,7 +58,7 @@ namespace wembed {
     void resize(size_t pNewSize);
     uint8_t *data() { return mAddress; }
     size_t size() { return mCurSize; }
-    size_t capacity() { return 4L*1024*1024*1024; }
+    size_t capacity() { return 4UL*1024*1024*1024; }
 
   protected:
     uint8_t *mAddress = nullptr;
@@ -48,11 +73,12 @@ namespace wembed {
   struct fp_bits<float> {
     using bits = uint32_t;
     static constexpr size_t sSignificandBits = 23;
-    static constexpr bits sMaxExponent  = 0xff;
-    static constexpr bits sQuietNan     = bits(1) << (sSignificandBits - 1);
-    static constexpr bits sSignMask     = 0b10000000'00000000'00000000'00000000;
-    static constexpr bits sExponentMask = 0b01111111'10000000'00000000'00000000;
-    static constexpr bits sMantissaMask = 0b00000000'01111111'11111111'11111111;
+    static constexpr bits sMaxExponent   = 0xff;
+    static constexpr bits sQuietNan      = bits(1) << (sSignificandBits - 1);
+    static constexpr bits sArithmeticNan = bits(3) << (sSignificandBits - 2);
+    static constexpr bits sSignMask      = 0b10000000'00000000'00000000'00000000;
+    static constexpr bits sExponentMask  = 0b01111111'10000000'00000000'00000000;
+    static constexpr bits sMantissaMask  = 0b00000000'01111111'11111111'11111111;
     union {
       struct {
         bits mMantissa : 23;
@@ -62,7 +88,7 @@ namespace wembed {
       float mValue;
       bits mRaw;
     };
-    fp_bits(const float pValue) : mValue(pValue) {}
+    fp_bits(float pValue) : mValue(pValue) {}
     operator float() const { return mValue; }
   };
 
@@ -70,11 +96,12 @@ namespace wembed {
   struct fp_bits<double> {
     using bits = uint64_t;
     static constexpr size_t sSignificandBits = 52;
-    static constexpr bits sMaxExponent  = 0x7ff;
-    static constexpr bits sQuietNan     = bits(1) << (sSignificandBits - 1);
-    static constexpr bits sSignMask     = 0b10000000'00000000'00000000'00000000'00000000'00000000'00000000'00000000;
-    static constexpr bits sExponentMask = 0b01111111'11110000'00000000'00000000'00000000'00000000'00000000'00000000;
-    static constexpr bits sMantissaMask = 0b00000000'00001111'11111111'11111111'11111111'11111111'11111111'11111111;
+    static constexpr bits sMaxExponent   = 0x7ff;
+    static constexpr bits sQuietNan      = bits(1) << (sSignificandBits - 1);
+    static constexpr bits sArithmeticNan = bits(3) << (sSignificandBits - 2);
+    static constexpr bits sSignMask      = 0b10000000'00000000'00000000'00000000'00000000'00000000'00000000'00000000;
+    static constexpr bits sExponentMask  = 0b01111111'11110000'00000000'00000000'00000000'00000000'00000000'00000000;
+    static constexpr bits sMantissaMask  = 0b00000000'00001111'11111111'11111111'11111111'11111111'11111111'11111111;
     union {
       struct {
         bits mMantissa : 52;
@@ -85,7 +112,7 @@ namespace wembed {
       bits mRaw;
     };
     fp_bits() {}
-    fp_bits(const double pValue) : mValue(pValue) {}
+    fp_bits(double pValue) : mValue(pValue) {}
     operator double() const { return mValue; }
   };
 
@@ -144,12 +171,12 @@ namespace wembed {
 
   template <typename TLast>
   void typehash_combine(uint64_t &pSeed) {
-    boost::hash_combine(pSeed, hash_ctype<TLast>());
+    hash_combine(pSeed, hash_ctype<TLast>());
   }
 
   template <typename TFirst, typename TSecond, typename...TRest>
   void typehash_combine(uint64_t &pSeed) {
-    boost::hash_combine(pSeed, hash_ctype<TFirst>());
+    hash_combine(pSeed, hash_ctype<TFirst>());
     typehash_combine<TSecond, TRest...>(pSeed);
   }
 

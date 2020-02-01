@@ -455,143 +455,143 @@ static_assert(alignof(__wasi_subscription_t) == 8, "non-wasi data layout");
 
 #define __WASI_SYSCALL_NAME(name)
 
-__wasi_errno_t __wasi_args_get(
+[[nodiscard]] __wasi_errno_t __wasi_args_get(
     charptrptr_w argv,
     charptr_w argv_buf
-) __WASI_SYSCALL_NAME(args_get) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(args_get);
 
-__wasi_errno_t __wasi_args_sizes_get(
+[[nodiscard]] __wasi_errno_t __wasi_args_sizes_get(
     sizeptr_w argc,
     sizeptr_w argv_buf_size
-) __WASI_SYSCALL_NAME(args_sizes_get) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(args_sizes_get);
 
-__wasi_errno_t __wasi_clock_res_get(
+[[nodiscard]] __wasi_errno_t __wasi_clock_res_get(
     __wasi_clockid_t clock_id,
     timestampptr_w resolution
-) __WASI_SYSCALL_NAME(clock_res_get) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(clock_res_get);
 
-__wasi_errno_t __wasi_clock_time_get(
+[[nodiscard]] __wasi_errno_t __wasi_clock_time_get(
     __wasi_clockid_t clock_id,
     __wasi_timestamp_t precision,
     timestampptr_w time
-) __WASI_SYSCALL_NAME(clock_time_get) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(clock_time_get);
 
-__wasi_errno_t __wasi_environ_get(
+[[nodiscard]] __wasi_errno_t __wasi_environ_get(
     charptrptr_w environ,
     charptr_w environ_buf
-) __WASI_SYSCALL_NAME(environ_get) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(environ_get);
 
-__wasi_errno_t __wasi_environ_sizes_get(
+[[nodiscard]] __wasi_errno_t __wasi_environ_sizes_get(
     sizeptr_w environ_count,
     sizeptr_w environ_buf_size
-) __WASI_SYSCALL_NAME(environ_sizes_get) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(environ_sizes_get);
 
-__wasi_errno_t __wasi_fd_prestat_get(
+[[nodiscard]] __wasi_errno_t __wasi_fd_prestat_get(
     __wasi_fd_t fd,
     prestatptr_w buf
-) __WASI_SYSCALL_NAME(fd_prestat_get) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(fd_prestat_get);
 
-__wasi_errno_t __wasi_fd_prestat_dir_name(
+[[nodiscard]] __wasi_errno_t __wasi_fd_prestat_dir_name(
     __wasi_fd_t fd,
     charptr_w path,
     size_w path_len
-) __WASI_SYSCALL_NAME(fd_prestat_dir_name) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(fd_prestat_dir_name);
 
-__wasi_errno_t __wasi_fd_close(
+[[nodiscard]] __wasi_errno_t __wasi_fd_close(
     __wasi_fd_t fd
-) __WASI_SYSCALL_NAME(fd_close) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(fd_close);
 
-__wasi_errno_t __wasi_fd_datasync(
+[[nodiscard]] __wasi_errno_t __wasi_fd_datasync(
     __wasi_fd_t fd
-) __WASI_SYSCALL_NAME(fd_datasync) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(fd_datasync);
 
-__wasi_errno_t __wasi_fd_pread(
+[[nodiscard]] __wasi_errno_t __wasi_fd_pread(
     __wasi_fd_t fd,
     const iovecptr_w iovs,
     size_w iovs_len,
     __wasi_filesize_t offset,
     sizeptr_w nread
-) __WASI_SYSCALL_NAME(fd_pread) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(fd_pread);
 
-__wasi_errno_t __wasi_fd_pwrite(
+[[nodiscard]] __wasi_errno_t __wasi_fd_pwrite(
     __wasi_fd_t fd,
     const ciovecptr_w iovs,
     size_w iovs_len,
     __wasi_filesize_t offset,
     sizeptr_w nwritten
-) __WASI_SYSCALL_NAME(fd_pwrite) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(fd_pwrite);
 
-__wasi_errno_t __wasi_fd_read(
+[[nodiscard]] __wasi_errno_t __wasi_fd_read(
     __wasi_fd_t fd,
     const iovecptr_w iovs,
     size_w iovs_len,
     sizeptr_w nread
-) __WASI_SYSCALL_NAME(fd_read) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(fd_read);
 
-__wasi_errno_t __wasi_fd_renumber(
+[[nodiscard]] __wasi_errno_t __wasi_fd_renumber(
     __wasi_fd_t from,
     __wasi_fd_t to
-) __WASI_SYSCALL_NAME(fd_renumber) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(fd_renumber);
 
-__wasi_errno_t __wasi_fd_seek(
+[[nodiscard]] __wasi_errno_t __wasi_fd_seek(
     __wasi_fd_t fd,
     __wasi_filedelta_t offset,
     __wasi_whence_t whence,
     filesizeptr_w newoffset
-) __WASI_SYSCALL_NAME(fd_seek) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(fd_seek);
 
-__wasi_errno_t __wasi_fd_tell(
+[[nodiscard]] __wasi_errno_t __wasi_fd_tell(
     __wasi_fd_t fd,
     filesizeptr_w newoffset
-) __WASI_SYSCALL_NAME(fd_tell) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(fd_tell);
 
-__wasi_errno_t __wasi_fd_fdstat_get(
+[[nodiscard]] __wasi_errno_t __wasi_fd_fdstat_get(
     __wasi_fd_t fd,
     fdstatptr_w buf
-) __WASI_SYSCALL_NAME(fd_fdstat_get) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(fd_fdstat_get);
 
-__wasi_errno_t __wasi_fd_fdstat_set_flags(
+[[nodiscard]] __wasi_errno_t __wasi_fd_fdstat_set_flags(
     __wasi_fd_t fd,
     __wasi_fdflags_t flags
-) __WASI_SYSCALL_NAME(fd_fdstat_set_flags) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(fd_fdstat_set_flags);
 
-__wasi_errno_t __wasi_fd_fdstat_set_rights(
+[[nodiscard]] __wasi_errno_t __wasi_fd_fdstat_set_rights(
     __wasi_fd_t fd,
     __wasi_rights_t fs_rights_base,
     __wasi_rights_t fs_rights_inheriting
-) __WASI_SYSCALL_NAME(fd_fdstat_set_rights) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(fd_fdstat_set_rights);
 
-__wasi_errno_t __wasi_fd_sync(
+[[nodiscard]] __wasi_errno_t __wasi_fd_sync(
     __wasi_fd_t fd
-) __WASI_SYSCALL_NAME(fd_sync) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(fd_sync);
 
-__wasi_errno_t __wasi_fd_write(
+[[nodiscard]] __wasi_errno_t __wasi_fd_write(
     __wasi_fd_t fd,
     const ciovecptr_w iovs,
     size_w iovs_len,
     sizeptr_w nwritten
-) __WASI_SYSCALL_NAME(fd_write) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(fd_write);
 
-__wasi_errno_t __wasi_fd_advise(
+[[nodiscard]] __wasi_errno_t __wasi_fd_advise(
     __wasi_fd_t fd,
     __wasi_filesize_t offset,
     __wasi_filesize_t len,
     __wasi_advice_t advice
-) __WASI_SYSCALL_NAME(fd_advise) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(fd_advise);
 
-__wasi_errno_t __wasi_fd_allocate(
+[[nodiscard]] __wasi_errno_t __wasi_fd_allocate(
     __wasi_fd_t fd,
     __wasi_filesize_t offset,
     __wasi_filesize_t len
-) __WASI_SYSCALL_NAME(fd_allocate) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(fd_allocate);
 
-__wasi_errno_t __wasi_path_create_directory(
+[[nodiscard]] __wasi_errno_t __wasi_path_create_directory(
     __wasi_fd_t fd,
     const charptr_w path,
     size_w path_len
-) __WASI_SYSCALL_NAME(path_create_directory) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(path_create_directory);
 
-__wasi_errno_t __wasi_path_link(
+[[nodiscard]] __wasi_errno_t __wasi_path_link(
     __wasi_fd_t old_fd,
     __wasi_lookupflags_t old_flags,
     const charptr_w old_path,
@@ -599,9 +599,9 @@ __wasi_errno_t __wasi_path_link(
     __wasi_fd_t new_fd,
     const charptr_w new_path,
     size_w new_path_len
-) __WASI_SYSCALL_NAME(path_link) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(path_link);
 
-__wasi_errno_t __wasi_path_open(
+[[nodiscard]] __wasi_errno_t __wasi_path_open(
     __wasi_fd_t dirfd,
     __wasi_lookupflags_t dirflags,
     const charptr_w path,
@@ -611,60 +611,60 @@ __wasi_errno_t __wasi_path_open(
     __wasi_rights_t fs_rights_inheriting,
     __wasi_fdflags_t fs_flags,
     fdptr_w fd
-) __WASI_SYSCALL_NAME(path_open) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(path_open);
 
-__wasi_errno_t __wasi_fd_readdir(
+[[nodiscard]] __wasi_errno_t __wasi_fd_readdir(
     __wasi_fd_t fd,
     voiptr_w buf,
     size_w buf_len,
     __wasi_dircookie_t cookie,
     sizeptr_w bufused
-) __WASI_SYSCALL_NAME(fd_readdir) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(fd_readdir);
 
-__wasi_errno_t __wasi_path_readlink(
+[[nodiscard]] __wasi_errno_t __wasi_path_readlink(
     __wasi_fd_t fd,
     const charptr_w path,
     size_w path_len,
     charptr_w buf,
     size_w buf_len,
     sizeptr_w bufused
-) __WASI_SYSCALL_NAME(path_readlink) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(path_readlink);
 
-__wasi_errno_t __wasi_path_rename(
+[[nodiscard]] __wasi_errno_t __wasi_path_rename(
     __wasi_fd_t old_fd,
     const charptr_w old_path,
     size_w old_path_len,
     __wasi_fd_t new_fd,
     const charptr_w new_path,
     size_w new_path_len
-) __WASI_SYSCALL_NAME(path_rename) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(path_rename);
 
-__wasi_errno_t __wasi_fd_filestat_get(
+[[nodiscard]] __wasi_errno_t __wasi_fd_filestat_get(
     __wasi_fd_t fd,
     filestatptr_w buf
-) __WASI_SYSCALL_NAME(fd_filestat_get) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(fd_filestat_get);
 
-__wasi_errno_t __wasi_fd_filestat_set_times(
+[[nodiscard]] __wasi_errno_t __wasi_fd_filestat_set_times(
     __wasi_fd_t fd,
     __wasi_timestamp_t st_atim,
     __wasi_timestamp_t st_mtim,
     __wasi_fstflags_t fstflags
-) __WASI_SYSCALL_NAME(fd_filestat_set_times) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(fd_filestat_set_times);
 
-__wasi_errno_t __wasi_fd_filestat_set_size(
+[[nodiscard]] __wasi_errno_t __wasi_fd_filestat_set_size(
     __wasi_fd_t fd,
     __wasi_filesize_t st_size
-) __WASI_SYSCALL_NAME(fd_filestat_set_size) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(fd_filestat_set_size);
 
-__wasi_errno_t __wasi_path_filestat_get(
+[[nodiscard]] __wasi_errno_t __wasi_path_filestat_get(
     __wasi_fd_t fd,
     __wasi_lookupflags_t flags,
     const charptr_w path,
     size_w path_len,
     filestatptr_w buf
-) __WASI_SYSCALL_NAME(path_filestat_get) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(path_filestat_get);
 
-__wasi_errno_t __wasi_path_filestat_set_times(
+[[nodiscard]] __wasi_errno_t __wasi_path_filestat_set_times(
     __wasi_fd_t fd,
     __wasi_lookupflags_t flags,
     const charptr_w path,
@@ -672,72 +672,72 @@ __wasi_errno_t __wasi_path_filestat_set_times(
     __wasi_timestamp_t st_atim,
     __wasi_timestamp_t st_mtim,
     __wasi_fstflags_t fstflags
-) __WASI_SYSCALL_NAME(path_filestat_set_times) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(path_filestat_set_times);
 
-__wasi_errno_t __wasi_path_symlink(
+[[nodiscard]] __wasi_errno_t __wasi_path_symlink(
     const charptr_w old_path,
     size_w old_path_len,
     __wasi_fd_t fd,
     const charptr_w new_path,
     size_w new_path_len
-) __WASI_SYSCALL_NAME(path_symlink) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(path_symlink);
 
-__wasi_errno_t __wasi_path_unlink_file(
+[[nodiscard]] __wasi_errno_t __wasi_path_unlink_file(
     __wasi_fd_t fd,
     const charptr_w path,
     size_w path_len
-) __WASI_SYSCALL_NAME(path_unlink_file) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(path_unlink_file);
 
-__wasi_errno_t __wasi_path_remove_directory(
+[[nodiscard]] __wasi_errno_t __wasi_path_remove_directory(
     __wasi_fd_t fd,
     const charptr_w path,
     size_w path_len
-) __WASI_SYSCALL_NAME(path_remove_directory) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(path_remove_directory);
 
-__wasi_errno_t __wasi_poll_oneoff(
+[[nodiscard]] __wasi_errno_t __wasi_poll_oneoff(
     const subscriptionptr_w in,
     eventptr_w out,
     size_w nsubscriptions,
     sizeptr_w nevents
-) __WASI_SYSCALL_NAME(poll_oneoff) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(poll_oneoff);
 
 void __wasi_proc_exit(
     __wasi_exitcode_t rval
 ) __WASI_SYSCALL_NAME(proc_exit);
 
-__wasi_errno_t __wasi_proc_raise(
+[[nodiscard]] __wasi_errno_t __wasi_proc_raise(
     __wasi_signal_t sig
-) __WASI_SYSCALL_NAME(proc_raise) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(proc_raise);
 
-__wasi_errno_t __wasi_random_get(
+[[nodiscard]] __wasi_errno_t __wasi_random_get(
     voiptr_w buf,
     size_w buf_len
-) __WASI_SYSCALL_NAME(random_get) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(random_get);
 
-__wasi_errno_t __wasi_sock_recv(
+[[nodiscard]] __wasi_errno_t __wasi_sock_recv(
     __wasi_fd_t sock,
     const iovecptr_w ri_data,
     size_w ri_data_len,
     __wasi_riflags_t ri_flags,
     sizeptr_w ro_datalen,
     roflagsptr_w ro_flags
-) __WASI_SYSCALL_NAME(sock_recv) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(sock_recv);
 
-__wasi_errno_t __wasi_sock_send(
+[[nodiscard]] __wasi_errno_t __wasi_sock_send(
     __wasi_fd_t sock,
     const ciovecptr_w si_data,
     size_w si_data_len,
     __wasi_siflags_t si_flags,
     sizeptr_w so_datalen
-) __WASI_SYSCALL_NAME(sock_send) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(sock_send);
 
-__wasi_errno_t __wasi_sock_shutdown(
+[[nodiscard]] __wasi_errno_t __wasi_sock_shutdown(
     __wasi_fd_t sock,
     __wasi_sdflags_t how
-) __WASI_SYSCALL_NAME(sock_shutdown) __attribute__((__warn_unused_result__));
+) __WASI_SYSCALL_NAME(sock_shutdown);
 
-__wasi_errno_t __wasi_sched_yield(void)
-__WASI_SYSCALL_NAME(sched_yield) __attribute__((__warn_unused_result__));
+[[nodiscard]] __wasi_errno_t __wasi_sched_yield(void)
+__WASI_SYSCALL_NAME(sched_yield);
 
 }
 

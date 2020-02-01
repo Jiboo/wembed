@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <limits>
 #include <ostream>
+#include <wembed/utils.hpp>
 
 #include "wembed.hpp"
 
@@ -42,7 +43,11 @@ wembed::fp_bits<T> fp(const char *p) {
       assert(p[lIndex + 1] == 'a' || p[lIndex + 1] == 'A');
       assert(p[lIndex + 2] == 'n' || p[lIndex + 2] == 'N');
       lResult.mBits.mExponent = wembed::fp_bits<T>::sMaxExponent;
-      if (p[lIndex + 3] == ':') {
+      if (strcmp(p, "nan:canonical") == 0) {
+        lResult.mBits.mMantissa = wembed::fp_bits<T>::sQuietNan;
+      } else if (strcmp(p, "nan:arithmetic") == 0) {
+        lResult.mBits.mMantissa = wembed::fp_bits<T>::sArithmeticNan;
+      } else if (p[lIndex + 3] == ':') {
         lResult.mBits.mMantissa = bits(strtoul(p + lIndex + 4, nullptr, 0));
       } else {
         lResult.mBits.mMantissa = wembed::fp_bits<T>::sQuietNan;
@@ -72,18 +77,22 @@ bool arithmetic_nan(T pInput) {
 
 namespace wembed {
   template<typename T>
-  bool operator==(const fp_bits <T> &pLHS, const fp_bits<T> &pRHS) {
+  bool operator==(const fp_bits<T> &pLHS, const fp_bits<T> &pRHS) {
+    // Hack to make +nan == -nan
+    if (pLHS.mBits.mExponent == fp_bits<T>::sMaxExponent && pRHS.mBits.mExponent == fp_bits<T>::sMaxExponent)
+      if (pLHS.mBits.mMantissa != 0 && pRHS.mBits.mMantissa != 0)
+        return true;
     return pLHS.mRaw == pRHS.mRaw;
   }
 
   template<typename T>
   bool operator==(const fp_bits<T> &pLHS, const T &pRHS) {
-    return pLHS.mRaw == fp_bits<T>(pRHS).mRaw;
+    return pLHS == fp_bits<T>(pRHS);
   }
 
   template<typename T>
   bool operator==(const T &pLHS, const fp_bits<T> &pRHS) {
-    return fp_bits<T>(pLHS).mRaw == pRHS.mRaw;
+    return fp_bits<T>(pLHS) == pRHS;
   }
 
   template<typename T>

@@ -453,60 +453,6 @@ protected:
       }
       pOutput << ";\n\n";
     }
-    else if (lId.mView == "assert_return_canonical_nan") {
-      expect(token_t::OPAR);
-      expect("invoke");
-      auto lFuncName = expect(token_t::STR);
-      stringstream lArgTypes, lArgs;
-      auto lNext = mTokenizer.next();
-      // Parse params
-      while (lNext.mType != token_t::CPAR) {
-        auto lType = mTokenizer.next().mView.substr(0, 3);
-        auto lValue = mTokenizer.next();
-        expect(token_t::CPAR);
-        lArgTypes << lType << ", ";
-        lArgs << dump_value(lType, lValue.mView) << ", ";
-        lNext = mTokenizer.next();
-      }
-      assert(lNext.mType == token_t::CPAR);
-      expect(token_t::CPAR);
-      string lCleanedName = string(lFuncName.mView.data() + 1, lFuncName.mView.size() - 2);
-      string lReturnType = func_return_type(lCleanedName);
-      string lArgsFormatted = lArgs.str().substr(0, lArgs.str().size() - 2);
-      string lArgTypesFormatted = lArgTypes.str().substr(0, lArgTypes.str().size() - 2);
-
-      pOutput << "/* " << std::string_view(lStart.mView.data(), lNext.mView.data() - lStart.mView.data() + 1) << "*/\n";
-      pOutput << "  EXPECT_TRUE(canonical_nan<" << lReturnType << ">("
-              << "lCtx" << mModuleCount << ".get_fn<" << lReturnType << '(' << lArgTypesFormatted << ")>("
-              << lFuncName.mView << "s)(" << lArgsFormatted << ")));\n\n";
-    }
-    else if (lId.mView == "assert_return_arithmetic_nan") {
-      expect(token_t::OPAR);
-      expect("invoke");
-      auto lFuncName = expect(token_t::STR);
-      stringstream lArgTypes, lArgs;
-      auto lNext = mTokenizer.next();
-      // Parse params
-      while (lNext.mType != token_t::CPAR) {
-        auto lType = mTokenizer.next().mView.substr(0, 3);
-        auto lValue = mTokenizer.next();
-        expect(token_t::CPAR);
-        lArgTypes << lType << ", ";
-        lArgs << dump_value(lType, lValue.mView) << ", ";
-        lNext = mTokenizer.next();
-      }
-      assert(lNext.mType == token_t::CPAR);
-      expect(token_t::CPAR);
-      string lCleanedName = string(lFuncName.mView.data() + 1, lFuncName.mView.size() - 2);
-      string lReturnType = func_return_type(lCleanedName);
-      string lArgsFormatted = lArgs.str().substr(0, lArgs.str().size() - 2);
-      string lArgTypesFormatted = lArgTypes.str().substr(0, lArgTypes.str().size() - 2);
-
-      pOutput << "/* " << std::string_view(lStart.mView.data(), lNext.mView.data() - lStart.mView.data() + 1) << "*/\n";
-      pOutput << "  EXPECT_TRUE(arithmetic_nan<" << lReturnType << ">("
-              << "lCtx" << mModuleCount << ".get_fn<" << lReturnType << '(' << lArgTypesFormatted << ")>("
-              << lFuncName.mView << "s)(" << lArgsFormatted << ")));\n\n";
-    }
     else if (lId.mView == "assert_malformed") {
       expect(token_t::OPAR);
       expect("module");

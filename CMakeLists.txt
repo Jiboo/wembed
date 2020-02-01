@@ -6,10 +6,10 @@ project(wembed)
 #add_definitions(-DWEMBED_GDB_DEBUG)
 #add_definitions(-DWEMBED_TRACE_WASI_CALLS)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 
-find_package(LLVM 10.0 REQUIRED CONFIG)
+find_package(LLVM 11.0 REQUIRED CONFIG)
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 include_directories(${LLVM_INCLUDE_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
@@ -18,9 +18,6 @@ llvm_map_components_to_libnames(LLVM_LIBS
   ScalarOpts Support Target
   nativecodegen
 )
-
-find_package(Boost REQUIRED)
-include_directories(${Boost_INCLUDE_DIRS})
 
 enable_testing()
 find_package(GTest)

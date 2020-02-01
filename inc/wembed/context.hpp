@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <optional>
 #include <sstream>
 
 #ifdef WEMBED_VERBOSE
