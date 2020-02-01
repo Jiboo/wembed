@@ -28,12 +28,6 @@ extern "C" {
 #endif
 
 #if defined(_WIN32)
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
 #include <Windows.h>
 #if defined(_MSC_VER) && _MSC_VER < 1900
   #define snprintf _snprintf
@@ -58,6 +52,10 @@ extern "C" {
 #if defined(__MACH__) && defined(__APPLE__)
 #include <mach/mach.h>
 #include <mach/mach_time.h>
+#endif
+
+#if __GNUC__ >= 5 && !defined(__STDC_VERSION__)
+#define __func__ __extension__ __FUNCTION__
 #endif
 
 #else
@@ -118,7 +116,6 @@ static void (*minunit_teardown)(void) = NULL;
 	}\
 	if (minunit_setup) (*minunit_setup)();\
 	minunit_status = 0;\
-	/*printf("Test: %s\n", #test);*/\
 	test();\
 	minunit_run++;\
 	if (minunit_status) {\
@@ -141,6 +138,7 @@ static void (*minunit_teardown)(void) = NULL;
 		minunit_end_real_timer - minunit_real_timer,\
 		minunit_end_proc_timer - minunit_proc_timer);\
 )
+#define MU_EXIT_CODE minunit_fail
 
 /*  Assertions */
 #define mu_check(test) MU__SAFE_BLOCK(\
@@ -205,7 +203,7 @@ static void (*minunit_teardown)(void) = NULL;
 	if (!minunit_tmp_r) {\
 		minunit_tmp_r = "<null pointer>";\
 	}\
-	if(strcmp(minunit_tmp_e, minunit_tmp_r) != 0) {\
+	if(strcmp(minunit_tmp_e, minunit_tmp_r)) {\
 		snprintf(minunit_last_message, MINUNIT_MESSAGE_LEN, "%s failed:\n\t%s:%d: '%s' expected but was '%s'", __func__, __FILE__, __LINE__, minunit_tmp_e, minunit_tmp_r);\
 		minunit_status = 1;\
 		return;\

@@ -131,11 +131,11 @@ int main(int argc, char **argv) {
   profile_step("Read wasm file to memory");
 
   resolvers_t lResolvers = {
-      {"wasi_unstable", wasi::make_unstable_resolver()},
+      {"wasi_snapshot_preview1", wasi::make_resolver()},
   };
 
   try {
-    module lModule((uint8_t*)lModuleBin.data(), lModuleBin.size(), {"wasi_unstable"}, lDebug);
+    module lModule((uint8_t*)lModuleBin.data(), lModuleBin.size(), {"wasi_snapshot_preview1"}, lDebug);
     profile_step("Module parse");
 
     lModule.optimize(lOptLevel);

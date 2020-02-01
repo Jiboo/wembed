@@ -71,7 +71,7 @@ namespace wembed::wasi {
     friend __wasi_errno_t fd_seek(void*, __wasi_fd_t, __wasi_filedelta_t, __wasi_whence_t, filesizeptr_w);
     friend __wasi_errno_t fd_sync(void*, __wasi_fd_t);
     friend __wasi_errno_t fd_tell(void*, __wasi_fd_t, filesizeptr_w);
-    friend __wasi_errno_t fd_write(void*, __wasi_fd_t, ciovecptr_w, size_w, sizeptr_w);
+    friend __wasi_errno_t fd_write_(void*, __wasi_fd_t, ciovecptr_w, size_w, sizeptr_w);
     friend __wasi_errno_t path_create_directory(void*, __wasi_fd_t, charptr_w, size_w);
     friend __wasi_errno_t path_filestat_get(void*, __wasi_fd_t, __wasi_lookupflags_t, charptr_w, size_w, filestatptr_w);
     friend __wasi_errno_t path_filestat_set_times(void*, __wasi_fd_t, __wasi_lookupflags_t, charptr_w, size_w, __wasi_timestamp_t, __wasi_timestamp_t, __wasi_fstflags_t);
@@ -92,6 +92,6 @@ namespace wembed::wasi {
     friend __wasi_errno_t sock_shutdown(void*, __wasi_fd_t, __wasi_sdflags_t);
   };
 
-  resolver_t make_unstable_resolver();
+  resolver_t make_resolver();
 
 };  // namespace wembed::wasi

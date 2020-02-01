@@ -28,10 +28,10 @@ std::ostream & operator<<(std::ostream &os, const __wasi_fdstat_t &pStat) {
      << "}";
 }
 std::ostream & operator<<(std::ostream &os, const __wasi_filestat_t &pStat) {
-  return os << "filestat_t{" << pStat.st_dev << ", " << pStat.st_ino
-     << ", " << (int)pStat.st_filetype << ", " << pStat.st_nlink
-     << ", " << pStat.st_size << ", " << pStat.st_atim
-     << ", " << pStat.st_mtim << ", " << pStat.st_ctim
+  return os << "filestat_t{" << pStat.dev << ", " << pStat.ino
+     << ", " << (int)pStat.filetype << ", " << pStat.nlink
+     << ", " << pStat.size << ", " << pStat.atim
+     << ", " << pStat.mtim << ", " << pStat.ctim
      << "}";
 }
 std::ostream & operator<<(std::ostream &os, const __wasi_prestat_t &pStat) {
@@ -74,83 +74,83 @@ void wasi_trace_read(const char *pName, std::string_view pStr) {
 std::string_view wasi_errno_str(wembed::wasi::__wasi_errno_t pCode) {
   using namespace std::literals;
   switch(pCode) {
-    case __WASI_ESUCCESS: return "SUCCESS"sv;
-    case __WASI_E2BIG: return "E2BIG"sv;
-    case __WASI_EACCES: return "EACCES"sv;
-    case __WASI_EADDRINUSE: return "EADDRINUSE"sv;
-    case __WASI_EADDRNOTAVAIL: return "EADDRNOTAVAIL"sv;
-    case __WASI_EAFNOSUPPORT: return "EAFNOSUPPORT"sv;
-    case __WASI_EAGAIN: return "EAGAIN"sv;
-    case __WASI_EALREADY: return "EALREADY"sv;
-    case __WASI_EBADF: return "EBADF"sv;
-    case __WASI_EBADMSG: return "EBADMSG"sv;
-    case __WASI_EBUSY: return "EBUSY"sv;
-    case __WASI_ECANCELED: return "ECANCELED"sv;
-    case __WASI_ECHILD: return "ECHILD"sv;
-    case __WASI_ECONNABORTED: return "ECONNABORTED"sv;
-    case __WASI_ECONNREFUSED: return "ECONNREFUSED"sv;
-    case __WASI_ECONNRESET: return "ECONNRESET"sv;
-    case __WASI_EDEADLK: return "EDEADLK"sv;
-    case __WASI_EDESTADDRREQ: return "EDESTADDRREQ"sv;
-    case __WASI_EDOM: return "EDOM"sv;
-    case __WASI_EDQUOT: return "EDQUOT"sv;
-    case __WASI_EEXIST: return "EEXIST"sv;
-    case __WASI_EFAULT: return "EFAULT"sv;
-    case __WASI_EFBIG: return "EFBIG"sv;
-    case __WASI_EHOSTUNREACH: return "EHOSTUNREACH"sv;
-    case __WASI_EIDRM: return "EIDRM"sv;
-    case __WASI_EILSEQ: return "EILSEQ"sv;
-    case __WASI_EINPROGRESS: return "EINPROGRESS"sv;
-    case __WASI_EINTR: return "EINTR"sv;
-    case __WASI_EINVAL: return "EINVAL"sv;
-    case __WASI_EIO: return "EIO"sv;
-    case __WASI_EISCONN: return "EISCONN"sv;
-    case __WASI_EISDIR: return "EISDIR"sv;
-    case __WASI_ELOOP: return "ELOOP"sv;
-    case __WASI_EMFILE: return "EMFILE"sv;
-    case __WASI_EMLINK: return "EMLINK"sv;
-    case __WASI_EMSGSIZE: return "EMSGSIZE"sv;
-    case __WASI_EMULTIHOP: return "EMULTIHOP"sv;
-    case __WASI_ENAMETOOLONG: return "ENAMETOOLONG"sv;
-    case __WASI_ENETDOWN: return "ENETDOWN"sv;
-    case __WASI_ENETRESET: return "ENETRESET"sv;
-    case __WASI_ENETUNREACH: return "ENETUNREACH"sv;
-    case __WASI_ENFILE: return "ENFILE"sv;
-    case __WASI_ENOBUFS: return "ENOBUFS"sv;
-    case __WASI_ENODEV: return "ENODEV"sv;
-    case __WASI_ENOENT: return "ENOENT"sv;
-    case __WASI_ENOEXEC: return "ENOEXEC"sv;
-    case __WASI_ENOLCK: return "ENOLCK"sv;
-    case __WASI_ENOLINK: return "ENOLINK"sv;
-    case __WASI_ENOMEM: return "ENOMEM"sv;
-    case __WASI_ENOMSG: return "ENOMSG"sv;
-    case __WASI_ENOPROTOOPT: return "ENOPROTOOPT"sv;
-    case __WASI_ENOSPC: return "ENOSPC"sv;
-    case __WASI_ENOSYS: return "ENOSYS"sv;
-    case __WASI_ENOTCONN: return "ENOTCONN"sv;
-    case __WASI_ENOTDIR: return "ENOTDIR"sv;
-    case __WASI_ENOTEMPTY: return "ENOTEMPTY"sv;
-    case __WASI_ENOTRECOVERABLE: return "ENOTRECOVERABLE"sv;
-    case __WASI_ENOTSOCK: return "ENOTSOCK"sv;
-    case __WASI_ENOTSUP: return "ENOTSUP"sv;
-    case __WASI_ENOTTY: return "ENOTTY"sv;
-    case __WASI_ENXIO: return "ENXIO"sv;
-    case __WASI_EOVERFLOW: return "EOVERFLOW"sv;
-    case __WASI_EOWNERDEAD: return "EOWNERDEAD"sv;
-    case __WASI_EPERM: return "EPERM"sv;
-    case __WASI_EPIPE: return "EPIPE"sv;
-    case __WASI_EPROTO: return "EPROTO"sv;
-    case __WASI_EPROTONOSUPPORT: return "EPROTONOSUPPORT"sv;
-    case __WASI_EPROTOTYPE: return "EPROTOTYPE"sv;
-    case __WASI_ERANGE: return "ERANGE"sv;
-    case __WASI_EROFS: return "EROFS"sv;
-    case __WASI_ESPIPE: return "ESPIPE"sv;
-    case __WASI_ESRCH: return "ESRCH"sv;
-    case __WASI_ESTALE: return "ESTALE"sv;
-    case __WASI_ETIMEDOUT: return "ETIMEDOUT"sv;
-    case __WASI_ETXTBSY: return "ETXTBSY"sv;
-    case __WASI_EXDEV: return "EXDEV"sv;
-    case __WASI_ENOTCAPABLE: return "ENOTCAPABLE"sv;
+    case __WASI_ERRNO_SUCCESS: return "SUCCESS"sv;
+    case __WASI_ERRNO_2BIG: return "E2BIG"sv;
+    case __WASI_ERRNO_ACCES: return "EACCES"sv;
+    case __WASI_ERRNO_ADDRINUSE: return "EADDRINUSE"sv;
+    case __WASI_ERRNO_ADDRNOTAVAIL: return "EADDRNOTAVAIL"sv;
+    case __WASI_ERRNO_AFNOSUPPORT: return "EAFNOSUPPORT"sv;
+    case __WASI_ERRNO_AGAIN: return "EAGAIN"sv;
+    case __WASI_ERRNO_ALREADY: return "EALREADY"sv;
+    case __WASI_ERRNO_BADF: return "EBADF"sv;
+    case __WASI_ERRNO_BADMSG: return "EBADMSG"sv;
+    case __WASI_ERRNO_BUSY: return "EBUSY"sv;
+    case __WASI_ERRNO_CANCELED: return "ECANCELED"sv;
+    case __WASI_ERRNO_CHILD: return "ECHILD"sv;
+    case __WASI_ERRNO_CONNABORTED: return "ECONNABORTED"sv;
+    case __WASI_ERRNO_CONNREFUSED: return "ECONNREFUSED"sv;
+    case __WASI_ERRNO_CONNRESET: return "ECONNRESET"sv;
+    case __WASI_ERRNO_DEADLK: return "EDEADLK"sv;
+    case __WASI_ERRNO_DESTADDRREQ: return "EDESTADDRREQ"sv;
+    case __WASI_ERRNO_DOM: return "EDOM"sv;
+    case __WASI_ERRNO_DQUOT: return "EDQUOT"sv;
+    case __WASI_ERRNO_EXIST: return "EEXIST"sv;
+    case __WASI_ERRNO_FAULT: return "EFAULT"sv;
+    case __WASI_ERRNO_FBIG: return "EFBIG"sv;
+    case __WASI_ERRNO_HOSTUNREACH: return "EHOSTUNREACH"sv;
+    case __WASI_ERRNO_IDRM: return "EIDRM"sv;
+    case __WASI_ERRNO_ILSEQ: return "EILSEQ"sv;
+    case __WASI_ERRNO_INPROGRESS: return "EINPROGRESS"sv;
+    case __WASI_ERRNO_INTR: return "EINTR"sv;
+    case __WASI_ERRNO_INVAL: return "EINVAL"sv;
+    case __WASI_ERRNO_IO: return "EIO"sv;
+    case __WASI_ERRNO_ISCONN: return "EISCONN"sv;
+    case __WASI_ERRNO_ISDIR: return "EISDIR"sv;
+    case __WASI_ERRNO_LOOP: return "ELOOP"sv;
+    case __WASI_ERRNO_MFILE: return "EMFILE"sv;
+    case __WASI_ERRNO_MLINK: return "EMLINK"sv;
+    case __WASI_ERRNO_MSGSIZE: return "EMSGSIZE"sv;
+    case __WASI_ERRNO_MULTIHOP: return "EMULTIHOP"sv;
+    case __WASI_ERRNO_NAMETOOLONG: return "ENAMETOOLONG"sv;
+    case __WASI_ERRNO_NETDOWN: return "ENETDOWN"sv;
+    case __WASI_ERRNO_NETRESET: return "ENETRESET"sv;
+    case __WASI_ERRNO_NETUNREACH: return "ENETUNREACH"sv;
+    case __WASI_ERRNO_NFILE: return "ENFILE"sv;
+    case __WASI_ERRNO_NOBUFS: return "ENOBUFS"sv;
+    case __WASI_ERRNO_NODEV: return "ENODEV"sv;
+    case __WASI_ERRNO_NOENT: return "ENOENT"sv;
+    case __WASI_ERRNO_NOEXEC: return "ENOEXEC"sv;
+    case __WASI_ERRNO_NOLCK: return "ENOLCK"sv;
+    case __WASI_ERRNO_NOLINK: return "ENOLINK"sv;
+    case __WASI_ERRNO_NOMEM: return "ENOMEM"sv;
+    case __WASI_ERRNO_NOMSG: return "ENOMSG"sv;
+    case __WASI_ERRNO_NOPROTOOPT: return "ENOPROTOOPT"sv;
+    case __WASI_ERRNO_NOSPC: return "ENOSPC"sv;
+    case __WASI_ERRNO_NOSYS: return "ENOSYS"sv;
+    case __WASI_ERRNO_NOTCONN: return "ENOTCONN"sv;
+    case __WASI_ERRNO_NOTDIR: return "ENOTDIR"sv;
+    case __WASI_ERRNO_NOTEMPTY: return "ENOTEMPTY"sv;
+    case __WASI_ERRNO_NOTRECOVERABLE: return "ENOTRECOVERABLE"sv;
+    case __WASI_ERRNO_NOTSOCK: return "ENOTSOCK"sv;
+    case __WASI_ERRNO_NOTSUP: return "ENOTSUP"sv;
+    case __WASI_ERRNO_NOTTY: return "ENOTTY"sv;
+    case __WASI_ERRNO_NXIO: return "ENXIO"sv;
+    case __WASI_ERRNO_OVERFLOW: return "EOVERFLOW"sv;
+    case __WASI_ERRNO_OWNERDEAD: return "EOWNERDEAD"sv;
+    case __WASI_ERRNO_PERM: return "EPERM"sv;
+    case __WASI_ERRNO_PIPE: return "EPIPE"sv;
+    case __WASI_ERRNO_PROTO: return "EPROTO"sv;
+    case __WASI_ERRNO_PROTONOSUPPORT: return "EPROTONOSUPPORT"sv;
+    case __WASI_ERRNO_PROTOTYPE: return "EPROTOTYPE"sv;
+    case __WASI_ERRNO_RANGE: return "ERANGE"sv;
+    case __WASI_ERRNO_ROFS: return "EROFS"sv;
+    case __WASI_ERRNO_SPIPE: return "ESPIPE"sv;
+    case __WASI_ERRNO_SRCH: return "ESRCH"sv;
+    case __WASI_ERRNO_STALE: return "ESTALE"sv;
+    case __WASI_ERRNO_TIMEDOUT: return "ETIMEDOUT"sv;
+    case __WASI_ERRNO_TXTBSY: return "ETXTBSY"sv;
+    case __WASI_ERRNO_XDEV: return "EXDEV"sv;
+    case __WASI_ERRNO_NOTCAPABLE: return "ENOTCAPABLE"sv;
     default: return "<invalid>"sv;
   }
 }
@@ -165,23 +165,23 @@ std::string_view wasi_errno_str(wembed::wasi::__wasi_errno_t pCode) {
 wasi_context::wasi_context(std::filesystem::path pRoot) : mRoot(std::move(pRoot)) {
   // Operations that apply to regular files.
   #define REGULAR_FILE_RIGHTS                                                                        \
-    (__WASI_RIGHT_FD_DATASYNC | __WASI_RIGHT_FD_READ | __WASI_RIGHT_FD_SEEK                        \
-     | __WASI_RIGHT_FD_FDSTAT_SET_FLAGS | __WASI_RIGHT_FD_SYNC | __WASI_RIGHT_FD_TELL              \
-     | __WASI_RIGHT_FD_WRITE | __WASI_RIGHT_FD_ADVISE | __WASI_RIGHT_FD_ALLOCATE                   \
-     | __WASI_RIGHT_FD_FILESTAT_GET | __WASI_RIGHT_FD_FILESTAT_SET_SIZE                            \
-     | __WASI_RIGHT_FD_FILESTAT_SET_TIMES | __WASI_RIGHT_POLL_FD_READWRITE)
+    (__WASI_RIGHTS_FD_DATASYNC | __WASI_RIGHTS_FD_READ | __WASI_RIGHTS_FD_SEEK                        \
+     | __WASI_RIGHTS_FD_FDSTAT_SET_FLAGS | __WASI_RIGHTS_FD_SYNC | __WASI_RIGHTS_FD_TELL              \
+     | __WASI_RIGHTS_FD_WRITE | __WASI_RIGHTS_FD_ADVISE | __WASI_RIGHTS_FD_ALLOCATE                   \
+     | __WASI_RIGHTS_FD_FILESTAT_GET | __WASI_RIGHTS_FD_FILESTAT_SET_SIZE                            \
+     | __WASI_RIGHTS_FD_FILESTAT_SET_TIMES | __WASI_RIGHTS_POLL_FD_READWRITE)
 
   // Only allow directory operations on directories.
   #define DIRECTORY_RIGHTS                                                                           \
-    (__WASI_RIGHT_FD_FDSTAT_SET_FLAGS | __WASI_RIGHT_FD_SYNC | __WASI_RIGHT_FD_ADVISE              \
-     | __WASI_RIGHT_PATH_CREATE_DIRECTORY | __WASI_RIGHT_PATH_CREATE_FILE                          \
-     | __WASI_RIGHT_PATH_LINK_SOURCE | __WASI_RIGHT_PATH_LINK_TARGET | __WASI_RIGHT_PATH_OPEN      \
-     | __WASI_RIGHT_FD_READDIR | __WASI_RIGHT_PATH_READLINK | __WASI_RIGHT_PATH_RENAME_SOURCE      \
-     | __WASI_RIGHT_PATH_RENAME_TARGET | __WASI_RIGHT_PATH_FILESTAT_GET                            \
-     | __WASI_RIGHT_PATH_FILESTAT_SET_SIZE | __WASI_RIGHT_PATH_FILESTAT_SET_TIMES                  \
-     | __WASI_RIGHT_FD_FILESTAT_GET | __WASI_RIGHT_FD_FILESTAT_SET_TIMES                           \
-     | __WASI_RIGHT_PATH_SYMLINK | __WASI_RIGHT_PATH_UNLINK_FILE                                   \
-     | __WASI_RIGHT_PATH_REMOVE_DIRECTORY | __WASI_RIGHT_POLL_FD_READWRITE)
+    (__WASI_RIGHTS_FD_FDSTAT_SET_FLAGS | __WASI_RIGHTS_FD_SYNC | __WASI_RIGHTS_FD_ADVISE              \
+     | __WASI_RIGHTS_PATH_CREATE_DIRECTORY | __WASI_RIGHTS_PATH_CREATE_FILE                          \
+     | __WASI_RIGHTS_PATH_LINK_SOURCE | __WASI_RIGHTS_PATH_LINK_TARGET | __WASI_RIGHTS_PATH_OPEN      \
+     | __WASI_RIGHTS_FD_READDIR | __WASI_RIGHTS_PATH_READLINK | __WASI_RIGHTS_PATH_RENAME_SOURCE      \
+     | __WASI_RIGHTS_PATH_RENAME_TARGET | __WASI_RIGHTS_PATH_FILESTAT_GET                            \
+     | __WASI_RIGHTS_PATH_FILESTAT_SET_SIZE | __WASI_RIGHTS_PATH_FILESTAT_SET_TIMES                  \
+     | __WASI_RIGHTS_FD_FILESTAT_GET | __WASI_RIGHTS_FD_FILESTAT_SET_TIMES                           \
+     | __WASI_RIGHTS_PATH_SYMLINK | __WASI_RIGHTS_PATH_UNLINK_FILE                                   \
+     | __WASI_RIGHTS_PATH_REMOVE_DIRECTORY | __WASI_RIGHTS_POLL_FD_READWRITE)
   // Only allow directory or file operations to be derived from directories.
   #define INHERITING_DIRECTORY_RIGHTS (DIRECTORY_RIGHTS | REGULAR_FILE_RIGHTS)
 
@@ -223,9 +223,9 @@ void wasi_context::add_preopen(__wasi_fd_t pFD, file pFile) {
 }
 
 void wasi_context::add_preopen_host() {
-  __wasi_rights_t lStdioRights = __WASI_RIGHT_FD_READ | __WASI_RIGHT_FD_FDSTAT_SET_FLAGS
-                               | __WASI_RIGHT_FD_WRITE | __WASI_RIGHT_FD_FILESTAT_GET
-                               | __WASI_RIGHT_POLL_FD_READWRITE;
+  __wasi_rights_t lStdioRights = __WASI_RIGHTS_FD_READ | __WASI_RIGHTS_FD_FDSTAT_SET_FLAGS
+                               | __WASI_RIGHTS_FD_WRITE | __WASI_RIGHTS_FD_FILESTAT_GET
+                               | __WASI_RIGHTS_POLL_FD_READWRITE;
 
   mFiles.emplace(0, file{STDIN_FILENO,  "__wembed_stdin", lStdioRights, lStdioRights});
   mFiles.emplace(1, file{STDOUT_FILENO,  "__wembed_stdout", lStdioRights, lStdioRights});
@@ -234,82 +234,82 @@ void wasi_context::add_preopen_host() {
 
 __wasi_errno_t errno_translate(int error = errno) {
   switch(error) {
-    case E2BIG: TRACE_WASI_RETURN(__WASI_E2BIG);
-    case EACCES: TRACE_WASI_RETURN(__WASI_EACCES);
-    case EADDRINUSE: TRACE_WASI_RETURN(__WASI_EADDRINUSE);
-    case EADDRNOTAVAIL: TRACE_WASI_RETURN(__WASI_EADDRNOTAVAIL);
-    case EAFNOSUPPORT: TRACE_WASI_RETURN(__WASI_EAFNOSUPPORT);
-    case EAGAIN: TRACE_WASI_RETURN(__WASI_EAGAIN);
-    case EALREADY: TRACE_WASI_RETURN(__WASI_EALREADY);
-    case EBADF: TRACE_WASI_RETURN(__WASI_EBADF);
-    case EBADMSG: TRACE_WASI_RETURN(__WASI_EBADMSG);
-    case EBUSY: TRACE_WASI_RETURN(__WASI_EBUSY);
-    case ECANCELED: TRACE_WASI_RETURN(__WASI_ECANCELED);
-    case ECHILD: TRACE_WASI_RETURN(__WASI_ECHILD);
-    case ECONNABORTED: TRACE_WASI_RETURN(__WASI_ECONNABORTED);
-    case ECONNREFUSED: TRACE_WASI_RETURN(__WASI_ECONNREFUSED);
-    case ECONNRESET: TRACE_WASI_RETURN(__WASI_ECONNRESET);
-    case EDEADLK: TRACE_WASI_RETURN(__WASI_EDEADLK);
-    case EDESTADDRREQ: TRACE_WASI_RETURN(__WASI_EDESTADDRREQ);
-    case EDOM: TRACE_WASI_RETURN(__WASI_EDOM);
-    case EDQUOT: TRACE_WASI_RETURN(__WASI_EDQUOT);
-    case EEXIST: TRACE_WASI_RETURN(__WASI_EEXIST);
-    case EFAULT: TRACE_WASI_RETURN(__WASI_EFAULT);
-    case EFBIG: TRACE_WASI_RETURN(__WASI_EFBIG);
-    case EHOSTUNREACH: TRACE_WASI_RETURN(__WASI_EHOSTUNREACH);
-    case EIDRM: TRACE_WASI_RETURN(__WASI_EIDRM);
-    case EILSEQ: TRACE_WASI_RETURN(__WASI_EILSEQ);
-    case EINPROGRESS: TRACE_WASI_RETURN(__WASI_EINPROGRESS);
-    case EINTR: TRACE_WASI_RETURN(__WASI_EINTR);
-    case EINVAL: TRACE_WASI_RETURN(__WASI_EINVAL);
-    case EIO: TRACE_WASI_RETURN(__WASI_EIO);
-    case EISCONN: TRACE_WASI_RETURN(__WASI_EISCONN);
-    case EISDIR: TRACE_WASI_RETURN(__WASI_EISDIR);
-    case ELOOP: TRACE_WASI_RETURN(__WASI_ELOOP);
-    case EMFILE: TRACE_WASI_RETURN(__WASI_EMFILE);
-    case EMLINK: TRACE_WASI_RETURN(__WASI_EMLINK);
-    case EMSGSIZE: TRACE_WASI_RETURN(__WASI_EMSGSIZE);
-    case EMULTIHOP: TRACE_WASI_RETURN(__WASI_EMULTIHOP);
-    case ENAMETOOLONG: TRACE_WASI_RETURN(__WASI_ENAMETOOLONG);
-    case ENETDOWN: TRACE_WASI_RETURN(__WASI_ENETDOWN);
-    case ENETRESET: TRACE_WASI_RETURN(__WASI_ENETRESET);
-    case ENETUNREACH: TRACE_WASI_RETURN(__WASI_ENETUNREACH);
-    case ENFILE: TRACE_WASI_RETURN(__WASI_ENFILE);
-    case ENOBUFS: TRACE_WASI_RETURN(__WASI_ENOBUFS);
-    case ENODEV: TRACE_WASI_RETURN(__WASI_ENODEV);
-    case ENOENT: TRACE_WASI_RETURN(__WASI_ENOENT);
-    case ENOEXEC: TRACE_WASI_RETURN(__WASI_ENOEXEC);
-    case ENOLCK: TRACE_WASI_RETURN(__WASI_ENOLCK);
-    case ENOLINK: TRACE_WASI_RETURN(__WASI_ENOLINK);
-    case ENOMEM: TRACE_WASI_RETURN(__WASI_ENOMEM);
-    case ENOMSG: TRACE_WASI_RETURN(__WASI_ENOMSG);
-    case ENOPROTOOPT: TRACE_WASI_RETURN(__WASI_ENOPROTOOPT);
-    case ENOSPC: TRACE_WASI_RETURN(__WASI_ENOSPC);
-    case ENOSYS: TRACE_WASI_RETURN(__WASI_ENOSYS);
-    case ENOTCONN: TRACE_WASI_RETURN(__WASI_ENOTCONN);
-    case ENOTDIR: TRACE_WASI_RETURN(__WASI_ENOTDIR);
-    case ENOTEMPTY: TRACE_WASI_RETURN(__WASI_ENOTEMPTY);
-    case ENOTRECOVERABLE: TRACE_WASI_RETURN(__WASI_ENOTRECOVERABLE);
-    case ENOTSOCK: TRACE_WASI_RETURN(__WASI_ENOTSOCK);
-    case ENOTSUP: TRACE_WASI_RETURN(__WASI_ENOTSUP);
-    case ENOTTY: TRACE_WASI_RETURN(__WASI_ENOTTY);
-    case ENXIO: TRACE_WASI_RETURN(__WASI_ENXIO);
-    case EOVERFLOW: TRACE_WASI_RETURN(__WASI_EOVERFLOW);
-    case EOWNERDEAD: TRACE_WASI_RETURN(__WASI_EOWNERDEAD);
-    case EPERM: TRACE_WASI_RETURN(__WASI_EPERM);
-    case EPIPE: TRACE_WASI_RETURN(__WASI_EPIPE);
-    case EPROTO: TRACE_WASI_RETURN(__WASI_EPROTO);
-    case EPROTONOSUPPORT: TRACE_WASI_RETURN(__WASI_EPROTONOSUPPORT);
-    case EPROTOTYPE: TRACE_WASI_RETURN(__WASI_EPROTOTYPE);
-    case ERANGE: TRACE_WASI_RETURN(__WASI_ERANGE);
-    case EROFS: TRACE_WASI_RETURN(__WASI_EROFS);
-    case ESPIPE: TRACE_WASI_RETURN(__WASI_ESPIPE);
-    case ESRCH: TRACE_WASI_RETURN(__WASI_ESRCH);
-    case ESTALE: TRACE_WASI_RETURN(__WASI_ESTALE);
-    case ETIMEDOUT: TRACE_WASI_RETURN(__WASI_ETIMEDOUT);
-    case ETXTBSY: TRACE_WASI_RETURN(__WASI_ETXTBSY);
-    case EXDEV: TRACE_WASI_RETURN(__WASI_EXDEV);
-    default: TRACE_WASI_RETURN(__WASI_ENOTCAPABLE);
+    case E2BIG: return __WASI_ERRNO_2BIG;
+    case EACCES: return __WASI_ERRNO_ACCES;
+    case EADDRINUSE: return __WASI_ERRNO_ADDRINUSE;
+    case EADDRNOTAVAIL: return __WASI_ERRNO_ADDRNOTAVAIL;
+    case EAFNOSUPPORT: return __WASI_ERRNO_AFNOSUPPORT;
+    case EAGAIN: return __WASI_ERRNO_AGAIN;
+    case EALREADY: return __WASI_ERRNO_ALREADY;
+    case EBADF: return __WASI_ERRNO_BADF;
+    case EBADMSG: return __WASI_ERRNO_BADMSG;
+    case EBUSY: return __WASI_ERRNO_BUSY;
+    case ECANCELED: return __WASI_ERRNO_CANCELED;
+    case ECHILD: return __WASI_ERRNO_CHILD;
+    case ECONNABORTED: return __WASI_ERRNO_CONNABORTED;
+    case ECONNREFUSED: return __WASI_ERRNO_CONNREFUSED;
+    case ECONNRESET: return __WASI_ERRNO_CONNRESET;
+    case EDEADLK: return __WASI_ERRNO_DEADLK;
+    case EDESTADDRREQ: return __WASI_ERRNO_DESTADDRREQ;
+    case EDOM: return __WASI_ERRNO_DOM;
+    case EDQUOT: return __WASI_ERRNO_DQUOT;
+    case EEXIST: return __WASI_ERRNO_EXIST;
+    case EFAULT: return __WASI_ERRNO_FAULT;
+    case EFBIG: return __WASI_ERRNO_FBIG;
+    case EHOSTUNREACH: return __WASI_ERRNO_HOSTUNREACH;
+    case EIDRM: return __WASI_ERRNO_IDRM;
+    case EILSEQ: return __WASI_ERRNO_ILSEQ;
+    case EINPROGRESS: return __WASI_ERRNO_INPROGRESS;
+    case EINTR: return __WASI_ERRNO_INTR;
+    case EINVAL: return __WASI_ERRNO_INVAL;
+    case EIO: return __WASI_ERRNO_IO;
+    case EISCONN: return __WASI_ERRNO_ISCONN;
+    case EISDIR: return __WASI_ERRNO_ISDIR;
+    case ELOOP: return __WASI_ERRNO_LOOP;
+    case EMFILE: return __WASI_ERRNO_MFILE;
+    case EMLINK: return __WASI_ERRNO_MLINK;
+    case EMSGSIZE: return __WASI_ERRNO_MSGSIZE;
+    case EMULTIHOP: return __WASI_ERRNO_MULTIHOP;
+    case ENAMETOOLONG: return __WASI_ERRNO_NAMETOOLONG;
+    case ENETDOWN: return __WASI_ERRNO_NETDOWN;
+    case ENETRESET: return __WASI_ERRNO_NETRESET;
+    case ENETUNREACH: return __WASI_ERRNO_NETUNREACH;
+    case ENFILE: return __WASI_ERRNO_NFILE;
+    case ENOBUFS: return __WASI_ERRNO_NOBUFS;
+    case ENODEV: return __WASI_ERRNO_NODEV;
+    case ENOENT: return __WASI_ERRNO_NOENT;
+    case ENOEXEC: return __WASI_ERRNO_NOEXEC;
+    case ENOLCK: return __WASI_ERRNO_NOLCK;
+    case ENOLINK: return __WASI_ERRNO_NOLINK;
+    case ENOMEM: return __WASI_ERRNO_NOMEM;
+    case ENOMSG: return __WASI_ERRNO_NOMSG;
+    case ENOPROTOOPT: return __WASI_ERRNO_NOPROTOOPT;
+    case ENOSPC: return __WASI_ERRNO_NOSPC;
+    case ENOSYS: return __WASI_ERRNO_NOSYS;
+    case ENOTCONN: return __WASI_ERRNO_NOTCONN;
+    case ENOTDIR: return __WASI_ERRNO_NOTDIR;
+    case ENOTEMPTY: return __WASI_ERRNO_NOTEMPTY;
+    case ENOTRECOVERABLE: return __WASI_ERRNO_NOTRECOVERABLE;
+    case ENOTSOCK: return __WASI_ERRNO_NOTSOCK;
+    case ENOTSUP: return __WASI_ERRNO_NOTSUP;
+    case ENOTTY: return __WASI_ERRNO_NOTTY;
+    case ENXIO: return __WASI_ERRNO_NXIO;
+    case EOVERFLOW: return __WASI_ERRNO_OVERFLOW;
+    case EOWNERDEAD: return __WASI_ERRNO_OWNERDEAD;
+    case EPERM: return __WASI_ERRNO_PERM;
+    case EPIPE: return __WASI_ERRNO_PIPE;
+    case EPROTO: return __WASI_ERRNO_PROTO;
+    case EPROTONOSUPPORT: return __WASI_ERRNO_PROTONOSUPPORT;
+    case EPROTOTYPE: return __WASI_ERRNO_PROTOTYPE;
+    case ERANGE: return __WASI_ERRNO_RANGE;
+    case EROFS: return __WASI_ERRNO_ROFS;
+    case ESPIPE: return __WASI_ERRNO_SPIPE;
+    case ESRCH: return __WASI_ERRNO_SRCH;
+    case ESTALE: return __WASI_ERRNO_STALE;
+    case ETIMEDOUT: return __WASI_ERRNO_TIMEDOUT;
+    case ETXTBSY: return __WASI_ERRNO_TXTBSY;
+    case EXDEV: return __WASI_ERRNO_XDEV;
+    default: return __WASI_ERRNO_NOTCAPABLE;
   }
 }
 
@@ -320,9 +320,9 @@ __wasi_errno_t args_get(void *ctx, charptrptr_w argv, charptr_w argv_buf) {
   auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
 
   if ((lWasiCtx->mArgs.mElements.size() * sizeof(charptr_w) + argv) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
   if ((lWasiCtx->mArgs.mBuffer.size() + argv_buf) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lArgv = (charptr_w*)(lWasmCtx->mem()->data() + argv);
   auto *lBuff = (char*)(lWasmCtx->mem()->data() + argv_buf);
@@ -334,7 +334,7 @@ __wasi_errno_t args_get(void *ctx, charptrptr_w argv, charptr_w argv_buf) {
     lArgv[i] = argv_buf + lWasiCtx->mArgs.mElements[i];
   }
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t args_sizes_get(void *ctx, sizeptr_w argc, sizeptr_w argv_buf_size) {
@@ -344,9 +344,9 @@ __wasi_errno_t args_sizes_get(void *ctx, sizeptr_w argc, sizeptr_w argv_buf_size
   auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
 
   if ((sizeof(size_w) + argc) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
   if ((sizeof(size_w) + argv_buf_size) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lCount = (size_w*)(lWasmCtx->mem()->data() + argc);
   auto *lBufSize = (size_w*)(lWasmCtx->mem()->data() + argv_buf_size);
@@ -356,7 +356,7 @@ __wasi_errno_t args_sizes_get(void *ctx, sizeptr_w argc, sizeptr_w argv_buf_size
   *lBufSize = lWasiCtx->mArgs.mBuffer.size();
   TRACE_WASI_OUT(argv_buf_size, *lBufSize);
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t clock_res_get(void *ctx, __wasi_clockid_t clock_id, timestampptr_w resolution) {
@@ -365,18 +365,18 @@ __wasi_errno_t clock_res_get(void *ctx, __wasi_clockid_t clock_id, timestampptr_
   auto *lWasmCtx = static_cast<context*>(ctx);
 
   if ((sizeof(__wasi_timestamp_t) + resolution) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lOut = (__wasi_timestamp_t*)(lWasmCtx->mem()->data() + resolution);
 
   clockid_t lHostID;
   switch (clock_id) {
-    case __WASI_CLOCK_REALTIME: lHostID = CLOCK_REALTIME; break;
-    case __WASI_CLOCK_MONOTONIC: lHostID = CLOCK_MONOTONIC; break;
-    case __WASI_CLOCK_PROCESS_CPUTIME_ID: lHostID = CLOCK_PROCESS_CPUTIME_ID; break;
-    case __WASI_CLOCK_THREAD_CPUTIME_ID: lHostID = CLOCK_THREAD_CPUTIME_ID; break;
+    case __WASI_CLOCKID_REALTIME: lHostID = CLOCK_REALTIME; break;
+    case __WASI_CLOCKID_MONOTONIC: lHostID = CLOCK_MONOTONIC; break;
+    case __WASI_CLOCKID_PROCESS_CPUTIME_ID: lHostID = CLOCK_PROCESS_CPUTIME_ID; break;
+    case __WASI_CLOCKID_THREAD_CPUTIME_ID: lHostID = CLOCK_THREAD_CPUTIME_ID; break;
     default:
-      TRACE_WASI_RETURN(__WASI_EINVAL);
+      TRACE_WASI_RETURN(__WASI_ERRNO_INVAL);
   }
 
   timespec lHostOut;
@@ -385,7 +385,7 @@ __wasi_errno_t clock_res_get(void *ctx, __wasi_clockid_t clock_id, timestampptr_
   *lOut = lHostOut.tv_nsec + lHostOut.tv_sec * 1'000'000'000;
   TRACE_WASI_OUT(resolution, *lOut);
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t clock_time_get(void *ctx, __wasi_clockid_t clock_id, __wasi_timestamp_t precision, timestampptr_w time) {
@@ -394,18 +394,18 @@ __wasi_errno_t clock_time_get(void *ctx, __wasi_clockid_t clock_id, __wasi_times
   auto *lWasmCtx = static_cast<context*>(ctx);
 
   if ((sizeof(__wasi_timestamp_t) + time) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lOut = (__wasi_timestamp_t*)(lWasmCtx->mem()->data() + time);
 
   clockid_t lHostID;
   switch (clock_id) {
-    case __WASI_CLOCK_REALTIME: lHostID = CLOCK_REALTIME; break;
-    case __WASI_CLOCK_MONOTONIC: lHostID = CLOCK_MONOTONIC; break;
-    case __WASI_CLOCK_PROCESS_CPUTIME_ID: lHostID = CLOCK_PROCESS_CPUTIME_ID; break;
-    case __WASI_CLOCK_THREAD_CPUTIME_ID: lHostID = CLOCK_THREAD_CPUTIME_ID; break;
+    case __WASI_CLOCKID_REALTIME: lHostID = CLOCK_REALTIME; break;
+    case __WASI_CLOCKID_MONOTONIC: lHostID = CLOCK_MONOTONIC; break;
+    case __WASI_CLOCKID_PROCESS_CPUTIME_ID: lHostID = CLOCK_PROCESS_CPUTIME_ID; break;
+    case __WASI_CLOCKID_THREAD_CPUTIME_ID: lHostID = CLOCK_THREAD_CPUTIME_ID; break;
     default:
-      TRACE_WASI_RETURN(__WASI_EINVAL);
+      TRACE_WASI_RETURN(__WASI_ERRNO_INVAL);
   }
 
   timespec lHostOut;
@@ -414,7 +414,7 @@ __wasi_errno_t clock_time_get(void *ctx, __wasi_clockid_t clock_id, __wasi_times
   *lOut = lHostOut.tv_nsec + lHostOut.tv_sec * 1'000'000'000;
   TRACE_WASI_OUT(time, *lOut);
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t environ_get(void *ctx, charptrptr_w environ, charptr_w environ_buf) {
@@ -424,9 +424,9 @@ __wasi_errno_t environ_get(void *ctx, charptrptr_w environ, charptr_w environ_bu
   auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
 
   if ((lWasiCtx->mEnv.mElements.size() * sizeof(charptr_w) + environ) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
   if ((lWasiCtx->mEnv.mBuffer.size() + environ_buf) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lEnv = (charptr_w*)(lWasmCtx->mem()->data() + environ);
   auto *lEnvBuf = (char*)(lWasmCtx->mem()->data() + environ_buf);
@@ -439,7 +439,7 @@ __wasi_errno_t environ_get(void *ctx, charptrptr_w environ, charptr_w environ_bu
   }
   lEnv[lCount] = 0;
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t environ_sizes_get(void *ctx, sizeptr_w environ_count, sizeptr_w environ_buf_size) {
@@ -449,9 +449,9 @@ __wasi_errno_t environ_sizes_get(void *ctx, sizeptr_w environ_count, sizeptr_w e
   auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
 
   if ((sizeof(size_w) + environ_count) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
   if ((sizeof(size_w) + environ_buf_size) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lCount = (size_w*)(lWasmCtx->mem()->data() + environ_count);
   auto *lBufSize = (size_w*)(lWasmCtx->mem()->data() + environ_buf_size);
@@ -461,7 +461,7 @@ __wasi_errno_t environ_sizes_get(void *ctx, sizeptr_w environ_count, sizeptr_w e
   *lBufSize = lWasiCtx->mEnv.mBuffer.size();
   TRACE_WASI_OUT(environ_buf_size, *lBufSize);
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t fd_advise(void *ctx, __wasi_fd_t fd, __wasi_filesize_t offset, __wasi_filesize_t len, __wasi_advice_t advice) {
@@ -472,10 +472,10 @@ __wasi_errno_t fd_advise(void *ctx, __wasi_fd_t fd, __wasi_filesize_t offset, __
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
-  if ((lIt->second.mRights & __WASI_RIGHT_FD_ADVISE) == 0)
-    TRACE_WASI_RETURN(__WASI_EACCES);
+  if ((lIt->second.mRights & __WASI_RIGHTS_FD_ADVISE) == 0)
+    TRACE_WASI_RETURN(__WASI_ERRNO_ACCES);
 
   int lHostAdvice;
   switch (advice) {
@@ -486,14 +486,14 @@ __wasi_errno_t fd_advise(void *ctx, __wasi_fd_t fd, __wasi_filesize_t offset, __
     case __WASI_ADVICE_DONTNEED: lHostAdvice = POSIX_FADV_DONTNEED; break;
     case __WASI_ADVICE_NOREUSE: lHostAdvice = POSIX_FADV_NOREUSE; break;
     default:
-      TRACE_WASI_RETURN(__WASI_EINVAL);
+      TRACE_WASI_RETURN(__WASI_ERRNO_INVAL);
   }
 
   int lResult = posix_fadvise(lIt->second.mHostFD, offset, len, lHostAdvice);
   if (lResult)
     TRACE_WASI_RETURN(errno_translate(lResult));
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t fd_allocate(void *ctx, __wasi_fd_t fd, __wasi_filesize_t offset, __wasi_filesize_t len) {
@@ -504,16 +504,16 @@ __wasi_errno_t fd_allocate(void *ctx, __wasi_fd_t fd, __wasi_filesize_t offset, 
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
-  if ((lIt->second.mRights & __WASI_RIGHT_FD_ALLOCATE) == 0)
-    TRACE_WASI_RETURN(__WASI_EACCES);
+  if ((lIt->second.mRights & __WASI_RIGHTS_FD_ALLOCATE) == 0)
+    TRACE_WASI_RETURN(__WASI_ERRNO_ACCES);
 
   int lResult = posix_fallocate(lIt->second.mHostFD, offset, len);
   if (lResult)
     TRACE_WASI_RETURN(errno_translate(lResult));
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t fd_close(void *ctx, __wasi_fd_t fd) {
@@ -524,14 +524,14 @@ __wasi_errno_t fd_close(void *ctx, __wasi_fd_t fd) {
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
   if(close(lIt->second.mHostFD))
     TRACE_WASI_RETURN(errno_translate());
 
   lWasiCtx->mFiles.erase(lIt);
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t fd_datasync(void *ctx, __wasi_fd_t fd) {
@@ -542,15 +542,15 @@ __wasi_errno_t fd_datasync(void *ctx, __wasi_fd_t fd) {
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
-  if ((lIt->second.mRights & __WASI_RIGHT_FD_DATASYNC) == 0)
-    TRACE_WASI_RETURN(__WASI_EACCES);
+  if ((lIt->second.mRights & __WASI_RIGHTS_FD_DATASYNC) == 0)
+    TRACE_WASI_RETURN(__WASI_ERRNO_ACCES);
 
   if(fdatasync(lIt->second.mHostFD))
     TRACE_WASI_RETURN(errno_translate());
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t fd_fdstat_get(void *ctx, __wasi_fd_t fd, fdstatptr_w buf) {
@@ -560,13 +560,13 @@ __wasi_errno_t fd_fdstat_get(void *ctx, __wasi_fd_t fd, fdstatptr_w buf) {
   auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
 
   if ((sizeof(__wasi_fdstat_t) + buf) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lDst = (__wasi_fdstat_t*)(lWasmCtx->mem()->data() + buf);
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
   int result = fcntl(lIt->second.mHostFD, F_GETFL);
   if (result < 0)
@@ -574,15 +574,15 @@ __wasi_errno_t fd_fdstat_get(void *ctx, __wasi_fd_t fd, fdstatptr_w buf) {
 
   __wasi_fdflags_t lOutFlags = 0;
   if (result & O_APPEND)
-    lOutFlags |= __WASI_FDFLAG_APPEND;
+    lOutFlags |= __WASI_FDFLAGS_APPEND;
   if (result & O_DSYNC)
-    lOutFlags |= __WASI_FDFLAG_DSYNC;
+    lOutFlags |= __WASI_FDFLAGS_DSYNC;
   if (result & O_NONBLOCK)
-    lOutFlags |= __WASI_FDFLAG_NONBLOCK;
+    lOutFlags |= __WASI_FDFLAGS_NONBLOCK;
   if (result & O_RSYNC)
-    lOutFlags |= __WASI_FDFLAG_RSYNC;
+    lOutFlags |= __WASI_FDFLAGS_RSYNC;
   if (result & O_SYNC)
-    lOutFlags |= __WASI_FDFLAG_SYNC;
+    lOutFlags |= __WASI_FDFLAGS_SYNC;
 
   struct stat lStat;
   if (fstat(lIt->second.mHostFD, &lStat))
@@ -602,7 +602,7 @@ __wasi_errno_t fd_fdstat_get(void *ctx, __wasi_fd_t fd, fdstatptr_w buf) {
   lDst->fs_rights_inheriting = lIt->second.mIRights;
   TRACE_WASI_OUT(buf, *lDst);
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t fd_fdstat_set_flags(void *ctx, __wasi_fd_t fd, __wasi_fdflags_t flags) {
@@ -613,27 +613,27 @@ __wasi_errno_t fd_fdstat_set_flags(void *ctx, __wasi_fd_t fd, __wasi_fdflags_t f
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
-  if ((lIt->second.mRights & __WASI_RIGHT_FD_FDSTAT_SET_FLAGS) == 0)
-    TRACE_WASI_RETURN(__WASI_EACCES);
+  if ((lIt->second.mRights & __WASI_RIGHTS_FD_FDSTAT_SET_FLAGS) == 0)
+    TRACE_WASI_RETURN(__WASI_ERRNO_ACCES);
 
   __wasi_fdflags_t lOutFlags = 0;
-  if (flags & __WASI_FDFLAG_APPEND)
+  if (flags & __WASI_FDFLAGS_APPEND)
     lOutFlags |= O_APPEND;
-  if (flags & __WASI_FDFLAG_DSYNC)
+  if (flags & __WASI_FDFLAGS_DSYNC)
     lOutFlags |= O_DSYNC;
-  if (flags & __WASI_FDFLAG_NONBLOCK)
+  if (flags & __WASI_FDFLAGS_NONBLOCK)
     lOutFlags |= O_NONBLOCK;
-  if (flags & __WASI_FDFLAG_RSYNC)
+  if (flags & __WASI_FDFLAGS_RSYNC)
     lOutFlags |= O_RSYNC;
-  if (flags & __WASI_FDFLAG_SYNC)
+  if (flags & __WASI_FDFLAGS_SYNC)
     lOutFlags |= O_SYNC;
 
   if (fcntl(lIt->second.mHostFD, F_SETFL, lOutFlags))
     TRACE_WASI_RETURN(errno_translate());
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t fd_fdstat_set_rights(void *ctx, __wasi_fd_t fd, __wasi_rights_t fs_rights_base, __wasi_rights_t fs_rights_inheriting) {
@@ -644,18 +644,18 @@ __wasi_errno_t fd_fdstat_set_rights(void *ctx, __wasi_fd_t fd, __wasi_rights_t f
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
   __wasi_fdflags_t lNewFlags = lIt->second.mRights & fs_rights_base;
   __wasi_fdflags_t lNewIFlags = lIt->second.mIRights & fs_rights_inheriting;
 
   if (lNewFlags != fs_rights_base || lNewIFlags != fs_rights_inheriting)
-    TRACE_WASI_RETURN(__WASI_ENOTCAPABLE);
+    TRACE_WASI_RETURN(__WASI_ERRNO_NOTCAPABLE);
 
   lIt->second.mRights = lNewFlags;
   lIt->second.mIRights = lNewIFlags;
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t fd_filestat_get(void *ctx, __wasi_fd_t fd, filestatptr_w buf) {
@@ -665,38 +665,38 @@ __wasi_errno_t fd_filestat_get(void *ctx, __wasi_fd_t fd, filestatptr_w buf) {
   auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
 
   if ((sizeof(__wasi_filestat_t) + buf) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lDst = (__wasi_filestat_t*)(lWasmCtx->mem()->data() + buf);
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
-  if ((lIt->second.mRights & __WASI_RIGHT_FD_FILESTAT_GET) == 0)
-    TRACE_WASI_RETURN(__WASI_EACCES);
+  if ((lIt->second.mRights & __WASI_RIGHTS_FD_FILESTAT_GET) == 0)
+    TRACE_WASI_RETURN(__WASI_ERRNO_ACCES);
 
   struct stat lStat;
   if (fstat(lIt->second.mHostFD, &lStat))
     TRACE_WASI_RETURN(errno_translate());
 
-  if (S_ISREG(lStat.st_mode)) lDst->st_filetype = __WASI_FILETYPE_REGULAR_FILE;
-  else if (S_ISDIR(lStat.st_mode)) lDst->st_filetype = __WASI_FILETYPE_DIRECTORY;
-  else if (S_ISLNK(lStat.st_mode)) lDst->st_filetype = __WASI_FILETYPE_SYMBOLIC_LINK;
-  else if (S_ISSOCK(lStat.st_mode)) lDst->st_filetype = __WASI_FILETYPE_SOCKET_STREAM; // FIXME: Socket type
-  else if (S_ISCHR(lStat.st_mode)) lDst->st_filetype = __WASI_FILETYPE_CHARACTER_DEVICE;
-  else if (S_ISBLK(lStat.st_mode)) lDst->st_filetype = __WASI_FILETYPE_BLOCK_DEVICE;
+  if (S_ISREG(lStat.st_mode)) lDst->filetype = __WASI_FILETYPE_REGULAR_FILE;
+  else if (S_ISDIR(lStat.st_mode)) lDst->filetype = __WASI_FILETYPE_DIRECTORY;
+  else if (S_ISLNK(lStat.st_mode)) lDst->filetype = __WASI_FILETYPE_SYMBOLIC_LINK;
+  else if (S_ISSOCK(lStat.st_mode)) lDst->filetype = __WASI_FILETYPE_SOCKET_STREAM; // FIXME: Socket type
+  else if (S_ISCHR(lStat.st_mode)) lDst->filetype = __WASI_FILETYPE_CHARACTER_DEVICE;
+  else if (S_ISBLK(lStat.st_mode)) lDst->filetype = __WASI_FILETYPE_BLOCK_DEVICE;
 
-  lDst->st_dev = lStat.st_dev;
-  lDst->st_ino = lStat.st_ino;
-  lDst->st_size = lStat.st_size;
-  lDst->st_nlink = lStat.st_nlink;
-  lDst->st_atim = lStat.st_atim.tv_nsec + lStat.st_atim.tv_sec * 1'000'000'000;
-  lDst->st_ctim = lStat.st_ctim.tv_nsec + lStat.st_ctim.tv_sec * 1'000'000'000;
-  lDst->st_mtim = lStat.st_mtim.tv_nsec + lStat.st_mtim.tv_sec * 1'000'000'000;
+  lDst->dev = lStat.st_dev;
+  lDst->ino = lStat.st_ino;
+  lDst->size = lStat.st_size;
+  lDst->nlink = lStat.st_nlink;
+  lDst->atim = lStat.st_atim.tv_nsec + lStat.st_atim.tv_sec * 1'000'000'000;
+  lDst->ctim = lStat.st_ctim.tv_nsec + lStat.st_ctim.tv_sec * 1'000'000'000;
+  lDst->mtim = lStat.st_mtim.tv_nsec + lStat.st_mtim.tv_sec * 1'000'000'000;
   TRACE_WASI_OUT(buf, *lDst);
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t fd_filestat_set_size(void *ctx, __wasi_fd_t fd, __wasi_filesize_t st_size) {
@@ -707,15 +707,15 @@ __wasi_errno_t fd_filestat_set_size(void *ctx, __wasi_fd_t fd, __wasi_filesize_t
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
-  if ((lIt->second.mRights & __WASI_RIGHT_FD_FILESTAT_SET_SIZE) == 0)
-    TRACE_WASI_RETURN(__WASI_EACCES);
+  if ((lIt->second.mRights & __WASI_RIGHTS_FD_FILESTAT_SET_SIZE) == 0)
+    TRACE_WASI_RETURN(__WASI_ERRNO_ACCES);
 
   if (ftruncate(lIt->second.mHostFD, st_size))
     TRACE_WASI_RETURN(errno_translate());
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t fd_filestat_set_times(void *ctx, __wasi_fd_t fd, __wasi_timestamp_t st_atim, __wasi_timestamp_t st_mtim, __wasi_fstflags_t fstflags) {
@@ -726,17 +726,17 @@ __wasi_errno_t fd_filestat_set_times(void *ctx, __wasi_fd_t fd, __wasi_timestamp
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
-  if ((lIt->second.mRights & __WASI_RIGHT_FD_FILESTAT_SET_TIMES) == 0)
-    TRACE_WASI_RETURN(__WASI_EACCES);
+  if ((lIt->second.mRights & __WASI_RIGHTS_FD_FILESTAT_SET_TIMES) == 0)
+    TRACE_WASI_RETURN(__WASI_ERRNO_ACCES);
 
   struct stat lStat;
   if (fstat(lIt->second.mHostFD, &lStat))
     TRACE_WASI_RETURN(errno_translate());
 
   timespec lNow;
-  if (fstflags & __WASI_FILESTAT_SET_ATIM_NOW || fstflags & __WASI_FILESTAT_SET_MTIM_NOW) {
+  if (fstflags & __WASI_FSTFLAGS_ATIM_NOW || fstflags & __WASI_FSTFLAGS_MTIM_NOW) {
     if (clock_gettime(CLOCK_REALTIME, &lNow))
       TRACE_WASI_RETURN(errno_translate());
   }
@@ -745,15 +745,15 @@ __wasi_errno_t fd_filestat_set_times(void *ctx, __wasi_fd_t fd, __wasi_timestamp
   lTimes[0] = lStat.st_atim;
   lTimes[1] = lStat.st_mtim;
 
-  if (fstflags & __WASI_FILESTAT_SET_ATIM_NOW)
+  if (fstflags & __WASI_FSTFLAGS_ATIM_NOW)
     lTimes[0] = lNow;
-  else if (fstflags & __WASI_FILESTAT_SET_ATIM) {
+  else if (fstflags & __WASI_FSTFLAGS_ATIM) {
     lTimes[0].tv_sec = st_atim / 1'000'000'000;
     lTimes[0].tv_nsec = st_atim - (lTimes[0].tv_sec * 1'000'000'000);
   }
-  if (fstflags & __WASI_FILESTAT_SET_MTIM_NOW)
+  if (fstflags & __WASI_FSTFLAGS_MTIM_NOW)
     lTimes[1] = lNow;
-  else if (fstflags & __WASI_FILESTAT_SET_MTIM) {
+  else if (fstflags & __WASI_FSTFLAGS_MTIM) {
     lTimes[1].tv_sec = st_mtim / 1'000'000'000;
     lTimes[1].tv_nsec = st_mtim - (lTimes[1].tv_sec * 1'000'000'000);
   }
@@ -761,7 +761,7 @@ __wasi_errno_t fd_filestat_set_times(void *ctx, __wasi_fd_t fd, __wasi_timestamp
   if (futimens(lIt->second.mHostFD, lTimes))
     TRACE_WASI_RETURN(errno_translate());
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t fd_pread(void *ctx, __wasi_fd_t fd, const iovecptr_w iovs, size_w iovs_len, __wasi_filesize_t offset, sizeptr_w nread) {
@@ -771,19 +771,19 @@ __wasi_errno_t fd_pread(void *ctx, __wasi_fd_t fd, const iovecptr_w iovs, size_w
   auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
 
   if ((sizeof(__wasi_iovec_t) * iovs_len + iovs) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
   if ((sizeof(size_w) + nread) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lIOVecsIn = (__wasi_iovec_t*)(lWasmCtx->mem()->data() + iovs);
   auto *lNRead = (size_w*)(lWasmCtx->mem()->data() + nread);
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
-  if ((lIt->second.mRights & __WASI_RIGHT_FD_READ) == 0)
-    TRACE_WASI_RETURN(__WASI_EACCES);
+  if ((lIt->second.mRights & __WASI_RIGHTS_FD_READ) == 0)
+    TRACE_WASI_RETURN(__WASI_ERRNO_ACCES);
 
   size_t lTotalSize = 0;
   iovec lIOVecs[iovs_len];
@@ -792,9 +792,9 @@ __wasi_errno_t fd_pread(void *ctx, __wasi_fd_t fd, const iovecptr_w iovs, size_w
     lIOVecs[i] = {lDst, (size_t)lIOVecsIn[i].buf_len};
     lTotalSize += lIOVecsIn[i].buf_len;
     if (lTotalSize > std::numeric_limits<size_w>::max())
-      TRACE_WASI_RETURN(__WASI_EINVAL);
+      TRACE_WASI_RETURN(__WASI_ERRNO_INVAL);
     if ((lIOVecsIn[i].buf + lIOVecsIn[i].buf_len) > lWasmCtx->mem()->byte_size())
-      TRACE_WASI_RETURN(__WASI_EFAULT);
+      TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
   }
 
   int read = preadv(lIt->second.mHostFD, lIOVecs, iovs_len, offset);
@@ -803,7 +803,7 @@ __wasi_errno_t fd_pread(void *ctx, __wasi_fd_t fd, const iovecptr_w iovs, size_w
   *lNRead = read;
   TRACE_WASI_OUT(nread, *lNRead);
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t fd_prestat_get(void *ctx, __wasi_fd_t fd, prestatptr_w buf) {
@@ -813,26 +813,26 @@ __wasi_errno_t fd_prestat_get(void *ctx, __wasi_fd_t fd, prestatptr_w buf) {
   auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
 
   if ((sizeof(__wasi_prestat_t) + buf) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lDst = (__wasi_prestat_t*)(lWasmCtx->mem()->data() + buf);
 
   if (lWasiCtx->mPreopens.find(fd) == lWasiCtx->mPreopens.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
   auto &lPath = lIt->second.mPath.native();
   if (lPath.size() > size_t(std::numeric_limits<int32_t>::max()))
-    TRACE_WASI_RETURN(__WASI_EOVERFLOW);
+    TRACE_WASI_RETURN(__WASI_ERRNO_OVERFLOW);
 
   lDst->pr_type = __WASI_PREOPENTYPE_DIR;
   lDst->u.dir.pr_name_len = lPath.size();
   TRACE_WASI_OUT(buf, *lDst);
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t fd_prestat_dir_name(void *ctx, __wasi_fd_t fd, charptr_w path, size_w path_len) {
@@ -842,23 +842,23 @@ __wasi_errno_t fd_prestat_dir_name(void *ctx, __wasi_fd_t fd, charptr_w path, si
   auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
 
   if ((path + path_len) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
   if (lWasiCtx->mPreopens.find(fd) == lWasiCtx->mPreopens.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
   auto *lDst = (char*)(lWasmCtx->mem()->data() + path);
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
   auto &lPath = lIt->second.mPath.native();
   if (lPath.size() != size_t(path_len))
-    TRACE_WASI_RETURN(__WASI_EINVAL);
+    TRACE_WASI_RETURN(__WASI_ERRNO_INVAL);
 
   memcpy(lDst, lPath.data(), path_len);
   TRACE_WASI_OUT(path, (std::string_view{lDst, path_len}));
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t fd_pwrite(void *ctx, __wasi_fd_t fd, const ciovecptr_w iovs, size_w iovs_len, __wasi_filesize_t offset, sizeptr_w nwritten) {
@@ -868,19 +868,19 @@ __wasi_errno_t fd_pwrite(void *ctx, __wasi_fd_t fd, const ciovecptr_w iovs, size
   auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
 
   if ((sizeof(__wasi_ciovec_t) * iovs_len + iovs) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
   if ((sizeof(size_w) + nwritten) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lIOVecsIn = (__wasi_iovec_t*)(lWasmCtx->mem()->data() + iovs);
   auto *lNWritten = (size_w*)(lWasmCtx->mem()->data() + nwritten);
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
-  if ((lIt->second.mRights & __WASI_RIGHT_FD_WRITE) == 0)
-    TRACE_WASI_RETURN(__WASI_EACCES);
+  if ((lIt->second.mRights & __WASI_RIGHTS_FD_WRITE) == 0)
+    TRACE_WASI_RETURN(__WASI_ERRNO_ACCES);
 
   size_t lTotalSize = 0;
   iovec lIOVecs[iovs_len];
@@ -889,9 +889,9 @@ __wasi_errno_t fd_pwrite(void *ctx, __wasi_fd_t fd, const ciovecptr_w iovs, size
     lIOVecs[i] = {lDst, (size_t)lIOVecsIn[i].buf_len};
     lTotalSize += lIOVecsIn[i].buf_len;
     if (lTotalSize > std::numeric_limits<size_w>::max())
-      TRACE_WASI_RETURN(__WASI_EINVAL);
+      TRACE_WASI_RETURN(__WASI_ERRNO_INVAL);
     if ((lIOVecsIn[i].buf + lIOVecsIn[i].buf_len) > lWasmCtx->mem()->byte_size())
-      TRACE_WASI_RETURN(__WASI_EFAULT);
+      TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
   }
 
   int written = pwritev(lIt->second.mHostFD, lIOVecs, iovs_len, offset);
@@ -900,7 +900,7 @@ __wasi_errno_t fd_pwrite(void *ctx, __wasi_fd_t fd, const ciovecptr_w iovs, size
   *lNWritten = written;
   TRACE_WASI_OUT(nwritten, *lNWritten);
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t fd_read(void *ctx, __wasi_fd_t fd, const ciovecptr_w iovs, size_w iovs_len, sizeptr_w nread) {
@@ -910,19 +910,19 @@ __wasi_errno_t fd_read(void *ctx, __wasi_fd_t fd, const ciovecptr_w iovs, size_w
   auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
 
   if ((sizeof(__wasi_ciovec_t) * iovs_len + iovs) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
   if ((sizeof(size_w) + nread) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lIOVecsIn = (__wasi_iovec_t*)(lWasmCtx->mem()->data() + iovs);
   auto *lNRead = (size_w*)(lWasmCtx->mem()->data() + nread);
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
-  if ((lIt->second.mRights & __WASI_RIGHT_FD_READ) == 0)
-    TRACE_WASI_RETURN(__WASI_EACCES);
+  if ((lIt->second.mRights & __WASI_RIGHTS_FD_READ) == 0)
+    TRACE_WASI_RETURN(__WASI_ERRNO_ACCES);
 
   size_t lTotalSize = 0;
   iovec lIOVecs[iovs_len];
@@ -931,9 +931,9 @@ __wasi_errno_t fd_read(void *ctx, __wasi_fd_t fd, const ciovecptr_w iovs, size_w
     lIOVecs[i] = {lDst, (size_t)lIOVecsIn[i].buf_len};
     lTotalSize += lIOVecsIn[i].buf_len;
     if (lTotalSize > std::numeric_limits<size_w>::max())
-      TRACE_WASI_RETURN(__WASI_EINVAL);
+      TRACE_WASI_RETURN(__WASI_ERRNO_INVAL);
     if ((lIOVecsIn[i].buf + lIOVecsIn[i].buf_len) > lWasmCtx->mem()->byte_size())
-      TRACE_WASI_RETURN(__WASI_EFAULT);
+      TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
   }
 
   int read = readv(lIt->second.mHostFD, lIOVecs, iovs_len);
@@ -942,7 +942,7 @@ __wasi_errno_t fd_read(void *ctx, __wasi_fd_t fd, const ciovecptr_w iovs, size_w
   *lNRead = read;
   TRACE_WASI_OUT(nread, *lNRead);
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t fd_readdir(void *ctx, __wasi_fd_t fd, voiptr_w buf, size_w buf_len, __wasi_dircookie_t cookie, sizeptr_w bufused) {
@@ -952,21 +952,21 @@ __wasi_errno_t fd_readdir(void *ctx, __wasi_fd_t fd, voiptr_w buf, size_w buf_le
   auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
 
   if (buf_len == 0)
-    TRACE_WASI_RETURN(__WASI_EINVAL);
+    TRACE_WASI_RETURN(__WASI_ERRNO_INVAL);
   if ((buf + buf_len) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
   if ((sizeof(size_w) + bufused) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lBuf = (char*)(lWasmCtx->mem()->data() + buf);
   auto *lBufUsed = (size_w*)(lWasmCtx->mem()->data() + bufused);
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
-  if ((lIt->second.mRights & __WASI_RIGHT_FD_READDIR) == 0)
-    TRACE_WASI_RETURN(__WASI_EACCES);
+  if ((lIt->second.mRights & __WASI_RIGHTS_FD_READDIR) == 0)
+    TRACE_WASI_RETURN(__WASI_ERRNO_ACCES);
 
   char lHostBuf[buf_len + cookie];
   long lRead = syscall(SYS_getdents64, lIt->second.mHostFD, lHostBuf, sizeof(lHostBuf));
@@ -1008,7 +1008,7 @@ __wasi_errno_t fd_readdir(void *ctx, __wasi_fd_t fd, voiptr_w buf, size_w buf_le
   *lBufUsed = lCopied;
   TRACE_WASI_OUT(bufused, *lBufUsed);
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t fd_renumber(void *ctx, __wasi_fd_t from, __wasi_fd_t to) {
@@ -1019,16 +1019,16 @@ __wasi_errno_t fd_renumber(void *ctx, __wasi_fd_t from, __wasi_fd_t to) {
 
   auto lItFrom = lWasiCtx->mFiles.find(from);
   if (lItFrom == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
   auto lItTo = lWasiCtx->mFiles.find(to);
   if (lItTo == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
   close(lItTo->second.mHostFD);
   lWasiCtx->mFiles[to] = lItFrom->second;
   lWasiCtx->mFiles.erase(lItFrom);
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t fd_seek(void *ctx, __wasi_fd_t fd, __wasi_filedelta_t offset, __wasi_whence_t whence, filesizeptr_w newoffset) {
@@ -1038,23 +1038,23 @@ __wasi_errno_t fd_seek(void *ctx, __wasi_fd_t fd, __wasi_filedelta_t offset, __w
   auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
 
   if ((sizeof(size_w) + newoffset) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lOffset = (__wasi_filesize_t*)(lWasmCtx->mem()->data() + newoffset);
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
-  if ((lIt->second.mRights & __WASI_RIGHT_FD_SEEK) == 0)
-    TRACE_WASI_RETURN(__WASI_EACCES);
+  if ((lIt->second.mRights & __WASI_RIGHTS_FD_SEEK) == 0)
+    TRACE_WASI_RETURN(__WASI_ERRNO_ACCES);
 
   int lWhence;
   switch (whence) {
     case __WASI_WHENCE_CUR: lWhence = SEEK_CUR; break;
     case __WASI_WHENCE_SET: lWhence = SEEK_SET; break;
     case __WASI_WHENCE_END: lWhence = SEEK_END; break;
-    default: TRACE_WASI_RETURN(__WASI_EINVAL);
+    default: TRACE_WASI_RETURN(__WASI_ERRNO_INVAL);
   }
 
   off_t lResult = lseek(lIt->second.mHostFD, offset, lWhence);
@@ -1063,7 +1063,7 @@ __wasi_errno_t fd_seek(void *ctx, __wasi_fd_t fd, __wasi_filedelta_t offset, __w
   *lOffset = lResult;
   TRACE_WASI_OUT(newoffset, *lOffset);
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t fd_sync(void *ctx, __wasi_fd_t fd) {
@@ -1074,15 +1074,15 @@ __wasi_errno_t fd_sync(void *ctx, __wasi_fd_t fd) {
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
-  if ((lIt->second.mRights & __WASI_RIGHT_FD_SYNC) == 0)
-    TRACE_WASI_RETURN(__WASI_EACCES);
+  if ((lIt->second.mRights & __WASI_RIGHTS_FD_SYNC) == 0)
+    TRACE_WASI_RETURN(__WASI_ERRNO_ACCES);
 
   if(fsync(lIt->second.mHostFD))
     TRACE_WASI_RETURN(errno_translate());
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t fd_tell(void *ctx, __wasi_fd_t fd, filesizeptr_w newoffset) {
@@ -1092,16 +1092,16 @@ __wasi_errno_t fd_tell(void *ctx, __wasi_fd_t fd, filesizeptr_w newoffset) {
   auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
 
   if ((sizeof(size_w) + newoffset) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lOffset = (__wasi_filesize_t*)(lWasmCtx->mem()->data() + newoffset);
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
-  if ((lIt->second.mRights & __WASI_RIGHT_FD_TELL) == 0)
-    TRACE_WASI_RETURN(__WASI_EACCES);
+  if ((lIt->second.mRights & __WASI_RIGHTS_FD_TELL) == 0)
+    TRACE_WASI_RETURN(__WASI_ERRNO_ACCES);
 
   off_t lResult = lseek(lIt->second.mHostFD, 0, SEEK_CUR);
   if (lResult < 0)
@@ -1109,29 +1109,29 @@ __wasi_errno_t fd_tell(void *ctx, __wasi_fd_t fd, filesizeptr_w newoffset) {
   *lOffset = lResult;
   TRACE_WASI_OUT(newoffset, *lOffset);
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
-__wasi_errno_t fd_write(void *ctx, __wasi_fd_t fd, const ciovecptr_w iovs, size_w iovs_len, sizeptr_w nwritten) {
+__wasi_errno_t fd_write_(void *ctx, __wasi_fd_t fd, const ciovecptr_w iovs, size_w iovs_len, sizeptr_w nwritten) {
   TRACE_WASI_CALLS(fd, iovs, iovs_len, nwritten);
 
   auto *lWasmCtx = static_cast<context*>(ctx);
   auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
 
   if ((sizeof(__wasi_ciovec_t) * iovs_len + iovs) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
   if ((sizeof(size_w) + nwritten) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lIOVecsIn = (__wasi_iovec_t*)(lWasmCtx->mem()->data() + iovs);
   auto *lNWritten = (size_w*)(lWasmCtx->mem()->data() + nwritten);
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
-  if ((lIt->second.mRights & __WASI_RIGHT_FD_WRITE) == 0)
-    TRACE_WASI_RETURN(__WASI_EACCES);
+  if ((lIt->second.mRights & __WASI_RIGHTS_FD_WRITE) == 0)
+    TRACE_WASI_RETURN(__WASI_ERRNO_ACCES);
 
   size_t lTotalSize = 0;
   iovec lIOVecs[iovs_len];
@@ -1140,9 +1140,9 @@ __wasi_errno_t fd_write(void *ctx, __wasi_fd_t fd, const ciovecptr_w iovs, size_
     lIOVecs[i] = {lDst, (size_t)lIOVecsIn[i].buf_len};
     lTotalSize += lIOVecsIn[i].buf_len;
     if (lTotalSize > std::numeric_limits<size_w>::max())
-      TRACE_WASI_RETURN(__WASI_EINVAL);
+      TRACE_WASI_RETURN(__WASI_ERRNO_INVAL);
     if ((lIOVecsIn[i].buf + lIOVecsIn[i].buf_len) > lWasmCtx->mem()->byte_size())
-      TRACE_WASI_RETURN(__WASI_EFAULT);
+      TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
   }
 
   int written = writev(lIt->second.mHostFD, lIOVecs, iovs_len);
@@ -1151,7 +1151,7 @@ __wasi_errno_t fd_write(void *ctx, __wasi_fd_t fd, const ciovecptr_w iovs, size_
   *lNWritten = written;
   TRACE_WASI_OUT(nwritten, *lNWritten);
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t path_create_directory(void *ctx, __wasi_fd_t fd, const charptr_w path, size_w path_len) {
@@ -1161,9 +1161,9 @@ __wasi_errno_t path_create_directory(void *ctx, __wasi_fd_t fd, const charptr_w 
   auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
 
   if (path_len == 0)
-    TRACE_WASI_RETURN(__WASI_EINVAL);
+    TRACE_WASI_RETURN(__WASI_ERRNO_INVAL);
   if ((path + path_len) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lPath = (char*)(lWasmCtx->mem()->data() + path);
 
@@ -1171,11 +1171,11 @@ __wasi_errno_t path_create_directory(void *ctx, __wasi_fd_t fd, const charptr_w 
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
   if (mkdirat(lIt->second.mHostFD, lPath, 0755))
     TRACE_WASI_RETURN(errno_translate());
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t path_filestat_get(void *ctx, __wasi_fd_t fd, __wasi_lookupflags_t flags, const charptr_w path, size_w path_len, filestatptr_w buf) {
@@ -1185,11 +1185,11 @@ __wasi_errno_t path_filestat_get(void *ctx, __wasi_fd_t fd, __wasi_lookupflags_t
   auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
 
   if (path_len == 0)
-    TRACE_WASI_RETURN(__WASI_EINVAL);
+    TRACE_WASI_RETURN(__WASI_ERRNO_INVAL);
   if ((path + path_len) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
   if ((sizeof(__wasi_filestat_t) + buf) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lPath = (char*)(lWasmCtx->mem()->data() + path);
   auto *lDst = (__wasi_filestat_t*)(lWasmCtx->mem()->data() + buf);
@@ -1198,36 +1198,36 @@ __wasi_errno_t path_filestat_get(void *ctx, __wasi_fd_t fd, __wasi_lookupflags_t
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
-  if ((lIt->second.mRights & __WASI_RIGHT_FD_READDIR) == 0)
-    TRACE_WASI_RETURN(__WASI_EACCES);
+  if ((lIt->second.mRights & __WASI_RIGHTS_FD_READDIR) == 0)
+    TRACE_WASI_RETURN(__WASI_ERRNO_ACCES);
 
   int lSearchFlags = 0;
-  if ((flags & __WASI_LOOKUP_SYMLINK_FOLLOW) == 0)
+  if ((flags & __WASI_LOOKUPFLAGS_SYMLINK_FOLLOW) == 0)
     lSearchFlags |= AT_SYMLINK_NOFOLLOW;
 
   struct stat lStat;
   if (fstatat(lIt->second.mHostFD, lPath, &lStat, lSearchFlags))
     TRACE_WASI_RETURN(errno_translate());
 
-  if (S_ISREG(lStat.st_mode)) lDst->st_filetype = __WASI_FILETYPE_REGULAR_FILE;
-  else if (S_ISDIR(lStat.st_mode)) lDst->st_filetype = __WASI_FILETYPE_DIRECTORY;
-  else if (S_ISLNK(lStat.st_mode)) lDst->st_filetype = __WASI_FILETYPE_SYMBOLIC_LINK;
-  else if (S_ISSOCK(lStat.st_mode)) lDst->st_filetype = __WASI_FILETYPE_SOCKET_STREAM; // FIXME: Socket type
-  else if (S_ISCHR(lStat.st_mode)) lDst->st_filetype = __WASI_FILETYPE_CHARACTER_DEVICE;
-  else if (S_ISBLK(lStat.st_mode)) lDst->st_filetype = __WASI_FILETYPE_BLOCK_DEVICE;
+  if (S_ISREG(lStat.st_mode)) lDst->filetype = __WASI_FILETYPE_REGULAR_FILE;
+  else if (S_ISDIR(lStat.st_mode)) lDst->filetype = __WASI_FILETYPE_DIRECTORY;
+  else if (S_ISLNK(lStat.st_mode)) lDst->filetype = __WASI_FILETYPE_SYMBOLIC_LINK;
+  else if (S_ISSOCK(lStat.st_mode)) lDst->filetype = __WASI_FILETYPE_SOCKET_STREAM; // FIXME: Socket type
+  else if (S_ISCHR(lStat.st_mode)) lDst->filetype = __WASI_FILETYPE_CHARACTER_DEVICE;
+  else if (S_ISBLK(lStat.st_mode)) lDst->filetype = __WASI_FILETYPE_BLOCK_DEVICE;
 
-  lDst->st_dev = lStat.st_dev;
-  lDst->st_ino = lStat.st_ino;
-  lDst->st_size = lStat.st_size;
-  lDst->st_nlink = lStat.st_nlink;
-  lDst->st_atim = lStat.st_atim.tv_nsec + lStat.st_atim.tv_sec * 1'000'000'000;
-  lDst->st_ctim = lStat.st_ctim.tv_nsec + lStat.st_ctim.tv_sec * 1'000'000'000;
-  lDst->st_mtim = lStat.st_mtim.tv_nsec + lStat.st_mtim.tv_sec * 1'000'000'000;
+  lDst->dev = lStat.st_dev;
+  lDst->ino = lStat.st_ino;
+  lDst->size = lStat.st_size;
+  lDst->nlink = lStat.st_nlink;
+  lDst->atim = lStat.st_atim.tv_nsec + lStat.st_atim.tv_sec * 1'000'000'000;
+  lDst->ctim = lStat.st_ctim.tv_nsec + lStat.st_ctim.tv_sec * 1'000'000'000;
+  lDst->mtim = lStat.st_mtim.tv_nsec + lStat.st_mtim.tv_sec * 1'000'000'000;
   TRACE_WASI_OUT(buf, *lDst);
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t path_filestat_set_times(void *ctx, __wasi_fd_t fd, __wasi_lookupflags_t flags, const charptr_w path, size_w path_len, __wasi_timestamp_t st_atim, __wasi_timestamp_t st_mtim, __wasi_fstflags_t fstflags) {
@@ -1237,9 +1237,9 @@ __wasi_errno_t path_filestat_set_times(void *ctx, __wasi_fd_t fd, __wasi_lookupf
   auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
 
   if (path_len == 0)
-    TRACE_WASI_RETURN(__WASI_EINVAL);
+    TRACE_WASI_RETURN(__WASI_ERRNO_INVAL);
   if ((path + path_len) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lPath = (char*)(lWasmCtx->mem()->data() + path);
 
@@ -1247,13 +1247,13 @@ __wasi_errno_t path_filestat_set_times(void *ctx, __wasi_fd_t fd, __wasi_lookupf
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
-  if ((lIt->second.mRights & __WASI_RIGHT_FD_FILESTAT_SET_TIMES) == 0)
-    TRACE_WASI_RETURN(__WASI_EACCES);
+  if ((lIt->second.mRights & __WASI_RIGHTS_FD_FILESTAT_SET_TIMES) == 0)
+    TRACE_WASI_RETURN(__WASI_ERRNO_ACCES);
 
   int lSearchFlags = 0;
-  if ((flags & __WASI_LOOKUP_SYMLINK_FOLLOW) == 0)
+  if ((flags & __WASI_LOOKUPFLAGS_SYMLINK_FOLLOW) == 0)
     lSearchFlags |= AT_SYMLINK_NOFOLLOW;
 
   struct stat lStat;
@@ -1261,7 +1261,7 @@ __wasi_errno_t path_filestat_set_times(void *ctx, __wasi_fd_t fd, __wasi_lookupf
     TRACE_WASI_RETURN(errno_translate());
 
   timespec lNow;
-  if (fstflags & __WASI_FILESTAT_SET_ATIM_NOW || fstflags & __WASI_FILESTAT_SET_MTIM_NOW) {
+  if (fstflags & __WASI_FSTFLAGS_ATIM_NOW || fstflags & __WASI_FSTFLAGS_MTIM_NOW) {
     if (clock_gettime(CLOCK_REALTIME, &lNow))
       TRACE_WASI_RETURN(errno_translate());
   }
@@ -1270,15 +1270,15 @@ __wasi_errno_t path_filestat_set_times(void *ctx, __wasi_fd_t fd, __wasi_lookupf
   lTimes[0] = lStat.st_atim;
   lTimes[1] = lStat.st_mtim;
 
-  if (fstflags & __WASI_FILESTAT_SET_ATIM_NOW)
+  if (fstflags & __WASI_FSTFLAGS_ATIM_NOW)
     lTimes[0] = lNow;
-  else if (fstflags & __WASI_FILESTAT_SET_ATIM) {
+  else if (fstflags & __WASI_FSTFLAGS_ATIM) {
     lTimes[0].tv_sec = st_atim / 1'000'000'000;
     lTimes[0].tv_nsec = st_atim - (lTimes[0].tv_sec * 1'000'000'000);
   }
-  if (fstflags & __WASI_FILESTAT_SET_MTIM_NOW)
+  if (fstflags & __WASI_FSTFLAGS_MTIM_NOW)
     lTimes[1] = lNow;
-  else if (fstflags & __WASI_FILESTAT_SET_MTIM) {
+  else if (fstflags & __WASI_FSTFLAGS_MTIM) {
     lTimes[1].tv_sec = st_mtim / 1'000'000'000;
     lTimes[1].tv_nsec = st_mtim - (lTimes[1].tv_sec * 1'000'000'000);
   }
@@ -1286,7 +1286,7 @@ __wasi_errno_t path_filestat_set_times(void *ctx, __wasi_fd_t fd, __wasi_lookupf
   if (utimensat(lIt->second.mHostFD, lPath, lTimes, lSearchFlags))
     TRACE_WASI_RETURN(errno_translate());
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t path_link(void *ctx, __wasi_fd_t old_fd, __wasi_lookupflags_t old_flags, const charptr_w old_path, size_w old_path_len, __wasi_fd_t new_fd, const charptr_w new_path, size_w new_path_len) {
@@ -1296,13 +1296,13 @@ __wasi_errno_t path_link(void *ctx, __wasi_fd_t old_fd, __wasi_lookupflags_t old
   auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
 
   if (old_path_len == 0)
-    TRACE_WASI_RETURN(__WASI_EINVAL);
+    TRACE_WASI_RETURN(__WASI_ERRNO_INVAL);
   if (new_path_len == 0)
-    TRACE_WASI_RETURN(__WASI_EINVAL);
+    TRACE_WASI_RETURN(__WASI_ERRNO_INVAL);
   if ((old_path + old_path_len) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
   if ((new_path + new_path_len) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lOldPath = (char*)(lWasmCtx->mem()->data() + old_path);
   auto *lNewPath = (char*)(lWasmCtx->mem()->data() + new_path);
@@ -1312,18 +1312,18 @@ __wasi_errno_t path_link(void *ctx, __wasi_fd_t old_fd, __wasi_lookupflags_t old
 
   auto lOld = lWasiCtx->mFiles.find(old_fd);
   if (lOld == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
   auto lNew = lWasiCtx->mFiles.find(new_fd);
   if (lNew == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
   int lSearchFlags = 0;
-  if (old_flags & __WASI_LOOKUP_SYMLINK_FOLLOW)
+  if (old_flags & __WASI_LOOKUPFLAGS_SYMLINK_FOLLOW)
     lSearchFlags |= AT_SYMLINK_FOLLOW;
 
   if (linkat(lOld->second.mHostFD, lOldPath, lNew->second.mHostFD, lNewPath, lSearchFlags))
     TRACE_WASI_RETURN(errno_translate());
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t path_open(void *ctx, __wasi_fd_t dirfd, __wasi_lookupflags_t dirflags, const charptr_w path, size_w path_len, __wasi_oflags_t oflags, __wasi_rights_t fs_rights_base, __wasi_rights_t fs_rights_inheriting, __wasi_fdflags_t fs_flags, fdptr_w fd) {
@@ -1333,11 +1333,11 @@ __wasi_errno_t path_open(void *ctx, __wasi_fd_t dirfd, __wasi_lookupflags_t dirf
   auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
 
   if (path_len == 0)
-    TRACE_WASI_RETURN(__WASI_EINVAL);
+    TRACE_WASI_RETURN(__WASI_ERRNO_INVAL);
   if ((path + path_len) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
   if ((sizeof(__wasi_fd_t) + fd) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lPath = (char*)(lWasmCtx->mem()->data() + path);
   auto *lFD = (__wasi_fd_t *)(lWasmCtx->mem()->data() + fd);
@@ -1346,32 +1346,32 @@ __wasi_errno_t path_open(void *ctx, __wasi_fd_t dirfd, __wasi_lookupflags_t dirf
 
   auto lDir = lWasiCtx->mFiles.find(dirfd);
   if (lDir == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
   int lOpenFlags = 0;
-  if (oflags & __WASI_O_CREAT)
+  if (oflags & __WASI_OFLAGS_CREAT)
     lOpenFlags |= O_CREAT;
-  if (oflags & __WASI_O_DIRECTORY)
+  if (oflags & __WASI_OFLAGS_DIRECTORY)
     lOpenFlags |= O_DIRECTORY;
-  if (oflags & __WASI_O_EXCL)
+  if (oflags & __WASI_OFLAGS_EXCL)
     lOpenFlags |= O_EXCL;
-  if (oflags & __WASI_O_TRUNC)
+  if (oflags & __WASI_OFLAGS_TRUNC)
     lOpenFlags |= O_TRUNC;
-  if ((dirflags & __WASI_LOOKUP_SYMLINK_FOLLOW) == 0)
+  if ((dirflags & __WASI_LOOKUPFLAGS_SYMLINK_FOLLOW) == 0)
     lOpenFlags |= O_NOFOLLOW;
-  if (fs_flags & __WASI_FDFLAG_APPEND)
+  if (fs_flags & __WASI_FDFLAGS_APPEND)
     lOpenFlags |= O_APPEND;
-  if (fs_flags & __WASI_FDFLAG_DSYNC)
+  if (fs_flags & __WASI_FDFLAGS_DSYNC)
     lOpenFlags |= O_DSYNC;
-  if (fs_flags & __WASI_FDFLAG_NONBLOCK)
+  if (fs_flags & __WASI_FDFLAGS_NONBLOCK)
     lOpenFlags |= O_NONBLOCK;
-  if (fs_flags & __WASI_FDFLAG_RSYNC)
+  if (fs_flags & __WASI_FDFLAGS_RSYNC)
     lOpenFlags |= O_RSYNC;
-  if (fs_flags & __WASI_FDFLAG_SYNC)
+  if (fs_flags & __WASI_FDFLAGS_SYNC)
     lOpenFlags |= O_SYNC;
 
-  constexpr __wasi_rights_t lReadMask = __WASI_RIGHT_FD_READ | __WASI_RIGHT_FD_READDIR;
-  constexpr __wasi_rights_t lWriteMask = __WASI_RIGHT_FD_WRITE | __WASI_RIGHT_FD_ALLOCATE | __WASI_RIGHT_FD_FILESTAT_SET_SIZE;
+  constexpr __wasi_rights_t lReadMask = __WASI_RIGHTS_FD_READ | __WASI_RIGHTS_FD_READDIR;
+  constexpr __wasi_rights_t lWriteMask = __WASI_RIGHTS_FD_WRITE | __WASI_RIGHTS_FD_ALLOCATE | __WASI_RIGHTS_FD_FILESTAT_SET_SIZE;
   const bool lRead = fs_rights_base & lReadMask;
   const bool lWrite = fs_rights_base & lWriteMask;
   if (lRead && !lWrite)
@@ -1399,7 +1399,7 @@ __wasi_errno_t path_open(void *ctx, __wasi_fd_t dirfd, __wasi_lookupflags_t dirf
 
   lWasiCtx->mFiles.emplace(lNewFD, file{lResult, lDir->second.mPath / lPath, fs_rights_base, fs_rights_inheriting});
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t path_readlink(void *ctx, __wasi_fd_t fd, const charptr_w path, size_w path_len, charptr_w buf, size_w buf_len, sizeptr_w bufused) {
@@ -1409,15 +1409,15 @@ __wasi_errno_t path_readlink(void *ctx, __wasi_fd_t fd, const charptr_w path, si
   auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
 
   if (path_len == 0)
-    TRACE_WASI_RETURN(__WASI_EINVAL);
+    TRACE_WASI_RETURN(__WASI_ERRNO_INVAL);
   if (buf_len == 0)
-    TRACE_WASI_RETURN(__WASI_EINVAL);
+    TRACE_WASI_RETURN(__WASI_ERRNO_INVAL);
   if ((path + path_len) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
   if ((buf + buf_len) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
   if ((sizeof(size_w) + bufused) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lPath = (char*)(lWasmCtx->mem()->data() + path);
   auto *lBuf = (char*)(lWasmCtx->mem()->data() + buf);
@@ -1427,7 +1427,7 @@ __wasi_errno_t path_readlink(void *ctx, __wasi_fd_t fd, const charptr_w path, si
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
   int lResult = readlinkat(lIt->second.mHostFD, lPath, lBuf, buf_len);
   if (lResult < 0)
@@ -1435,7 +1435,7 @@ __wasi_errno_t path_readlink(void *ctx, __wasi_fd_t fd, const charptr_w path, si
   *lBufUsed = lResult;
   TRACE_WASI_OUT(bufused, *lBufUsed);
   TRACE_WASI_OUT(buf, lBuf);
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t path_remove_directory(void *ctx, __wasi_fd_t fd, const charptr_w path, size_w path_len) {
@@ -1445,9 +1445,9 @@ __wasi_errno_t path_remove_directory(void *ctx, __wasi_fd_t fd, const charptr_w 
   auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
 
   if (path_len == 0)
-    TRACE_WASI_RETURN(__WASI_EINVAL);
+    TRACE_WASI_RETURN(__WASI_ERRNO_INVAL);
   if ((path + path_len) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lPath = (char*)(lWasmCtx->mem()->data() + path);
 
@@ -1455,11 +1455,11 @@ __wasi_errno_t path_remove_directory(void *ctx, __wasi_fd_t fd, const charptr_w 
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
   if (unlinkat(lIt->second.mHostFD, lPath, AT_REMOVEDIR))
     TRACE_WASI_RETURN(errno_translate());
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t path_rename(void *ctx, __wasi_fd_t old_fd, const charptr_w old_path, size_w old_path_len, __wasi_fd_t new_fd, const charptr_w new_path, size_w new_path_len) {
@@ -1469,13 +1469,13 @@ __wasi_errno_t path_rename(void *ctx, __wasi_fd_t old_fd, const charptr_w old_pa
   auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
 
   if (old_path_len == 0)
-    TRACE_WASI_RETURN(__WASI_EINVAL);
+    TRACE_WASI_RETURN(__WASI_ERRNO_INVAL);
   if (new_path_len == 0)
-    TRACE_WASI_RETURN(__WASI_EINVAL);
+    TRACE_WASI_RETURN(__WASI_ERRNO_INVAL);
   if ((old_path + old_path_len) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
   if ((new_path + new_path_len) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lOldPath = (char*)(lWasmCtx->mem()->data() + old_path);
   auto *lNewPath = (char*)(lWasmCtx->mem()->data() + new_path);
@@ -1485,14 +1485,14 @@ __wasi_errno_t path_rename(void *ctx, __wasi_fd_t old_fd, const charptr_w old_pa
 
   auto lOld = lWasiCtx->mFiles.find(old_fd);
   if (lOld == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
   auto lNew = lWasiCtx->mFiles.find(new_fd);
   if (lNew == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
   if (renameat(lOld->second.mHostFD, lOldPath, lNew->second.mHostFD, lNewPath))
     TRACE_WASI_RETURN(errno_translate());
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t path_symlink(void *ctx, const charptr_w old_path, size_w old_path_len, __wasi_fd_t fd, const charptr_w new_path, size_w new_path_len) {
@@ -1502,13 +1502,13 @@ __wasi_errno_t path_symlink(void *ctx, const charptr_w old_path, size_w old_path
   auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
 
   if (new_path_len == 0)
-    TRACE_WASI_RETURN(__WASI_EINVAL);
+    TRACE_WASI_RETURN(__WASI_ERRNO_INVAL);
   if (old_path_len == 0)
-    TRACE_WASI_RETURN(__WASI_EINVAL);
+    TRACE_WASI_RETURN(__WASI_ERRNO_INVAL);
   if ((old_path + old_path_len) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
   if ((new_path + new_path_len) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lOldPath = (char*)(lWasmCtx->mem()->data() + old_path);
   auto *lNewPath = (char*)(lWasmCtx->mem()->data() + new_path);
@@ -1518,11 +1518,11 @@ __wasi_errno_t path_symlink(void *ctx, const charptr_w old_path, size_w old_path
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
   if (symlinkat(lOldPath, lIt->second.mHostFD, lNewPath))
     TRACE_WASI_RETURN(errno_translate());
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t path_unlink_file(void *ctx, __wasi_fd_t fd, const charptr_w path, size_w path_len) {
@@ -1532,9 +1532,9 @@ __wasi_errno_t path_unlink_file(void *ctx, __wasi_fd_t fd, const charptr_w path,
   auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
 
   if (path_len == 0)
-    TRACE_WASI_RETURN(__WASI_EINVAL);
+    TRACE_WASI_RETURN(__WASI_ERRNO_INVAL);
   if ((path + path_len) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lPath = (char*)(lWasmCtx->mem()->data() + path);
 
@@ -1542,16 +1542,16 @@ __wasi_errno_t path_unlink_file(void *ctx, __wasi_fd_t fd, const charptr_w path,
 
   auto lIt = lWasiCtx->mFiles.find(fd);
   if (lIt == lWasiCtx->mFiles.end())
-    TRACE_WASI_RETURN(__WASI_EBADF);
+    TRACE_WASI_RETURN(__WASI_ERRNO_BADF);
 
   if (unlinkat(lIt->second.mHostFD, lPath, 0))
     TRACE_WASI_RETURN(errno_translate());
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t poll_oneoff(void *ctx, const subscriptionptr_w in, eventptr_w out, size_w nsubscriptions, sizeptr_w nevents) {
   TRACE_WASI_CALLS(in, out, nsubscriptions, nevents);
-  TRACE_WASI_RETURN(__WASI_ENOTCAPABLE);
+  TRACE_WASI_RETURN(__WASI_ERRNO_NOTCAPABLE);
 }
 
 void proc_exit(void *ctx, __wasi_exitcode_t rval) {
@@ -1564,42 +1564,42 @@ __wasi_errno_t proc_raise(void *ctx, __wasi_signal_t sig) {
 
   int lCode;
   switch (sig) {
-    case __WASI_SIGHUP : lCode = SIGHUP; break;
-    case __WASI_SIGINT : lCode = SIGINT; break;
-    case __WASI_SIGQUIT : lCode = SIGQUIT; break;
-    case __WASI_SIGILL : lCode = SIGILL; break;
-    case __WASI_SIGTRAP : lCode = SIGTRAP; break;
-    case __WASI_SIGABRT : lCode = SIGABRT; break;
-    case __WASI_SIGBUS : lCode = SIGBUS; break;
-    case __WASI_SIGFPE : lCode = SIGFPE; break;
-    case __WASI_SIGKILL : lCode = SIGKILL; break;
-    case __WASI_SIGUSR1 : lCode = SIGUSR1; break;
-    case __WASI_SIGSEGV : lCode = SIGSEGV; break;
-    case __WASI_SIGUSR2 : lCode = SIGUSR2; break;
-    case __WASI_SIGPIPE : lCode = SIGPIPE; break;
-    case __WASI_SIGALRM : lCode = SIGALRM; break;
-    case __WASI_SIGTERM : lCode = SIGTERM; break;
-    case __WASI_SIGCHLD : lCode = SIGCHLD; break;
-    case __WASI_SIGCONT : lCode = SIGCONT; break;
-    case __WASI_SIGSTOP : lCode = SIGSTOP; break;
-    case __WASI_SIGTSTP : lCode = SIGTSTP; break;
-    case __WASI_SIGTTIN : lCode = SIGTTIN; break;
-    case __WASI_SIGTTOU : lCode = SIGTTOU; break;
-    case __WASI_SIGURG : lCode = SIGURG; break;
-    case __WASI_SIGXCPU : lCode = SIGXCPU; break;
-    case __WASI_SIGXFSZ : lCode = SIGXFSZ; break;
-    case __WASI_SIGVTALRM : lCode = SIGVTALRM; break;
-    case __WASI_SIGPROF : lCode = SIGPROF; break;
-    case __WASI_SIGWINCH : lCode = SIGWINCH; break;
-    case __WASI_SIGPOLL : lCode = SIGPOLL; break;
-    case __WASI_SIGPWR : lCode = SIGPWR; break;
-    case __WASI_SIGSYS : lCode = SIGSYS; break;
-    default: TRACE_WASI_RETURN(__WASI_EINVAL);
+    case __WASI_SIGNAL_HUP : lCode = SIGHUP; break;
+    case __WASI_SIGNAL_INT : lCode = SIGINT; break;
+    case __WASI_SIGNAL_QUIT : lCode = SIGQUIT; break;
+    case __WASI_SIGNAL_ILL : lCode = SIGILL; break;
+    case __WASI_SIGNAL_TRAP : lCode = SIGTRAP; break;
+    case __WASI_SIGNAL_ABRT : lCode = SIGABRT; break;
+    case __WASI_SIGNAL_BUS : lCode = SIGBUS; break;
+    case __WASI_SIGNAL_FPE : lCode = SIGFPE; break;
+    case __WASI_SIGNAL_KILL : lCode = SIGKILL; break;
+    case __WASI_SIGNAL_USR1 : lCode = SIGUSR1; break;
+    case __WASI_SIGNAL_SEGV : lCode = SIGSEGV; break;
+    case __WASI_SIGNAL_USR2 : lCode = SIGUSR2; break;
+    case __WASI_SIGNAL_PIPE : lCode = SIGPIPE; break;
+    case __WASI_SIGNAL_ALRM : lCode = SIGALRM; break;
+    case __WASI_SIGNAL_TERM : lCode = SIGTERM; break;
+    case __WASI_SIGNAL_CHLD : lCode = SIGCHLD; break;
+    case __WASI_SIGNAL_CONT : lCode = SIGCONT; break;
+    case __WASI_SIGNAL_STOP : lCode = SIGSTOP; break;
+    case __WASI_SIGNAL_TSTP : lCode = SIGTSTP; break;
+    case __WASI_SIGNAL_TTIN : lCode = SIGTTIN; break;
+    case __WASI_SIGNAL_TTOU : lCode = SIGTTOU; break;
+    case __WASI_SIGNAL_URG : lCode = SIGURG; break;
+    case __WASI_SIGNAL_XCPU : lCode = SIGXCPU; break;
+    case __WASI_SIGNAL_XFSZ : lCode = SIGXFSZ; break;
+    case __WASI_SIGNAL_VTALRM : lCode = SIGVTALRM; break;
+    case __WASI_SIGNAL_PROF : lCode = SIGPROF; break;
+    case __WASI_SIGNAL_WINCH : lCode = SIGWINCH; break;
+    case __WASI_SIGNAL_POLL : lCode = SIGPOLL; break;
+    case __WASI_SIGNAL_PWR : lCode = SIGPWR; break;
+    case __WASI_SIGNAL_SYS : lCode = SIGSYS; break;
+    default: TRACE_WASI_RETURN(__WASI_ERRNO_INVAL);
   }
 
   if (!raise(lCode))
-    TRACE_WASI_RETURN(__WASI_ENOTCAPABLE);
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+    TRACE_WASI_RETURN(__WASI_ERRNO_NOTCAPABLE);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t random_get(void *ctx, voiptr_w buf, size_w buf_len) {
@@ -1608,9 +1608,9 @@ __wasi_errno_t random_get(void *ctx, voiptr_w buf, size_w buf_len) {
   auto *lWasmCtx = static_cast<context*>(ctx);
 
   if (buf_len == 0)
-    TRACE_WASI_RETURN(__WASI_EINVAL);
+    TRACE_WASI_RETURN(__WASI_ERRNO_INVAL);
   if ((buf + buf_len) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_EFAULT);
+    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
 
   auto *lBuf = (char*)(lWasmCtx->mem()->data() + buf);
 
@@ -1618,34 +1618,34 @@ __wasi_errno_t random_get(void *ctx, voiptr_w buf, size_w buf_len) {
   if (lWritten < 0)
     TRACE_WASI_RETURN(errno_translate());
   if (lWritten != buf_len)
-    TRACE_WASI_RETURN(__WASI_EAGAIN);
+    TRACE_WASI_RETURN(__WASI_ERRNO_AGAIN);
 
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t sched_yield(void *ctx) {
   TRACE_WASI_CALLS("no inputs");
   if (::sched_yield())
     TRACE_WASI_RETURN(errno_translate());
-  TRACE_WASI_RETURN(__WASI_ESUCCESS);
+  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
 __wasi_errno_t sock_recv(void *ctx, __wasi_fd_t sock, const iovecptr_w ri_data, size_w ri_data_len, __wasi_riflags_t ri_flags, sizeptr_w ro_datalen, roflagsptr_w ro_flags) {
   TRACE_WASI_CALLS(sock, ri_data, ri_data_len, ri_flags, ro_datalen, ro_flags);
-  TRACE_WASI_RETURN(__WASI_ENOTCAPABLE);
+  TRACE_WASI_RETURN(__WASI_ERRNO_NOTCAPABLE);
 }
 
 __wasi_errno_t sock_send(void *ctx, __wasi_fd_t sock, const ciovecptr_w si_data, size_w si_data_len, __wasi_siflags_t si_flags, sizeptr_w so_datalen) {
   TRACE_WASI_CALLS(sock, si_data, si_data_len, si_flags, so_datalen);
-  TRACE_WASI_RETURN(__WASI_ENOTCAPABLE);
+  TRACE_WASI_RETURN(__WASI_ERRNO_NOTCAPABLE);
 }
 
 __wasi_errno_t sock_shutdown(void *ctx, __wasi_fd_t sock, __wasi_sdflags_t how) {
   TRACE_WASI_CALLS(sock, how);
-  TRACE_WASI_RETURN(__WASI_ENOTCAPABLE);
+  TRACE_WASI_RETURN(__WASI_ERRNO_NOTCAPABLE);
 }
 
-resolver_t make_unstable_resolver() {
+resolver_t make_resolver() {
   return [](context &pContext, std::string_view pFieldName) {
     const static std::unordered_map<std::string_view, resolve_result_t> sEnvMappings = {
       {"args_get", expose_func(&args_get)},
@@ -1674,7 +1674,7 @@ resolver_t make_unstable_resolver() {
       {"fd_seek", expose_func(&fd_seek)},
       {"fd_sync", expose_func(&fd_sync)},
       {"fd_tell", expose_func(&fd_tell)},
-      {"fd_write", expose_func(&fd_write)},
+      {"fd_write", expose_func(&fd_write_)},
       {"path_create_directory", expose_func(&path_create_directory)},
       {"path_filestat_get", expose_func(&path_filestat_get)},
       {"path_filestat_set_times", expose_func(&path_filestat_set_times)},
@@ -1697,7 +1697,7 @@ resolver_t make_unstable_resolver() {
 
     auto lFound = sEnvMappings.find(pFieldName);
     if (lFound == sEnvMappings.end())
-      throw std::runtime_error(std::string("unknown wasi unstable import: ") + std::string(pFieldName));
+      throw std::runtime_error(std::string("unknown wasi import: ") + std::string(pFieldName));
     return lFound->second;
   };
 }

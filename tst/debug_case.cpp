@@ -9,6 +9,8 @@
 using namespace wembed;
 using namespace std::literals::string_literals;
 
+#include "wembed/wasi_decls.hpp"
+
 TEST(debug, case){
   std::unordered_map<std::string_view, context*> declared, registered;
   auto lSpectestResolver = [](context&, std::string_view pFieldName) -> resolve_result_t {
