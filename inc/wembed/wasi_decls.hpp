@@ -1909,7 +1909,7 @@ static_assert(alignof(uint64_t) == 8, "non-wasi data layout");
  * Write to a file descriptor.
  * Note: This is similar to `writev` in POSIX.
  */
-  __wasi_errno_t fd_write(
+  __wasi_errno_t __wasi_fd_write(
       __wasi_fd_t fd,
 
       /**

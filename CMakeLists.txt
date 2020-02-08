@@ -27,7 +27,16 @@ include_directories(dep/try_signal)
 
 include_directories(inc)
 file(GLOB_RECURSE WEMBED_INC "inc/**.hpp")
-file(GLOB_RECURSE WEMBED_SRC "src/**.cpp")
+file(GLOB WEMBED_COMMON_SRC "src/*.cpp")
+
+if (WIN32)
+  file(GLOB WEMBED_W32_SRC "src/*win32.cpp")
+  set(WEMBED_SRC ${WEMBED_COMMON_SRC} ${WEMBED_W32_SRC})
+elseif(UNIX)
+  file(GLOB WEMBED_POSIX_SRC "src/sys/*posix.cpp")
+  set(WEMBED_SRC ${WEMBED_COMMON_SRC} ${WEMBED_POSIX_SRC})
+endif()
+message(STATUS "WEMBED_SRC: ${WEMBED_SRC}")
 
 add_library(wembed ${WEMBED_INC} ${WEMBED_SRC})
 target_link_libraries(wembed ${LLVM_LIBS})

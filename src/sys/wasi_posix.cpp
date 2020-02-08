@@ -13,226 +13,9 @@
 
 #include <random>
 
-#ifdef WEMBED_TRACE_WASI_CALLS
-#include <iostream>
-#include <string_view>
-#endif
-
 namespace wembed::wasi {
 
-#ifdef WEMBED_TRACE_WASI_CALLS
-
-std::ostream & operator<<(std::ostream &os, const __wasi_fdstat_t &pStat) {
-  return os << "fdstat_t{" << (int)pStat.fs_filetype << ", " << pStat.fs_flags
-     << ", " << pStat.fs_rights_base << ", " << pStat.fs_rights_inheriting
-     << "}";
-}
-std::ostream & operator<<(std::ostream &os, const __wasi_filestat_t &pStat) {
-  return os << "filestat_t{" << pStat.dev << ", " << pStat.ino
-     << ", " << (int)pStat.filetype << ", " << pStat.nlink
-     << ", " << pStat.size << ", " << pStat.atim
-     << ", " << pStat.mtim << ", " << pStat.ctim
-     << "}";
-}
-std::ostream & operator<<(std::ostream &os, const __wasi_prestat_t &pStat) {
-  os << "prestat_t{" << (int)pStat.pr_type << ", ";
-  switch (pStat.pr_type) {
-    case __WASI_PREOPENTYPE_DIR: {
-      os << pStat.u.dir.pr_name_len;
-    }
-  }
-  return os << "}";
-}
-
-template <typename T>
-void wasi_trace_args(std::string_view pName, const T &pValue)
-{
-  std::cout << pName << " = " << pValue;
-}
-template <typename T, typename... TRest>
-void wasi_trace_args(std::string_view pNames, const T &pArg1, const TRest &...pArgs)
-{
-  auto lComma = pNames.find(',', 1);
-  auto lArg1Name = pNames.substr(0, lComma);
-  std::cout << lArg1Name << " = " << pArg1 << ", ";
-  auto lRestNames = pNames.substr(lComma + 2);
-  wasi_trace_args(lRestNames, pArgs...);
-}
-#define TRACE_WASI_CALLS(...) { std::cout << "[wasi] " << __FUNCTION__ << " ("; wasi_trace_args(#__VA_ARGS__, __VA_ARGS__); std::cout << ")" << std::endl; }
-
-template<typename T>
-void wasi_trace_write(const char *pName, const T &pValue) {
-  std::cout << "[wasi] \tout: " << pName << " => " << pValue << std::endl;
-}
-#define TRACE_WASI_OUT(out, val) { wasi_trace_write(#out, val); }
-
-void wasi_trace_read(const char *pName, std::string_view pStr) {
-  std::cout << "[wasi] \tin: " << pName << " => \"" << pStr << "\"" << std::endl;
-}
-#define TRACE_WASI_IN_STR(in, len) { wasi_trace_read(#in, std::string_view{in, (uint)len}); }
-
-std::string_view wasi_errno_str(wembed::wasi::__wasi_errno_t pCode) {
-  using namespace std::literals;
-  switch(pCode) {
-    case __WASI_ERRNO_SUCCESS: return "SUCCESS"sv;
-    case __WASI_ERRNO_2BIG: return "E2BIG"sv;
-    case __WASI_ERRNO_ACCES: return "EACCES"sv;
-    case __WASI_ERRNO_ADDRINUSE: return "EADDRINUSE"sv;
-    case __WASI_ERRNO_ADDRNOTAVAIL: return "EADDRNOTAVAIL"sv;
-    case __WASI_ERRNO_AFNOSUPPORT: return "EAFNOSUPPORT"sv;
-    case __WASI_ERRNO_AGAIN: return "EAGAIN"sv;
-    case __WASI_ERRNO_ALREADY: return "EALREADY"sv;
-    case __WASI_ERRNO_BADF: return "EBADF"sv;
-    case __WASI_ERRNO_BADMSG: return "EBADMSG"sv;
-    case __WASI_ERRNO_BUSY: return "EBUSY"sv;
-    case __WASI_ERRNO_CANCELED: return "ECANCELED"sv;
-    case __WASI_ERRNO_CHILD: return "ECHILD"sv;
-    case __WASI_ERRNO_CONNABORTED: return "ECONNABORTED"sv;
-    case __WASI_ERRNO_CONNREFUSED: return "ECONNREFUSED"sv;
-    case __WASI_ERRNO_CONNRESET: return "ECONNRESET"sv;
-    case __WASI_ERRNO_DEADLK: return "EDEADLK"sv;
-    case __WASI_ERRNO_DESTADDRREQ: return "EDESTADDRREQ"sv;
-    case __WASI_ERRNO_DOM: return "EDOM"sv;
-    case __WASI_ERRNO_DQUOT: return "EDQUOT"sv;
-    case __WASI_ERRNO_EXIST: return "EEXIST"sv;
-    case __WASI_ERRNO_FAULT: return "EFAULT"sv;
-    case __WASI_ERRNO_FBIG: return "EFBIG"sv;
-    case __WASI_ERRNO_HOSTUNREACH: return "EHOSTUNREACH"sv;
-    case __WASI_ERRNO_IDRM: return "EIDRM"sv;
-    case __WASI_ERRNO_ILSEQ: return "EILSEQ"sv;
-    case __WASI_ERRNO_INPROGRESS: return "EINPROGRESS"sv;
-    case __WASI_ERRNO_INTR: return "EINTR"sv;
-    case __WASI_ERRNO_INVAL: return "EINVAL"sv;
-    case __WASI_ERRNO_IO: return "EIO"sv;
-    case __WASI_ERRNO_ISCONN: return "EISCONN"sv;
-    case __WASI_ERRNO_ISDIR: return "EISDIR"sv;
-    case __WASI_ERRNO_LOOP: return "ELOOP"sv;
-    case __WASI_ERRNO_MFILE: return "EMFILE"sv;
-    case __WASI_ERRNO_MLINK: return "EMLINK"sv;
-    case __WASI_ERRNO_MSGSIZE: return "EMSGSIZE"sv;
-    case __WASI_ERRNO_MULTIHOP: return "EMULTIHOP"sv;
-    case __WASI_ERRNO_NAMETOOLONG: return "ENAMETOOLONG"sv;
-    case __WASI_ERRNO_NETDOWN: return "ENETDOWN"sv;
-    case __WASI_ERRNO_NETRESET: return "ENETRESET"sv;
-    case __WASI_ERRNO_NETUNREACH: return "ENETUNREACH"sv;
-    case __WASI_ERRNO_NFILE: return "ENFILE"sv;
-    case __WASI_ERRNO_NOBUFS: return "ENOBUFS"sv;
-    case __WASI_ERRNO_NODEV: return "ENODEV"sv;
-    case __WASI_ERRNO_NOENT: return "ENOENT"sv;
-    case __WASI_ERRNO_NOEXEC: return "ENOEXEC"sv;
-    case __WASI_ERRNO_NOLCK: return "ENOLCK"sv;
-    case __WASI_ERRNO_NOLINK: return "ENOLINK"sv;
-    case __WASI_ERRNO_NOMEM: return "ENOMEM"sv;
-    case __WASI_ERRNO_NOMSG: return "ENOMSG"sv;
-    case __WASI_ERRNO_NOPROTOOPT: return "ENOPROTOOPT"sv;
-    case __WASI_ERRNO_NOSPC: return "ENOSPC"sv;
-    case __WASI_ERRNO_NOSYS: return "ENOSYS"sv;
-    case __WASI_ERRNO_NOTCONN: return "ENOTCONN"sv;
-    case __WASI_ERRNO_NOTDIR: return "ENOTDIR"sv;
-    case __WASI_ERRNO_NOTEMPTY: return "ENOTEMPTY"sv;
-    case __WASI_ERRNO_NOTRECOVERABLE: return "ENOTRECOVERABLE"sv;
-    case __WASI_ERRNO_NOTSOCK: return "ENOTSOCK"sv;
-    case __WASI_ERRNO_NOTSUP: return "ENOTSUP"sv;
-    case __WASI_ERRNO_NOTTY: return "ENOTTY"sv;
-    case __WASI_ERRNO_NXIO: return "ENXIO"sv;
-    case __WASI_ERRNO_OVERFLOW: return "EOVERFLOW"sv;
-    case __WASI_ERRNO_OWNERDEAD: return "EOWNERDEAD"sv;
-    case __WASI_ERRNO_PERM: return "EPERM"sv;
-    case __WASI_ERRNO_PIPE: return "EPIPE"sv;
-    case __WASI_ERRNO_PROTO: return "EPROTO"sv;
-    case __WASI_ERRNO_PROTONOSUPPORT: return "EPROTONOSUPPORT"sv;
-    case __WASI_ERRNO_PROTOTYPE: return "EPROTOTYPE"sv;
-    case __WASI_ERRNO_RANGE: return "ERANGE"sv;
-    case __WASI_ERRNO_ROFS: return "EROFS"sv;
-    case __WASI_ERRNO_SPIPE: return "ESPIPE"sv;
-    case __WASI_ERRNO_SRCH: return "ESRCH"sv;
-    case __WASI_ERRNO_STALE: return "ESTALE"sv;
-    case __WASI_ERRNO_TIMEDOUT: return "ETIMEDOUT"sv;
-    case __WASI_ERRNO_TXTBSY: return "ETXTBSY"sv;
-    case __WASI_ERRNO_XDEV: return "EXDEV"sv;
-    case __WASI_ERRNO_NOTCAPABLE: return "ENOTCAPABLE"sv;
-    default: return "<invalid>"sv;
-  }
-}
-#define TRACE_WASI_RETURN(expr) { __wasi_errno_t value = expr; if (value) { std::cout << "[wasi] \tres: " << wasi_errno_str(value) << std::endl; } return value; }
-#else
-#define TRACE_WASI_CALLS(...)
-#define TRACE_WASI_IN_STR(in, len)
-#define TRACE_WASI_OUT(out, val)
-#define TRACE_WASI_RETURN(value) return value
-#endif
-
-wasi_context::wasi_context(std::filesystem::path pRoot) : mRoot(std::move(pRoot)) {
-  // Operations that apply to regular files.
-  #define REGULAR_FILE_RIGHTS                                                                        \
-    (__WASI_RIGHTS_FD_DATASYNC | __WASI_RIGHTS_FD_READ | __WASI_RIGHTS_FD_SEEK                        \
-     | __WASI_RIGHTS_FD_FDSTAT_SET_FLAGS | __WASI_RIGHTS_FD_SYNC | __WASI_RIGHTS_FD_TELL              \
-     | __WASI_RIGHTS_FD_WRITE | __WASI_RIGHTS_FD_ADVISE | __WASI_RIGHTS_FD_ALLOCATE                   \
-     | __WASI_RIGHTS_FD_FILESTAT_GET | __WASI_RIGHTS_FD_FILESTAT_SET_SIZE                            \
-     | __WASI_RIGHTS_FD_FILESTAT_SET_TIMES | __WASI_RIGHTS_POLL_FD_READWRITE)
-
-  // Only allow directory operations on directories.
-  #define DIRECTORY_RIGHTS                                                                           \
-    (__WASI_RIGHTS_FD_FDSTAT_SET_FLAGS | __WASI_RIGHTS_FD_SYNC | __WASI_RIGHTS_FD_ADVISE              \
-     | __WASI_RIGHTS_PATH_CREATE_DIRECTORY | __WASI_RIGHTS_PATH_CREATE_FILE                          \
-     | __WASI_RIGHTS_PATH_LINK_SOURCE | __WASI_RIGHTS_PATH_LINK_TARGET | __WASI_RIGHTS_PATH_OPEN      \
-     | __WASI_RIGHTS_FD_READDIR | __WASI_RIGHTS_PATH_READLINK | __WASI_RIGHTS_PATH_RENAME_SOURCE      \
-     | __WASI_RIGHTS_PATH_RENAME_TARGET | __WASI_RIGHTS_PATH_FILESTAT_GET                            \
-     | __WASI_RIGHTS_PATH_FILESTAT_SET_SIZE | __WASI_RIGHTS_PATH_FILESTAT_SET_TIMES                  \
-     | __WASI_RIGHTS_FD_FILESTAT_GET | __WASI_RIGHTS_FD_FILESTAT_SET_TIMES                           \
-     | __WASI_RIGHTS_PATH_SYMLINK | __WASI_RIGHTS_PATH_UNLINK_FILE                                   \
-     | __WASI_RIGHTS_PATH_REMOVE_DIRECTORY | __WASI_RIGHTS_POLL_FD_READWRITE)
-  // Only allow directory or file operations to be derived from directories.
-  #define INHERITING_DIRECTORY_RIGHTS (DIRECTORY_RIGHTS | REGULAR_FILE_RIGHTS)
-
-  int lHostRootFD = open(mRoot.c_str(), O_PATH);
-  add_preopen(3, {lHostRootFD, ".", DIRECTORY_RIGHTS, INHERITING_DIRECTORY_RIGHTS});
-}
-
-void wasi_context::add_arg(std::string_view pArg) {
-  auto lOffset = mArgs.mBuffer.size();
-  auto lArgLen = pArg.size();
-  mArgs.mElements.emplace_back(lOffset);
-  mArgs.mBuffer.resize(lOffset + lArgLen + 1);
-  memcpy(mArgs.mBuffer.data() + lOffset, pArg.data(), lArgLen);
-}
-
-void wasi_context::add_args(int pArgc, const char **pArgv) {
-  for (int lArg = 0; lArg < pArgc; lArg++) {
-    add_arg(pArgv[lArg]);
-  }
-}
-
-void wasi_context::add_env(std::string_view pEnv) {
-  auto lOffset = mEnv.mBuffer.size();
-  auto lEnvLen = pEnv.size();
-  mEnv.mElements.emplace_back(lOffset);
-  mEnv.mBuffer.resize(lOffset + lEnvLen + 1);
-  memcpy(mEnv.mBuffer.data() + lOffset, pEnv.data(), lEnvLen);
-}
-
-void wasi_context::add_env_host() {
-  for (char **env = environ; *env != nullptr; env++) {
-    add_env(*env);
-  }
-}
-
-void wasi_context::add_preopen(__wasi_fd_t pFD, file pFile) {
-  mFiles.emplace(pFD, std::move(pFile));
-  mPreopens.emplace(pFD);
-}
-
-void wasi_context::add_preopen_host() {
-  __wasi_rights_t lStdioRights = __WASI_RIGHTS_FD_READ | __WASI_RIGHTS_FD_FDSTAT_SET_FLAGS
-                               | __WASI_RIGHTS_FD_WRITE | __WASI_RIGHTS_FD_FILESTAT_GET
-                               | __WASI_RIGHTS_POLL_FD_READWRITE;
-
-  mFiles.emplace(0, file{STDIN_FILENO,  "__wembed_stdin", lStdioRights, lStdioRights});
-  mFiles.emplace(1, file{STDOUT_FILENO,  "__wembed_stdout", lStdioRights, lStdioRights});
-  mFiles.emplace(2, file{STDERR_FILENO,  "__wembed_stderr", lStdioRights, lStdioRights});
-}
-
-__wasi_errno_t errno_translate(int error = errno) {
+__wasi_errno_t errno_translate(int error) {
   switch(error) {
     case E2BIG: return __WASI_ERRNO_2BIG;
     case EACCES: return __WASI_ERRNO_ACCES;
@@ -313,50 +96,48 @@ __wasi_errno_t errno_translate(int error = errno) {
   }
 }
 
-__wasi_errno_t args_get(void *ctx, charptrptr_w argv, charptr_w argv_buf) {
-  TRACE_WASI_CALLS(argv, argv_buf);
+wasi_context::wasi_context(std::filesystem::path pRoot) : mRoot(std::move(pRoot)) {
+  // Operations that apply to regular files.
+  #define REGULAR_FILE_RIGHTS                                                                        \
+    (__WASI_RIGHTS_FD_DATASYNC | __WASI_RIGHTS_FD_READ | __WASI_RIGHTS_FD_SEEK                       \
+     | __WASI_RIGHTS_FD_FDSTAT_SET_FLAGS | __WASI_RIGHTS_FD_SYNC | __WASI_RIGHTS_FD_TELL             \
+     | __WASI_RIGHTS_FD_WRITE | __WASI_RIGHTS_FD_ADVISE | __WASI_RIGHTS_FD_ALLOCATE                  \
+     | __WASI_RIGHTS_FD_FILESTAT_GET | __WASI_RIGHTS_FD_FILESTAT_SET_SIZE                            \
+     | __WASI_RIGHTS_FD_FILESTAT_SET_TIMES | __WASI_RIGHTS_POLL_FD_READWRITE)
 
-  auto *lWasmCtx = static_cast<context*>(ctx);
-  auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
+  // Only allow directory operations on directories.
+  #define DIRECTORY_RIGHTS                                                                           \
+    (__WASI_RIGHTS_FD_FDSTAT_SET_FLAGS | __WASI_RIGHTS_FD_SYNC | __WASI_RIGHTS_FD_ADVISE             \
+     | __WASI_RIGHTS_PATH_CREATE_DIRECTORY | __WASI_RIGHTS_PATH_CREATE_FILE                          \
+     | __WASI_RIGHTS_PATH_LINK_SOURCE | __WASI_RIGHTS_PATH_LINK_TARGET | __WASI_RIGHTS_PATH_OPEN     \
+     | __WASI_RIGHTS_FD_READDIR | __WASI_RIGHTS_PATH_READLINK | __WASI_RIGHTS_PATH_RENAME_SOURCE     \
+     | __WASI_RIGHTS_PATH_RENAME_TARGET | __WASI_RIGHTS_PATH_FILESTAT_GET                            \
+     | __WASI_RIGHTS_PATH_FILESTAT_SET_SIZE | __WASI_RIGHTS_PATH_FILESTAT_SET_TIMES                  \
+     | __WASI_RIGHTS_FD_FILESTAT_GET | __WASI_RIGHTS_FD_FILESTAT_SET_TIMES                           \
+     | __WASI_RIGHTS_PATH_SYMLINK | __WASI_RIGHTS_PATH_UNLINK_FILE                                   \
+     | __WASI_RIGHTS_PATH_REMOVE_DIRECTORY | __WASI_RIGHTS_POLL_FD_READWRITE)
 
-  if ((lWasiCtx->mArgs.mElements.size() * sizeof(charptr_w) + argv) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
-  if ((lWasiCtx->mArgs.mBuffer.size() + argv_buf) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
+  // Only allow directory or file operations to be derived from directories.
+  #define INHERITING_DIRECTORY_RIGHTS (DIRECTORY_RIGHTS | REGULAR_FILE_RIGHTS)
 
-  auto *lArgv = (charptr_w*)(lWasmCtx->mem()->data() + argv);
-  auto *lBuff = (char*)(lWasmCtx->mem()->data() + argv_buf);
-
-  memcpy(lBuff, lWasiCtx->mArgs.mBuffer.data(), lWasiCtx->mArgs.mBuffer.size());
-
-  auto lCount = lWasiCtx->mArgs.mElements.size();
-  for (size_t i = 0; i < lCount; i++) {
-    lArgv[i] = argv_buf + lWasiCtx->mArgs.mElements[i];
-  }
-
-  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
+  int lHostRootFD = open(mRoot.c_str(), O_PATH);
+  add_preopen(3, {lHostRootFD, ".", DIRECTORY_RIGHTS, INHERITING_DIRECTORY_RIGHTS});
 }
 
-__wasi_errno_t args_sizes_get(void *ctx, sizeptr_w argc, sizeptr_w argv_buf_size) {
-  TRACE_WASI_CALLS(argc, argv_buf_size);
+void wasi_context::add_env_host() {
+  for (char **env = environ; *env != nullptr; env++) {
+    add_env(*env);
+  }
+}
 
-  auto *lWasmCtx = static_cast<context*>(ctx);
-  auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
+void wasi_context::add_preopen_host() {
+  __wasi_rights_t lStdioRights = __WASI_RIGHTS_FD_READ | __WASI_RIGHTS_FD_FDSTAT_SET_FLAGS
+                                 | __WASI_RIGHTS_FD_WRITE | __WASI_RIGHTS_FD_FILESTAT_GET
+                                 | __WASI_RIGHTS_POLL_FD_READWRITE;
 
-  if ((sizeof(size_w) + argc) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
-  if ((sizeof(size_w) + argv_buf_size) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
-
-  auto *lCount = (size_w*)(lWasmCtx->mem()->data() + argc);
-  auto *lBufSize = (size_w*)(lWasmCtx->mem()->data() + argv_buf_size);
-
-  *lCount = lWasiCtx->mArgs.mElements.size();
-  TRACE_WASI_OUT(argc, *lCount);
-  *lBufSize = lWasiCtx->mArgs.mBuffer.size();
-  TRACE_WASI_OUT(argv_buf_size, *lBufSize);
-
-  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
+  mFiles.emplace(0, file{STDIN_FILENO,  "__wembed_stdin", lStdioRights, lStdioRights});
+  mFiles.emplace(1, file{STDOUT_FILENO,  "__wembed_stdout", lStdioRights, lStdioRights});
+  mFiles.emplace(2, file{STDERR_FILENO,  "__wembed_stderr", lStdioRights, lStdioRights});
 }
 
 __wasi_errno_t clock_res_get(void *ctx, __wasi_clockid_t clock_id, timestampptr_w resolution) {
@@ -413,53 +194,6 @@ __wasi_errno_t clock_time_get(void *ctx, __wasi_clockid_t clock_id, __wasi_times
     TRACE_WASI_RETURN(errno_translate());
   *lOut = lHostOut.tv_nsec + lHostOut.tv_sec * 1'000'000'000;
   TRACE_WASI_OUT(time, *lOut);
-
-  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
-}
-
-__wasi_errno_t environ_get(void *ctx, charptrptr_w environ, charptr_w environ_buf) {
-  TRACE_WASI_CALLS(environ, environ_buf);
-
-  auto *lWasmCtx = static_cast<context*>(ctx);
-  auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
-
-  if ((lWasiCtx->mEnv.mElements.size() * sizeof(charptr_w) + environ) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
-  if ((lWasiCtx->mEnv.mBuffer.size() + environ_buf) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
-
-  auto *lEnv = (charptr_w*)(lWasmCtx->mem()->data() + environ);
-  auto *lEnvBuf = (char*)(lWasmCtx->mem()->data() + environ_buf);
-
-  memcpy(lEnvBuf, lWasiCtx->mEnv.mBuffer.data(), lWasiCtx->mEnv.mBuffer.size());
-
-  auto lCount = lWasiCtx->mEnv.mElements.size();
-  for (size_t i = 0; i < lCount; i++) {
-    lEnv[i] = environ_buf + lWasiCtx->mEnv.mElements[i];
-  }
-  lEnv[lCount] = 0;
-
-  TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
-}
-
-__wasi_errno_t environ_sizes_get(void *ctx, sizeptr_w environ_count, sizeptr_w environ_buf_size) {
-  TRACE_WASI_CALLS(environ_count, environ_buf_size);
-
-  auto *lWasmCtx = static_cast<context*>(ctx);
-  auto *lWasiCtx = static_cast<wasi_context*>(lWasmCtx->user());
-
-  if ((sizeof(size_w) + environ_count) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
-  if ((sizeof(size_w) + environ_buf_size) > lWasmCtx->mem()->byte_size())
-    TRACE_WASI_RETURN(__WASI_ERRNO_FAULT);
-
-  auto *lCount = (size_w*)(lWasmCtx->mem()->data() + environ_count);
-  auto *lBufSize = (size_w*)(lWasmCtx->mem()->data() + environ_buf_size);
-
-  *lCount = lWasiCtx->mEnv.mElements.size();
-  TRACE_WASI_OUT(environ_count, *lCount);
-  *lBufSize = lWasiCtx->mEnv.mBuffer.size();
-  TRACE_WASI_OUT(environ_buf_size, *lBufSize);
 
   TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
@@ -1112,7 +846,7 @@ __wasi_errno_t fd_tell(void *ctx, __wasi_fd_t fd, filesizeptr_w newoffset) {
   TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
-__wasi_errno_t fd_write_(void *ctx, __wasi_fd_t fd, const ciovecptr_w iovs, size_w iovs_len, sizeptr_w nwritten) {
+__wasi_errno_t fd_write(void *ctx, __wasi_fd_t fd, const ciovecptr_w iovs, size_w iovs_len, sizeptr_w nwritten) {
   TRACE_WASI_CALLS(fd, iovs, iovs_len, nwritten);
 
   auto *lWasmCtx = static_cast<context*>(ctx);
@@ -1397,7 +1131,7 @@ __wasi_errno_t path_open(void *ctx, __wasi_fd_t dirfd, __wasi_lookupflags_t dirf
   *lFD = lNewFD;
   TRACE_WASI_OUT(fd, *lFD);
 
-  lWasiCtx->mFiles.emplace(lNewFD, file{lResult, lDir->second.mPath / lPath, fs_rights_base, fs_rights_inheriting});
+  lWasiCtx->mFiles.emplace(lNewFD, wasi_context::file{lResult, lDir->second.mPath / lPath, fs_rights_base, fs_rights_inheriting});
 
   TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
@@ -1549,16 +1283,6 @@ __wasi_errno_t path_unlink_file(void *ctx, __wasi_fd_t fd, const charptr_w path,
   TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
 }
 
-__wasi_errno_t poll_oneoff(void *ctx, const subscriptionptr_w in, eventptr_w out, size_w nsubscriptions, sizeptr_w nevents) {
-  TRACE_WASI_CALLS(in, out, nsubscriptions, nevents);
-  TRACE_WASI_RETURN(__WASI_ERRNO_NOTCAPABLE);
-}
-
-void proc_exit(void *ctx, __wasi_exitcode_t rval) {
-  TRACE_WASI_CALLS(rval);
-  throw proc_exit_exception(rval);
-}
-
 __wasi_errno_t proc_raise(void *ctx, __wasi_signal_t sig) {
   TRACE_WASI_CALLS(sig);
 
@@ -1628,78 +1352,6 @@ __wasi_errno_t sched_yield(void *ctx) {
   if (::sched_yield())
     TRACE_WASI_RETURN(errno_translate());
   TRACE_WASI_RETURN(__WASI_ERRNO_SUCCESS);
-}
-
-__wasi_errno_t sock_recv(void *ctx, __wasi_fd_t sock, const iovecptr_w ri_data, size_w ri_data_len, __wasi_riflags_t ri_flags, sizeptr_w ro_datalen, roflagsptr_w ro_flags) {
-  TRACE_WASI_CALLS(sock, ri_data, ri_data_len, ri_flags, ro_datalen, ro_flags);
-  TRACE_WASI_RETURN(__WASI_ERRNO_NOTCAPABLE);
-}
-
-__wasi_errno_t sock_send(void *ctx, __wasi_fd_t sock, const ciovecptr_w si_data, size_w si_data_len, __wasi_siflags_t si_flags, sizeptr_w so_datalen) {
-  TRACE_WASI_CALLS(sock, si_data, si_data_len, si_flags, so_datalen);
-  TRACE_WASI_RETURN(__WASI_ERRNO_NOTCAPABLE);
-}
-
-__wasi_errno_t sock_shutdown(void *ctx, __wasi_fd_t sock, __wasi_sdflags_t how) {
-  TRACE_WASI_CALLS(sock, how);
-  TRACE_WASI_RETURN(__WASI_ERRNO_NOTCAPABLE);
-}
-
-resolver_t make_resolver() {
-  return [](context &pContext, std::string_view pFieldName) {
-    const static std::unordered_map<std::string_view, resolve_result_t> sEnvMappings = {
-      {"args_get", expose_func(&args_get)},
-      {"args_sizes_get", expose_func(&args_sizes_get)},
-      {"clock_res_get", expose_func(&clock_res_get)},
-      {"clock_time_get", expose_func(&clock_time_get)},
-      {"environ_get", expose_func(&environ_get)},
-      {"environ_sizes_get", expose_func(&environ_sizes_get)},
-      {"fd_advise", expose_func(&fd_advise)},
-      {"fd_allocate", expose_func(&fd_allocate)},
-      {"fd_close", expose_func(&fd_close)},
-      {"fd_datasync", expose_func(&fd_datasync)},
-      {"fd_fdstat_get", expose_func(&fd_fdstat_get)},
-      {"fd_fdstat_set_flags", expose_func(&fd_fdstat_set_flags)},
-      {"fd_fdstat_set_rights", expose_func(&fd_fdstat_set_rights)},
-      {"fd_filestat_get", expose_func(&fd_filestat_get)},
-      {"fd_filestat_set_size", expose_func(&fd_filestat_set_size)},
-      {"fd_filestat_set_times", expose_func(&fd_filestat_set_times)},
-      {"fd_pread", expose_func(&fd_pread)},
-      {"fd_prestat_get", expose_func(&fd_prestat_get)},
-      {"fd_prestat_dir_name", expose_func(&fd_prestat_dir_name)},
-      {"fd_pwrite", expose_func(&fd_pwrite)},
-      {"fd_read", expose_func(&fd_read)},
-      {"fd_readdir", expose_func(&fd_readdir)},
-      {"fd_renumber", expose_func(&fd_renumber)},
-      {"fd_seek", expose_func(&fd_seek)},
-      {"fd_sync", expose_func(&fd_sync)},
-      {"fd_tell", expose_func(&fd_tell)},
-      {"fd_write", expose_func(&fd_write_)},
-      {"path_create_directory", expose_func(&path_create_directory)},
-      {"path_filestat_get", expose_func(&path_filestat_get)},
-      {"path_filestat_set_times", expose_func(&path_filestat_set_times)},
-      {"path_link", expose_func(&path_link)},
-      {"path_open", expose_func(&path_open)},
-      {"path_readlink", expose_func(&path_readlink)},
-      {"path_remove_directory", expose_func(&path_remove_directory)},
-      {"path_rename", expose_func(&path_rename)},
-      {"path_symlink", expose_func(&path_symlink)},
-      {"path_unlink_file", expose_func(&path_unlink_file)},
-      {"poll_oneoff", expose_func(&poll_oneoff)},
-      {"proc_exit", expose_func(&proc_exit)},
-      {"proc_raise", expose_func(&proc_raise)},
-      {"random_get", expose_func(&random_get)},
-      {"sched_yield", expose_func(&sched_yield)},
-      {"sock_recv", expose_func(&sock_recv)},
-      {"sock_send", expose_func(&sock_send)},
-      {"sock_shutdown", expose_func(&sock_shutdown)},
-    };
-
-    auto lFound = sEnvMappings.find(pFieldName);
-    if (lFound == sEnvMappings.end())
-      throw std::runtime_error(std::string("unknown wasi import: ") + std::string(pFieldName));
-    return lFound->second;
-  };
 }
 
 }  // namespace wembed::wasi
